@@ -1,4 +1,4 @@
-import {ref, computed} from 'vue';
+import {ref, computed, toRaw} from 'vue';
 import type {PipelineDefinition, PipelineNode, PipelineEdge} from '@lorca/core';
 import {newId} from '../utils/id.js';
 import {resolveOutputRef} from '@lorca/pipeline';
@@ -42,7 +42,7 @@ function defaultNode(type: PipelineNode['type']): PipelineNode {
 }
 
 export function usePipelineEditor(initialDef: PipelineDefinition) {
-  const def = ref<PipelineDefinition>(structuredClone(initialDef));
+  const def = ref<PipelineDefinition>(structuredClone(toRaw(initialDef)));
 
   const finalArtifactKey = computed(() =>
     resolveOutputRef(def.value.outputRef, def.value.nodes),
