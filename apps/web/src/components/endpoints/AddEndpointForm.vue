@@ -1,16 +1,16 @@
 <template>
   <form class="add-ep-form" @submit.prevent="submit">
     <div class="form-row">
-      <label>Name</label>
-      <input v-model="form.name" placeholder="Local Ollama" required />
+      <FieldLabel label="Name" required title="Friendly label for this endpoint in Lorca" />
+      <input v-model="form.name" placeholder="Local Ollama" required title="Friendly label for this endpoint in Lorca" />
     </div>
     <div class="form-row">
-      <label>Base URL</label>
-      <input v-model="form.baseUrl" placeholder="http://localhost:11434" required />
+      <FieldLabel label="Base URL" required title="Root URL of the AI server (e.g. Ollama at localhost:11434)" />
+      <input v-model="form.baseUrl" placeholder="http://localhost:11434" required title="Root URL of the AI server (e.g. Ollama at localhost:11434)" />
     </div>
     <div class="form-row">
-      <label>Type</label>
-      <select v-model="form.kind">
+      <FieldLabel label="Type" title="Adapter used to talk to this server" />
+      <select v-model="form.kind" title="Adapter used to talk to this server">
         <option value="ollama">Ollama</option>
         <option value="openai-compatible">OpenAI-compatible</option>
         <option value="lmstudio">LM Studio</option>
@@ -18,16 +18,16 @@
       </select>
     </div>
     <div class="form-row">
-      <label>Auth</label>
-      <select v-model="form.authKind">
+      <FieldLabel label="Auth" title="Authentication method for API requests" />
+      <select v-model="form.authKind" title="Authentication method for API requests">
         <option value="none">None</option>
         <option value="bearer-token">Bearer token</option>
         <option value="api-key">API key</option>
       </select>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn" @click="$emit('cancel')">Cancel</button>
-      <button type="submit" class="btn btn-primary">Add endpoint</button>
+      <button type="button" class="btn" title="Discard and close the form" @click="$emit('cancel')">Cancel</button>
+      <button type="submit" class="btn btn-primary" title="Save this endpoint configuration">Add endpoint</button>
     </div>
   </form>
 </template>
@@ -36,6 +36,7 @@
 import {reactive} from 'vue';
 import type {AiEndpointConfig} from '@lorca/core';
 import {newId} from '../../utils/id.js';
+import FieldLabel from '../common/FieldLabel.vue';
 
 const emit = defineEmits<{ add: [config: AiEndpointConfig]; cancel: [] }>();
 
@@ -70,7 +71,6 @@ function submit() {
 <style scoped>
 .add-ep-form { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; }
 .form-row { display: flex; flex-direction: column; gap: 0.2rem; }
-.form-row label { font-size: 0.75rem; color: #888; }
 .form-row input, .form-row select {
   background: #111;
   border: 1px solid #333;

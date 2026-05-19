@@ -3,10 +3,12 @@ import {testBrowserAccess, listModels} from '@lorca/endpoints';
 import type {AiEndpointConfig} from '@lorca/core';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
+import {useUiStore} from '../stores/ui.js';
 
 export function useEndpointActions() {
   const endpointsStore = useEndpointsStore();
   const modelsStore = useModelsStore();
+  const uiStore = useUiStore();
   const testing = ref<Set<string>>(new Set());
   const discovering = ref<Set<string>>(new Set());
 
@@ -31,6 +33,7 @@ export function useEndpointActions() {
       const result = await listModels(config);
       if (result.ok) {
         await modelsStore.setModelsForEndpoint(config.id, result.value);
+        uiStore.expandLeftPaneSection('models');
       }
       return result;
     } finally {

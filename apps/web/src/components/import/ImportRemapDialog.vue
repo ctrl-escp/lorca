@@ -3,7 +3,7 @@
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="import-title">
       <header class="dialog-header">
         <h2 id="import-title">Import {{ kindLabel }}</h2>
-        <button class="dialog-close" type="button" @click="emit('cancel')">×</button>
+        <button class="dialog-close" type="button" title="Close without importing" @click="emit('cancel')">×</button>
       </header>
 
       <div class="dialog-body">
@@ -19,7 +19,7 @@
             <span class="remap-title">{{ ref.label }}</span>
             <span class="remap-meta">{{ ref.endpointId }} / {{ ref.modelName }}</span>
           </div>
-          <select v-model="localRemaps[ref.key]">
+          <select v-model="localRemaps[ref.key]" :title="`Choose a local model to replace ${ref.modelName}`">
             <option value="">— select local model —</option>
             <option v-for="m in models" :key="m.id" :value="`${m.endpointId}::${m.providerModelName}`">
               {{ m.displayName }} ({{ endpointName(m.endpointId) }})
@@ -29,8 +29,8 @@
       </div>
 
       <footer class="dialog-footer">
-        <button class="btn btn-secondary" type="button" @click="emit('cancel')">Cancel</button>
-        <button class="btn btn-primary" type="button" :disabled="!canConfirm" @click="confirm">
+        <button class="btn btn-secondary" type="button" title="Close without importing" @click="emit('cancel')">Cancel</button>
+        <button class="btn btn-primary" type="button" :disabled="!canConfirm" title="Import with the selected model mappings" @click="confirm">
           Import
         </button>
       </footer>

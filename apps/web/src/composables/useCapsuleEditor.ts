@@ -64,11 +64,12 @@ export function useCapsuleEditor(initialDef: CapsuleDefinition) {
     }
   }
 
-  function addNode(type: PipelineNode['type']) {
-    if (type === 'capsule-instance') return; // Phase 9
+  function addNode(type: PipelineNode['type']): string | undefined {
+    if (type === 'capsule-instance') return undefined;
     const node = defaultNode(type);
     def.value = {...def.value, nodes: [...def.value.nodes, node]};
     sync();
+    return node.id;
   }
 
   function removeNode(nodeId: string) {

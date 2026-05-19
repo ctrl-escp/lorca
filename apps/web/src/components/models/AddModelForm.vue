@@ -1,26 +1,26 @@
 <template>
   <form class="add-model-form" @submit.prevent="submit">
     <div class="form-row">
-      <label>Model name (as shown by the endpoint)</label>
-      <input v-model="form.providerModelName" placeholder="llama3.2:3b" required />
+      <FieldLabel label="Model name (as shown by the endpoint)" required title="Exact model identifier returned by the endpoint API" />
+      <input v-model="form.providerModelName" placeholder="llama3.2:3b" required title="Exact model identifier returned by the endpoint API" />
     </div>
     <div class="form-row">
-      <label>Display name (optional)</label>
-      <input v-model="form.displayName" placeholder="Llama 3.2 3B" />
+      <FieldLabel label="Display name (optional)" title="Human-readable name shown in Lorca (defaults to model name)" />
+      <input v-model="form.displayName" placeholder="Llama 3.2 3B" title="Human-readable name shown in Lorca (defaults to model name)" />
     </div>
     <div class="form-row">
-      <label>Endpoint</label>
-      <select v-model="form.endpointId" required>
+      <FieldLabel label="Endpoint" required title="Which endpoint hosts this model" />
+      <select v-model="form.endpointId" required title="Which endpoint hosts this model">
         <option v-for="ep in endpoints" :key="ep.id" :value="ep.id">{{ ep.name }}</option>
       </select>
     </div>
     <div class="form-row">
-      <label>Parameter size (optional, e.g. 7b)</label>
-      <input v-model="form.parameterSize" placeholder="7b" />
+      <FieldLabel label="Parameter size (optional, e.g. 7b)" title="Used to auto-assign usage buckets (tiny, thinking, etc.)" />
+      <input v-model="form.parameterSize" placeholder="7b" title="Used to auto-assign usage buckets (tiny, thinking, etc.)" />
     </div>
     <div class="form-actions">
-      <button type="button" class="btn" @click="$emit('cancel')">Cancel</button>
-      <button type="submit" class="btn btn-primary">Add model</button>
+      <button type="button" class="btn" title="Discard and close the form" @click="$emit('cancel')">Cancel</button>
+      <button type="submit" class="btn btn-primary" title="Add this model to the library">Add model</button>
     </div>
   </form>
 </template>
@@ -30,6 +30,7 @@ import {reactive} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel} from '@lorca/core';
 import {assignBuckets} from '@lorca/endpoints';
 import {newId} from '../../utils/id.js';
+import FieldLabel from '../common/FieldLabel.vue';
 
 const props = defineProps<{endpoints: AiEndpointConfig[]}>();
 const emit = defineEmits<{add: [model: DiscoveredModel]; cancel: []}>();
@@ -66,7 +67,6 @@ function submit() {
 <style scoped>
 .add-model-form { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; }
 .form-row { display: flex; flex-direction: column; gap: 0.2rem; }
-.form-row label { font-size: 0.75rem; color: #888; }
 .form-row input, .form-row select { background: #111; border: 1px solid #333; color: #e8e8e8; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem; }
 .form-row input:focus, .form-row select:focus { outline: none; border-color: #555; }
 .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }

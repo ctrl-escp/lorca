@@ -61,10 +61,11 @@ export function usePipelineEditor(initialDef: PipelineDefinition) {
     }
   }
 
-  function addNode(type: PipelineNode['type']) {
+  function addNode(type: PipelineNode['type']): string {
     const node = defaultNode(type);
     def.value = {...def.value, nodes: [...def.value.nodes, node]};
     sync();
+    return node.id;
   }
 
   function removeNode(nodeId: string) {

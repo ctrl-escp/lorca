@@ -1,21 +1,23 @@
 <template>
-  <div class="bucket-editor">
+  <div class="bucket-editor" title="Usage buckets help Lorca suggest models for different tasks">
     <div class="bucket-list">
       <label
         v-for="bucket in ALL_BUCKETS"
         :key="bucket"
         class="bucket-toggle"
         :class="{active: effective.includes(bucket)}"
+        :title="BUCKET_TITLES[bucket]"
       >
         <input
           type="checkbox"
           :checked="effective.includes(bucket)"
+          :title="BUCKET_TITLES[bucket]"
           @change="toggle(bucket)"
         />
         {{ bucket }}
       </label>
     </div>
-    <button v-if="hasOverride" class="btn-reset" @click="reset">Reset to auto</button>
+    <button v-if="hasOverride" class="btn-reset" title="Restore auto-assigned buckets from model metadata" @click="reset">Reset to auto</button>
   </div>
 </template>
 
@@ -26,6 +28,17 @@ import type {DiscoveredModel, ModelUsageBucket} from '@lorca/core';
 const ALL_BUCKETS: ModelUsageBucket[] = [
   'tiny', 'thinking', 'summarize', 'rewrite', 'extract-json', 'verify', 'general', 'unknown',
 ];
+
+const BUCKET_TITLES: Record<ModelUsageBucket, string> = {
+  tiny: 'Small/fast models for lightweight tasks',
+  thinking: 'Larger models for reasoning and complex generation',
+  summarize: 'Models suited for summarization',
+  rewrite: 'Models suited for rewriting and rephrasing',
+  'extract-json': 'Models suited for structured JSON extraction',
+  verify: 'Models suited for verification and critique',
+  general: 'General-purpose models',
+  unknown: 'Uncategorized usage',
+};
 
 const props = defineProps<{model: DiscoveredModel}>();
 const emit = defineEmits<{update: [buckets: ModelUsageBucket[] | undefined]}>();

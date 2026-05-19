@@ -1,11 +1,18 @@
 <template>
   <div class="capsule-center">
     <div class="capsule-toolbar">
-      <input class="capsule-name" v-model="localName" @blur="editor.updateMeta({name: localName})" placeholder="Capsule name" :readonly="def.status === 'locked'" />
-      <span class="capsule-version">{{ def.version }}</span>
-      <span class="capsule-status" :class="`status-${def.status}`">{{ def.status }}</span>
-      <button v-if="def.status === 'draft'" class="btn btn-lock" @click="handleLock">Lock</button>
-      <button v-else class="btn btn-edit" @click="handleEditLocked">Edit (new draft)</button>
+      <input
+        class="capsule-name"
+        v-model="localName"
+        @blur="editor.updateMeta({name: localName})"
+        placeholder="Capsule name"
+        :readonly="def.status === 'locked'"
+        title="Display name for this Capsule"
+      />
+      <span class="capsule-version" title="Capsule version identifier">{{ def.version }}</span>
+      <span class="capsule-status" :class="`status-${def.status}`" :title="`Capsule is ${def.status}`">{{ def.status }}</span>
+      <button v-if="def.status === 'draft'" class="btn btn-lock" title="Lock this Capsule so it can be used in pipelines" @click="handleLock">Lock</button>
+      <button v-else class="btn btn-edit" title="Create a new draft copy to edit a locked Capsule" @click="handleEditLocked">Edit (new draft)</button>
       <button class="btn btn-secondary" type="button" title="Export Capsule JSON" @click="handleExport">Export</button>
       <button class="btn btn-secondary" type="button" title="Import Capsule JSON" @click="handleImport">Import</button>
     </div>
@@ -16,7 +23,7 @@
       :trace="capsuleRunStore.trace"
       :final-artifact-key="finalArtifactKey"
       @select="uiStore.selectNode"
-      @add="editor.addNode"
+      @add="handleAddNode"
       @remove="editor.removeNode"
       @move-up="(id) => editor.moveNode(id, 'up')"
       @move-down="(id) => editor.moveNode(id, 'down')"
@@ -27,40 +34,46 @@
       <div class="test-panel-header">
         <span class="test-panel-title">Test Run</span>
         <div class="test-run-controls">
-          <button class="btn btn-run" :disabled="capsuleRunStore.isRunning" @click="handleTestRun">
+          <button class="btn btn-run" :disabled="capsuleRunStore.isRunning" title="Run this Capsule with the test inputs below" @click="handleTestRun">
             {{ capsuleRunStore.isRunning ? 'Running…' : 'Test' }}
           </button>
-          <button class="btn btn-cancel" v-if="capsuleRunStore.isRunning" @click="capsuleRunStore.cancel">Cancel</button>
+          <button class="btn btn-cancel" v-if="capsuleRunStore.isRunning" title="Stop the current test run" @click="capsuleRunStore.cancel">Cancel</button>
         </div>
       </div>
 
       <div class="test-fields">
         <div class="test-field">
-          <label>User prompt</label>
-          <textarea v-model="testPrompt" rows="2" placeholder="Test prompt for InputNode…" />
+          <FieldLabel label="User prompt" required title="Test input for the Capsule's Input step" />
+          <textarea v-model="testPrompt" rows="2" placeholder="Test prompt for InputNode…" title="Test input for the Capsule's Input step" />
         </div>
 
         <!-- Input port values -->
         <template v-if="def.interface.inputs.length > 0">
           <div v-for="port in def.interface.inputs" :key="port.name" class="test-field">
-            <label>{{ port.name }} <span class="kind-badge">{{ port.kind }}</span></label>
-            <textarea v-model="testInputValues[port.name]" rows="2" :placeholder="port.kind === 'json' ? '{}' : ''" />
+            <FieldLabel :label="port.name" :required="port.required" :title="`Test value for input port '${port.name}' (${port.kind})`" />
+            <span class="kind-badge">{{ port.kind }}</span>
+            <textarea
+              v-model="testInputValues[port.name]"
+              rows="2"
+              :placeholder="port.kind === 'json' ? '{}' : ''"
+              :title="`Test value for input port '${port.name}' (${port.kind})`"
+            />
           </div>
         </template>
 
         <!-- Parameter values -->
         <template v-if="def.interface.parameters.length > 0">
           <div v-for="param in def.interface.parameters" :key="param.name" class="test-field">
-            <label>param: {{ param.name }} <span class="kind-badge">{{ param.kind }}</span></label>
-            <input v-model="testParamValues[param.name]" :placeholder="param.kind" />
+            <label :title="`Test value for parameter '${param.name}' (${param.kind})`">param: {{ param.name }} <span class="kind-badge">{{ param.kind }}</span></label>
+            <input v-model="testParamValues[param.name]" :placeholder="param.kind" :title="`Test value for parameter '${param.name}'`" />
           </div>
         </template>
 
         <!-- Slot assignments -->
         <template v-if="def.interface.modelSlots.length > 0">
           <div v-for="slot in def.interface.modelSlots" :key="slot.name" class="test-field">
-            <label>slot: {{ slot.name }}</label>
-            <select v-model="testSlotAssignments[slot.name]">
+            <FieldLabel :label="`slot: ${slot.name}`" :required="slot.required" :title="`Model to use for slot '${slot.name}' during test run`" />
+            <select v-model="testSlotAssignments[slot.name]" :title="`Model assignment for slot '${slot.name}'`">
               <option value="">— select model —</option>
               <option v-for="m in modelsStore.models" :key="m.id" :value="`${m.endpointId}::${m.providerModelName}`">
                 {{ m.displayName }}
@@ -75,7 +88,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {CapsuleDefinition} from '@lorca/core';
+import type {CapsuleDefinition, PipelineNode} from '@lorca/core';
 import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
@@ -84,6 +97,7 @@ import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import {resolveOutputRef} from '@lorca/pipeline';
+import FieldLabel from '../common/FieldLabel.vue';
 import ChainEditor from '../pipeline/ChainEditor.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
@@ -112,6 +126,11 @@ const testPrompt = ref('');
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
+
+function handleAddNode(type: PipelineNode['type']) {
+  const nodeId = editor.addNode(type);
+  if (nodeId) uiStore.selectNodeAndInspect(nodeId);
+}
 
 function handleLock() {
   if (!uiStore.activeCapsuleEditId) return;
@@ -204,7 +223,6 @@ function handleImport() {
 .test-run-controls { display: flex; gap: 0.4rem; }
 .test-fields { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .test-field { display: flex; flex-direction: column; gap: 0.15rem; }
-.test-field label { font-size: 0.7rem; color: #666; }
 .test-field input, .test-field textarea, .test-field select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.82rem;

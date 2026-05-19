@@ -4,7 +4,7 @@
     <ul>
       <li v-for="(err, idx) in errors" :key="idx">{{ err }}</li>
     </ul>
-    <button type="button" class="dismiss" @click="emit('dismiss')">Dismiss</button>
+    <button type="button" class="dismiss" title="Dismiss import error messages" @click="emit('dismiss')">Dismiss</button>
   </div>
 </template>
 

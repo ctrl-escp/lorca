@@ -3,6 +3,7 @@ import {ref} from 'vue';
 
 export type EditorContext = 'pipeline' | 'capsule';
 export type RightPaneTab = 'inspector' | 'interface' | 'trace' | 'output';
+export type LeftPaneSection = 'endpoints' | 'examples' | 'capsules' | 'models';
 
 export interface UiState {
   editorContext: EditorContext;
@@ -20,6 +21,7 @@ export const useUiStore = defineStore('ui', () => {
   const rightPaneTab = ref<RightPaneTab>('inspector');
   const leftPaneWidth = ref(280);
   const rightPaneWidth = ref(360);
+  const leftPaneExpandedSection = ref<LeftPaneSection | null>(null);
 
   function openCapsuleEditor(capsuleId: string) {
     editorContext.value = 'capsule';
@@ -41,6 +43,19 @@ export const useUiStore = defineStore('ui', () => {
     rightPaneTab.value = tab;
   }
 
+  function toggleLeftPaneSection(section: LeftPaneSection) {
+    leftPaneExpandedSection.value = leftPaneExpandedSection.value === section ? null : section;
+  }
+
+  function expandLeftPaneSection(section: LeftPaneSection) {
+    leftPaneExpandedSection.value = section;
+  }
+
+  function selectNodeAndInspect(nodeId: string | null) {
+    selectedNodeId.value = nodeId;
+    if (nodeId) rightPaneTab.value = 'inspector';
+  }
+
   return {
     editorContext,
     activeCapsuleEditId,
@@ -48,9 +63,13 @@ export const useUiStore = defineStore('ui', () => {
     rightPaneTab,
     leftPaneWidth,
     rightPaneWidth,
+    leftPaneExpandedSection,
     openCapsuleEditor,
     closeCapsuleEditor,
     selectNode,
+    selectNodeAndInspect,
     setRightPaneTab,
+    toggleLeftPaneSection,
+    expandLeftPaneSection,
   };
 });

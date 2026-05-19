@@ -3,12 +3,12 @@
     <header class="app-header">
       <h1>Lorca</h1>
       <template v-if="uiStore.editorContext === 'capsule' && activeCapsule">
-        <button class="breadcrumb-back" @click="uiStore.closeCapsuleEditor()">← Pipeline</button>
+        <button class="breadcrumb-back" title="Return to pipeline editor" @click="uiStore.closeCapsuleEditor()">← Pipeline</button>
         <span class="breadcrumb-sep">›</span>
         <span class="breadcrumb-label">{{ activeCapsule.name || 'Capsule' }}</span>
       </template>
       <span v-else class="app-subtitle">Local AI Orchestrator</span>
-      <span v-if="runStatus !== 'idle'" class="run-status" :class="`rs-${runStatus}`">
+      <span v-if="runStatus !== 'idle'" class="run-status" :class="`rs-${runStatus}`" :title="`Run status: ${runStatus}`">
         {{ runStatus }}
       </span>
     </header>
@@ -18,9 +18,10 @@
       @dismiss="importStore.cancelImport()"
     />
     <main class="app-body">
-      <div class="pane pane-left">
+      <div class="pane pane-left" :style="{width: `${uiStore.leftPaneWidth}px`}">
         <LeftPane />
       </div>
+      <PaneResizeHandle side="left" @resize="resizeLeftPane" />
       <div class="pane pane-center">
         <CapsuleCenterPane
           v-if="uiStore.editorContext === 'capsule' && activeCapsule"
@@ -36,7 +37,8 @@
           @update="onUpdateDef"
         />
       </div>
-      <div class="pane pane-right">
+      <PaneResizeHandle side="right" @resize="resizeRightPane" />
+      <div class="pane pane-right" :style="{width: `${uiStore.rightPaneWidth}px`}">
         <RightPane
           :nodes="activeNodes"
           :on-update="onUpdateNode"
@@ -75,6 +77,7 @@ import CapsuleCenterPane from './components/capsule/CapsuleCenterPane.vue';
 import RightPane from './components/RightPane.vue';
 import ImportRemapDialog from './components/import/ImportRemapDialog.vue';
 import ImportErrorBanner from './components/import/ImportErrorBanner.vue';
+import PaneResizeHandle from './components/layout/PaneResizeHandle.vue';
 import type {ModelRemap} from './stores/importExport.js';
 
 const runStore = useActiveRunStore();
@@ -158,6 +161,14 @@ async function onConfirmImport(remaps: Record<string, ModelRemap>) {
   }
 }
 
+function resizeLeftPane(delta: number) {
+  uiStore.leftPaneWidth = Math.min(520, Math.max(180, uiStore.leftPaneWidth + delta));
+}
+
+function resizeRightPane(delta: number) {
+  uiStore.rightPaneWidth = Math.min(640, Math.max(260, uiStore.rightPaneWidth + delta));
+}
+
 onMounted(async () => {
   await useEndpointsStore().load();
   await useModelsStore().load();
@@ -199,8 +210,8 @@ body {
 
 .app-body { flex: 1; display: flex; min-height: 0; }
 
-.pane { overflow: hidden; display: flex; flex-direction: column; }
-.pane-left { width: 280px; flex-shrink: 0; border-right: 1px solid #2a2a2a; }
+.pane { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.pane-left { flex-shrink: 0; border-right: none; }
 .pane-center { flex: 1; min-width: 0; }
-.pane-right { width: 360px; flex-shrink: 0; }
+.pane-right { flex-shrink: 0; border-left: none; }
 </style>

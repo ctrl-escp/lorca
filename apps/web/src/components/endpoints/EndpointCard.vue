@@ -1,5 +1,5 @@
 <template>
-  <div class="ep-card" :class="`status-${endpoint.browserAccess}`">
+  <div class="ep-card" :class="`status-${endpoint.browserAccess}`" :title="`${endpoint.name} — ${endpoint.baseUrl} (${accessLabel})`">
     <div class="ep-card-header">
       <span class="ep-name">{{ endpoint.name }}</span>
       <span class="ep-badge" :class="`badge-${endpoint.browserAccess}`">
@@ -12,13 +12,13 @@
       <span class="ep-model-count" v-if="modelCount > 0">{{ modelCount }} model{{ modelCount !== 1 ? 's' : '' }}</span>
     </div>
     <div class="ep-actions">
-      <button class="btn btn-sm" :disabled="isTesting" @click="$emit('test', endpoint)">
+      <button class="btn btn-sm" :disabled="isTesting" title="Check whether the browser can reach this endpoint (CORS)" @click="$emit('test', endpoint)">
         {{ isTesting ? 'Testing…' : 'Test access' }}
       </button>
-      <button class="btn btn-sm" :disabled="isDiscovering || endpoint.browserAccess !== 'available'" @click="$emit('discover', endpoint)">
+      <button class="btn btn-sm" :disabled="isDiscovering || endpoint.browserAccess !== 'available'" title="Fetch the model list from this endpoint" @click="$emit('discover', endpoint)">
         {{ isDiscovering ? 'Discovering…' : 'Discover models' }}
       </button>
-      <button class="btn btn-sm btn-danger" @click="$emit('remove', endpoint.id)">Remove</button>
+      <button class="btn btn-sm btn-danger" title="Remove this endpoint and its discovered models" @click="$emit('remove', endpoint.id)">Remove</button>
     </div>
     <div v-if="endpoint.browserAccess === 'blocked'" class="ep-cors-warn">
       Browser cannot reach this endpoint. Check CORS headers or use a local proxy.

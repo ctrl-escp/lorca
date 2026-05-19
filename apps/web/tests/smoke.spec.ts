@@ -45,7 +45,7 @@ test.beforeEach(async ({page}) => {
 
 // Helper: add endpoint and make it available
 async function addEndpoint(page: import('@playwright/test').Page, name = 'Test Ollama') {
-  await page.getByTitle('Add endpoint').click();
+  await page.getByTitle('Add a new AI endpoint (e.g. local Ollama)').click();
   await page.getByPlaceholder('Local Ollama').fill(name);
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
@@ -55,9 +55,19 @@ async function addEndpoint(page: import('@playwright/test').Page, name = 'Test O
   await expect(page.getByRole('button', {name: 'Discover models'})).toBeEnabled({timeout: 5000});
 }
 
+async function expandLeftSection(
+  page: import('@playwright/test').Page,
+  section: 'Endpoints' | 'Examples' | 'Capsules' | 'Models',
+) {
+  const toggle = page.locator('.section-toggle').filter({hasText: section});
+  if (await toggle.getAttribute('aria-expanded') !== 'true') {
+    await toggle.click();
+  }
+}
+
 // 1. Add endpoint
 test('smoke: add endpoint', async ({page}) => {
-  await page.getByTitle('Add endpoint').click();
+  await page.getByTitle('Add a new AI endpoint (e.g. local Ollama)').click();
   await page.getByPlaceholder('Local Ollama').fill('My Endpoint');
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
@@ -91,13 +101,13 @@ test('smoke: add model-call step', async ({page}) => {
 
 // 6. Create capsule
 test('smoke: create capsule', async ({page}) => {
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
 });
 
 // 7. Lock capsule
 test('smoke: lock capsule', async ({page}) => {
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Test Cap');
   await page.getByRole('button', {name: 'Lock'}).click();
@@ -107,7 +117,7 @@ test('smoke: lock capsule', async ({page}) => {
 // 8. Insert capsule into pipeline
 test('smoke: insert capsule instance into pipeline', async ({page}) => {
   // Create and lock a capsule
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('My Capsule');
   await page.getByRole('button', {name: 'Lock'}).click();
@@ -124,7 +134,7 @@ test('smoke: insert capsule instance into pipeline', async ({page}) => {
 // 9. Configure capsule loop count
 test('smoke: configure capsule loop count', async ({page}) => {
   // Create, lock, insert capsule
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Loopy Cap');
   await page.getByRole('button', {name: 'Lock'}).click();
@@ -185,7 +195,7 @@ test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await page.getByRole('button', {name: '+ Model call'}).click();
   await expect(page.locator('.step-type-badge').filter({hasText: 'Model call'})).toBeVisible();
 
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Persisted Capsule');
   await page.getByRole('button', {name: 'Lock'}).click();
@@ -194,13 +204,14 @@ test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await page.reload();
   await expect(page.getByPlaceholder('Pipeline name')).toHaveValue('Persisted Pipeline', {timeout: 10000});
   await expect(page.locator('.step-type-badge').filter({hasText: 'Model call'})).toBeVisible();
+  await expandLeftSection(page, 'Capsules');
   await expect(page.getByText('Persisted Capsule')).toBeVisible();
   await expect(page.getByText('locked')).toBeVisible();
 });
 
 // Phase 12: export and import Capsule
 test('smoke: export and import capsule', async ({page}) => {
-  await page.getByTitle('New Capsule').click();
+  await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Portable Cap');
   await page.getByRole('button', {name: 'Lock'}).click();
@@ -242,10 +253,11 @@ test('smoke: export and import capsule', async ({page}) => {
     }),
   );
   await page.reload();
+  await expandLeftSection(page, 'Capsules');
   await expect(page.getByText('No Capsules yet.')).toBeVisible({timeout: 10000});
 
   const importChooser = page.waitForEvent('filechooser');
-  await page.getByTitle('Import Capsule').click();
+  await page.getByTitle('Import a Capsule from a JSON file').click();
   const chooser = await importChooser;
   await chooser.setFiles({
     name: 'portable.capsule.json',
@@ -260,6 +272,7 @@ test('smoke: export and import capsule', async ({page}) => {
 });
 
 test('smoke: duplicate example capsule', async ({page}) => {
+  await expandLeftSection(page, 'Examples');
   await expect(page.getByText('Intent Extraction')).toBeVisible({timeout: 5000});
   const row = page.locator('.example-row').filter({hasText: 'Intent Extraction'});
   await row.getByRole('button', {name: 'Duplicate'}).click();
@@ -269,7 +282,7 @@ test('smoke: duplicate example capsule', async ({page}) => {
 
 test('smoke: reject invalid capsule import', async ({page}) => {
   const importChooser = page.waitForEvent('filechooser');
-  await page.getByTitle('Import Capsule').click();
+  await page.getByTitle('Import a Capsule from a JSON file').click();
   const chooser = await importChooser;
   await chooser.setFiles({
     name: 'bad.json',

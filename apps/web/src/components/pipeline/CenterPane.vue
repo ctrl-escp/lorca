@@ -5,21 +5,32 @@
         class="pipeline-name"
         v-model="localPipelineName"
         placeholder="Pipeline name"
+        title="Display name for this pipeline (saved locally)"
         @change="commitPipelineName"
       />
       <div class="run-controls">
         <button class="btn btn-secondary" type="button" title="Export pipeline JSON" @click="handleExport">Export</button>
         <button class="btn btn-secondary" type="button" title="Import pipeline JSON" @click="handleImport">Import</button>
-        <button class="btn btn-run" :disabled="runStore.isRunning || !canRun" @click="handleRun">
+        <button
+          class="btn btn-run"
+          :disabled="runStore.isRunning || !canRun"
+          :title="canRun ? 'Run the pipeline with the target prompt' : 'Enter a target prompt to enable Execute'"
+          @click="handleRun"
+        >
           {{ runStore.isRunning ? 'Running…' : 'Execute' }}
         </button>
-        <button class="btn btn-cancel" v-if="runStore.isRunning" @click="runStore.cancel">Cancel</button>
+        <button class="btn btn-cancel" v-if="runStore.isRunning" title="Stop the current pipeline run" @click="runStore.cancel">Cancel</button>
       </div>
     </div>
 
     <div class="prompt-input">
-      <label>Target prompt</label>
-      <textarea v-model="userPrompt" rows="3" placeholder="Enter your target prompt…" />
+      <FieldLabel label="Target prompt" required title="Your main input text — wrapped and passed through the pipeline on Execute" />
+      <textarea
+        v-model="userPrompt"
+        rows="3"
+        placeholder="Enter your target prompt…"
+        title="Your main input text — wrapped and passed through the pipeline on Execute"
+      />
     </div>
 
     <ChainEditor
@@ -29,7 +40,7 @@
       :final-artifact-key="finalArtifactKey"
       :show-capsule-add="true"
       @select="uiStore.selectNode"
-      @add="editor.addNode"
+      @add="handleAddNode"
       @remove="editor.removeNode"
       @move-up="(id) => editor.moveNode(id, 'up')"
       @move-down="(id) => editor.moveNode(id, 'down')"
@@ -39,12 +50,13 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {PipelineDefinition} from '@lorca/core';
+import type {PipelineDefinition, PipelineNode} from '@lorca/core';
 import {usePipelineEditor} from '../../composables/usePipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {pickJsonFile} from '../../utils/importFile.js';
+import FieldLabel from '../common/FieldLabel.vue';
 import ChainEditor from './ChainEditor.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
@@ -74,6 +86,11 @@ watch(localPipelineName, () => commitPipelineName());
 const canRun = computed(() => userPrompt.value.trim().length > 0);
 
 watch(def, (newDef) => emit('update', newDef), {deep: true});
+
+function handleAddNode(type: PipelineNode['type']) {
+  const nodeId = editor.addNode(type);
+  if (nodeId) uiStore.selectNodeAndInspect(nodeId);
+}
 
 async function handleRun() {
   await runStore.run(def.value, userPrompt.value.trim());
@@ -109,8 +126,7 @@ function handleImport() {
 .btn-secondary:hover { background: #222; color: #ccc; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
-.prompt-input { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.2rem; }
-.prompt-input label { font-size: 0.72rem; color: #666; }
+.prompt-input { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .prompt-input textarea { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 4px; padding: 6px 8px; font-size: 0.85rem; resize: vertical; font-family: inherit; }
 .prompt-input textarea:focus { outline: none; border-color: #3a6080; }
 </style>

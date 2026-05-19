@@ -6,6 +6,7 @@
         :key="tab.id"
         class="tab-btn"
         :class="{active: uiStore.rightPaneTab === tab.id}"
+        :title="tab.title"
         @click="uiStore.setRightPaneTab(tab.id)"
       >{{ tab.label }}</button>
     </div>
@@ -71,16 +72,16 @@ const capsulesStore = useCapsulesStore();
 const isCapsuleMode = computed(() => uiStore.editorContext === 'capsule');
 
 const PIPELINE_TABS = [
-  {id: 'inspector' as const, label: 'Inspector'},
-  {id: 'trace' as const, label: 'Trace'},
-  {id: 'output' as const, label: 'Output'},
+  {id: 'inspector' as const, label: 'Inspector', title: 'Configure the selected pipeline step'},
+  {id: 'trace' as const, label: 'Trace', title: 'Step-by-step execution log from the last run'},
+  {id: 'output' as const, label: 'Output', title: 'Final artifact from the last pipeline run'},
 ];
 
 const CAPSULE_TABS = [
-  {id: 'inspector' as const, label: 'Inspector'},
-  {id: 'interface' as const, label: 'Interface'},
-  {id: 'trace' as const, label: 'Trace'},
-  {id: 'output' as const, label: 'Output'},
+  {id: 'inspector' as const, label: 'Inspector', title: 'Configure the selected Capsule step'},
+  {id: 'interface' as const, label: 'Interface', title: 'Declare Capsule inputs, outputs, parameters, and model slots'},
+  {id: 'trace' as const, label: 'Trace', title: 'Step-by-step log from the last test run'},
+  {id: 'output' as const, label: 'Output', title: 'Final artifact from the last test run'},
 ];
 
 const activeTabs = computed(() => isCapsuleMode.value ? CAPSULE_TABS : PIPELINE_TABS);
@@ -114,7 +115,7 @@ watch(() => capsuleRunStore.status, (s) => {
 </script>
 
 <style scoped>
-.right-pane { display: flex; flex-direction: column; height: 100%; border-left: 1px solid #2a2a2a; }
+.right-pane { display: flex; flex-direction: column; height: 100%; }
 .right-tabs { display: flex; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; }
 .tab-btn { flex: 1; background: none; border: none; border-bottom: 2px solid transparent; color: #666; padding: 0.4rem; font-size: 0.72rem; cursor: pointer; }
 .tab-btn:hover { color: #999; }
