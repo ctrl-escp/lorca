@@ -163,10 +163,10 @@ watch(() => props.node, (node) => {
     localWrapPlacement.value = node.config.inputPlacement;
   }
   if (node.type === 'model-call') {
-    const ref = node.config.modelRef;
-    localModelRefKind.value = ref.kind;
-    localModelKey.value = ref.kind === 'fixed' ? `${ref.endpointId}::${ref.modelName}` : '';
-    localSlotName.value = ref.kind === 'slot' ? ref.slotName : '';
+    const modelRef = node.config.modelRef;
+    localModelRefKind.value = modelRef.kind;
+    localModelKey.value = modelRef.kind === 'fixed' ? `${modelRef.endpointId}::${modelRef.modelName}` : '';
+    localSlotName.value = modelRef.kind === 'slot' ? modelRef.slotName : '';
     localMode.value = node.config.mode;
     localInputRef.value = node.config.inputArtifactRef;
     localSystemPrompt.value = node.config.systemPrompt ?? '';

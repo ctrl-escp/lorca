@@ -31,7 +31,7 @@
     />
 
     <ChainEditor
-      :nodes="def.nodes"
+      :nodes="pipeline.nodes"
       :selected-node-id="uiStore.selectedNodeId"
       :trace="runStore.trace"
       :final-artifact-key="finalArtifactKey"
@@ -65,7 +65,7 @@ const uiStore = useUiStore();
 const userPrompt = ref('');
 const localPipelineName = ref(props.def.name);
 const editor = usePipelineEditor(props.def);
-const {def, finalArtifactKey, updateNode} = editor;
+const {def: pipeline, finalArtifactKey, updateNode} = editor;
 
 defineExpose({updateNode});
 
@@ -74,14 +74,14 @@ watch(() => props.def.name, (name) => {
 });
 
 function commitPipelineName() {
-  if (localPipelineName.value === def.value.name) return;
-  def.value = {...def.value, name: localPipelineName.value};
+  if (localPipelineName.value === pipeline.value.name) return;
+  pipeline.value = {...pipeline.value, name: localPipelineName.value};
 }
 
 watch(localPipelineName, () => commitPipelineName());
 
 const selectedNode = computed(() =>
-  uiStore.selectedNodeId ? def.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
+  uiStore.selectedNodeId ? pipeline.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
 );
 const canRun = computed(() => userPrompt.value.trim().length > 0);
 
@@ -89,7 +89,7 @@ function onStepPromptNodeUpdate(patch: Record<string, unknown>) {
   if (uiStore.selectedNodeId) updateNode(uiStore.selectedNodeId, patch);
 }
 
-watch(def, (newDef) => emit('update', newDef), {deep: true});
+watch(pipeline, (newDef) => emit('update', newDef), {deep: true});
 
 function handleAddNode(type: PipelineNode['type']) {
   const nodeId = editor.addNode(type);
@@ -97,11 +97,11 @@ function handleAddNode(type: PipelineNode['type']) {
 }
 
 async function handleRun() {
-  await runStore.run(def.value, userPrompt.value.trim());
+  await runStore.run(pipeline.value, userPrompt.value.trim());
 }
 
 function handleExport() {
-  importStore.exportCurrentPipeline(def.value);
+  importStore.exportCurrentPipeline(pipeline.value);
 }
 
 function handleImport() {
