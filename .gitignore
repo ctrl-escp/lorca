@@ -1,0 +1,10 @@
+.idea
+.vs-code
+*.iml
+.cursor
+.claude
+
+CLAUDE.md
+*tmp*
+.DS_Store
+AGENTS.md
