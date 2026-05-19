@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {DiscoveredModel, ModelUsageBucket} from '@lorca/core';
+import {getDb} from '@lorca/storage';
 
 export const useModelsStore = defineStore('models', () => {
   const models = ref<DiscoveredModel[]>([]);
@@ -15,7 +16,12 @@ export const useModelsStore = defineStore('models', () => {
     return map;
   });
 
-  function addModel(model: DiscoveredModel) {
+  async function load() {
+    models.value = await getDb().models.toArray();
+  }
+
+  async function addModel(model: DiscoveredModel) {
+    await getDb().models.put(model);
     const existing = models.value.findIndex((m) => m.id === model.id);
     if (existing !== -1) {
       models.value[existing] = model;
@@ -24,21 +30,28 @@ export const useModelsStore = defineStore('models', () => {
     }
   }
 
-  function setModelsForEndpoint(endpointId: string, discovered: DiscoveredModel[]) {
+  async function setModelsForEndpoint(endpointId: string, discovered: DiscoveredModel[]) {
+    await getDb().models.where('endpointId').equals(endpointId).delete();
+    await getDb().models.bulkPut(discovered);
     models.value = [
       ...models.value.filter((m) => m.endpointId !== endpointId),
       ...discovered,
     ];
   }
 
-  function setUserBuckets(modelId: string, buckets: ModelUsageBucket[]) {
+  async function setUserBuckets(modelId: string, buckets: ModelUsageBucket[]) {
     const m = models.value.find((m) => m.id === modelId);
-    if (m) m.userBuckets = buckets;
+    if (!m) return;
+    const updated = {...m, userBuckets: buckets};
+    await getDb().models.put(updated);
+    const idx = models.value.findIndex((m) => m.id === modelId);
+    if (idx !== -1) models.value[idx] = updated;
   }
 
-  function removeModelsForEndpoint(endpointId: string) {
+  async function removeModelsForEndpoint(endpointId: string) {
+    await getDb().models.where('endpointId').equals(endpointId).delete();
     models.value = models.value.filter((m) => m.endpointId !== endpointId);
   }
 
-  return {models, modelsByEndpoint, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint};
+  return {models, modelsByEndpoint, load, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint};
 });

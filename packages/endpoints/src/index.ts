@@ -1,4 +1,4 @@
-export type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket} from '@lorca/core';
-
-// Endpoint adapters are implemented in Phase 2.
-// Each adapter must implement: listModels, testBrowserAccess, executeModelCall.
+export type { EndpointAdapter, ModelCallRequest, ModelCallResponse } from './adapter.js';
+export { assignBuckets } from './buckets.js';
+export { ollamaAdapter } from './ollama.js';
+export { testBrowserAccess, listModels, executeModelCall } from './registry.js';
