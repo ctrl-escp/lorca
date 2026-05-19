@@ -317,7 +317,11 @@ async function executeLoopGroupStep(
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Nested loop groups are not supported in V1', nodeId: step.id}};
   }
 
-  const innerPlan = compileActiveStepsToExecutionPlan(innerActive);
+  const loopIdx = pipeline.steps.findIndex((s) => s.id === step.id);
+  const outerBefore = loopIdx >= 0 ? pipeline.steps.slice(0, loopIdx) : [];
+  const innerPlan = compileActiveStepsToExecutionPlan(innerActive, {
+    allSteps: [...outerBefore, ...config.steps],
+  });
   const innerStepMap = new Map(config.steps.map((s) => [s.id, s]));
   const outerSnapshot: Record<string, PipelineArtifact> = {...artifacts};
   const loopArtifacts: Record<string, PipelineArtifact> = {...outerSnapshot};

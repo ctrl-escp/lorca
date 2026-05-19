@@ -104,6 +104,7 @@
         <button class="btn btn-sm" @click="$emit('append', 'manual-text')">+ Manual text</button>
         <button class="btn btn-sm" @click="$emit('append', 'template')">+ Template</button>
         <button class="btn btn-sm" @click="$emit('append', 'json-extract')">+ JSON extract</button>
+        <button class="btn btn-sm" @click="$emit('append', 'loop-group')">+ Loop</button>
         <button v-if="showCapsuleAdd" class="btn btn-sm btn-capsule" @click="$emit('append', 'capsule-instance')">+ Capsule</button>
       </div>
     </div>

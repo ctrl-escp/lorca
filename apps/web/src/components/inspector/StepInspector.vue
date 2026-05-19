@@ -132,22 +132,10 @@
       </template>
 
       <!-- Capsule Instance -->
-      <template v-else-if="step.config.type === 'capsule-instance'">
-        <div class="inspector-field">
-          <FieldLabel label="Capsule" title="ID of the Capsule this step instantiates" />
-          <code class="ns-value">{{ step.config.capsuleId }} @ {{ step.config.capsuleVersion }}</code>
-        </div>
-        <div v-if="Object.keys(step.config.inputBindings).length > 0" class="inspector-field">
-          <FieldLabel label="Input bindings" />
-          <div class="binding-list">
-            <div v-for="(val, key) in step.config.inputBindings" :key="key" class="binding-row">
-              <span class="binding-port">{{ key }}</span>
-              <span class="binding-arrow">←</span>
-              <code class="binding-ref">{{ val }}</code>
-            </div>
-          </div>
-        </div>
-      </template>
+      <PipelineCapsuleInstanceEditor
+        v-else-if="step.config.type === 'capsule-instance'"
+        :step="step"
+      />
 
       <!-- Loop Group -->
       <template v-else-if="step.config.type === 'loop-group'">
@@ -186,14 +174,15 @@
             </select>
           </div>
         </template>
-        <div class="inspector-readonly">
-          <p>{{ step.config.steps.length }} inner step(s). Open the Capsule editor to edit the inner chain.</p>
-        </div>
+        <LoopInnerChainEditor
+          :loop-step-id="step.id"
+          :inner-steps="step.config.steps"
+        />
       </template>
 
       <!-- Prompt composition (shown for all prompt-bearing steps) -->
       <PromptCompositionEditor
-        v-if="hasPromptBlocks"
+        v-if="hasPromptBlocks && step.config.type !== 'loop-group'"
         :step-id="step.id"
         :config="step.prompt"
       />
@@ -212,6 +201,8 @@ import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import FieldLabel from '../common/FieldLabel.vue';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
+import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
+import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 
 const editorStore = usePipelineEditorStore();
 const runStore = useActiveRunStore();

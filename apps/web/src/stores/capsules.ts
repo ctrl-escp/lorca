@@ -70,6 +70,25 @@ export const useCapsulesStore = defineStore('capsules', () => {
     return fromDb ?? getBuiltinExample(id);
   }
 
+  function duplicateCapsule(sourceId: string): string | null {
+    const source = capsules.value.find((c) => c.id === sourceId);
+    if (!source) return null;
+    const id = newId('cap');
+    const now = new Date().toISOString();
+    const copy = cloneForStorage({
+      ...source,
+      id,
+      name: `${source.name} (copy)`,
+      version: 'v1',
+      status: 'draft',
+      createdAt: now,
+      updatedAt: now,
+    });
+    delete (copy as {lockedAt?: string}).lockedAt;
+    addCapsule(copy);
+    return id;
+  }
+
   function duplicateFromExample(exampleId: string): string | null {
     const example = getBuiltinExample(exampleId);
     if (!example) return null;
@@ -112,5 +131,6 @@ export const useCapsulesStore = defineStore('capsules', () => {
     lockCapsuleById,
     editLockedCapsule,
     duplicateFromExample,
+    duplicateCapsule,
   };
 });

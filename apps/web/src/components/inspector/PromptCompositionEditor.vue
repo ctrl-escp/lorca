@@ -218,7 +218,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig} from '@lorca/core';
+import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig, PipelineStep} from '@lorca/core';
 import {isValidTag, previewPromptXml} from '@lorca/prompt';
 import {
   getPriorSourceSteps,
@@ -234,6 +234,9 @@ import {useActiveRunStore} from '../../stores/activeRun.js';
 const props = defineProps<{
   stepId: string;
   config: PromptCompositionConfig | undefined;
+  /** When editing a step inside a loop group, prior steps from outer + inner chain. */
+  contextSteps?: PipelineStep[];
+  loopGroupStepId?: string;
 }>();
 
 const editorStore = usePipelineEditorStore();
@@ -252,7 +255,9 @@ const localHistoryReads = ref<StepHistoryReadConfig[]>([]);
 const localBlocks = ref<PromptBlock[]>([]);
 const showPreview = ref(false);
 
-const priorSources = computed(() => getPriorSourceSteps(editorStore.steps, props.stepId));
+const chainSteps = computed(() => props.contextSteps ?? editorStore.steps);
+
+const priorSources = computed(() => getPriorSourceSteps(chainSteps.value, props.stepId));
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
   const c = cfg ?? EMPTY_CONFIG;
@@ -277,20 +282,36 @@ function buildConfig(): PromptCompositionConfig {
   };
 }
 
+function applyStepPatch(patch: Partial<PipelineStep>, label?: string) {
+  if (props.loopGroupStepId) {
+    if (label) {
+      editorStore.commitLoopInnerStepEdit(props.loopGroupStepId, props.stepId, patch, label);
+    } else {
+      editorStore.updateLoopInnerStep(props.loopGroupStepId, props.stepId, patch);
+    }
+    return;
+  }
+  if (label) {
+    editorStore.commitStepConfigEdit(props.stepId, patch, label);
+  } else {
+    editorStore.updateStepConfig(props.stepId, patch);
+  }
+}
+
 function liveUpdate() {
-  editorStore.updateStepConfig(props.stepId, {prompt: buildConfig()});
+  applyStepPatch({prompt: buildConfig()});
 }
 
 function commitPrev() {
-  editorStore.commitStepConfigEdit(props.stepId, {prompt: buildConfig()}, 'Update previous output');
+  applyStepPatch({prompt: buildConfig()}, 'Update previous output');
 }
 
 function commitBlocks(label: string) {
-  editorStore.commitStepConfigEdit(props.stepId, {prompt: buildConfig()}, label);
+  applyStepPatch({prompt: buildConfig()}, label);
 }
 
 function commitHistoryReads(label: string) {
-  editorStore.commitStepConfigEdit(props.stepId, {prompt: buildConfig()}, label);
+  applyStepPatch({prompt: buildConfig()}, label);
 }
 
 function toggleBlock(idx: number) {
@@ -322,8 +343,8 @@ function defaultNewHistoryRead(): StepHistoryReadConfig {
   const sourceStepId = lastPrior.stepId;
   return {
     sourceStepId,
-    sourceArtifactRef: defaultArtifactRefForSource(editorStore.steps, sourceStepId),
-    tagName: suggestHistoryReadTagName(sourceStepId, editorStore.steps),
+    sourceArtifactRef: defaultArtifactRefForSource(chainSteps.value, sourceStepId),
+    tagName: suggestHistoryReadTagName(sourceStepId, chainSteps.value),
     required: true,
   };
 }
@@ -341,8 +362,8 @@ function deleteHistoryRead(idx: number) {
 function onSourceStepChange(idx: number, sourceStepId: string) {
   const read = localHistoryReads.value[idx]!;
   read.sourceStepId = sourceStepId;
-  read.sourceArtifactRef = defaultArtifactRefForSource(editorStore.steps, sourceStepId);
-  read.tagName = suggestHistoryReadTagName(sourceStepId, editorStore.steps);
+  read.sourceArtifactRef = defaultArtifactRefForSource(chainSteps.value, sourceStepId);
+  read.tagName = suggestHistoryReadTagName(sourceStepId, chainSteps.value);
   commitHistoryReads('Change history read source');
 }
 
@@ -363,11 +384,11 @@ function toggleRequired(idx: number) {
 }
 
 function artifactsForRead(read: StepHistoryReadConfig) {
-  return artifactsForSourceStep(editorStore.steps, read.sourceStepId);
+  return artifactsForSourceStep(chainSteps.value, read.sourceStepId);
 }
 
 function readStatus(read: StepHistoryReadConfig) {
-  return validateHistoryRead(read, props.stepId, editorStore.steps);
+  return validateHistoryRead(read, props.stepId, chainSteps.value);
 }
 
 function historyReadStatusClass(read: StepHistoryReadConfig) {

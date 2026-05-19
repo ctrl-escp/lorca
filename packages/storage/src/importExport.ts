@@ -275,10 +275,10 @@ export function collectPipelineCapsuleRefs(
 
 function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference[] {
   const refs: MissingModelReference[] = [];
-  for (const step of steps) {
+  const visit = (step: PipelineStep) => {
     if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
       const {endpointId, modelName} = step.config.modelRef;
-      if (!endpointId && !modelName) continue;
+      if (!endpointId && !modelName) return;
       refs.push({
         key: step.id,
         nodeId: step.id,
@@ -300,7 +300,11 @@ function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference
         });
       }
     }
-  }
+    if (step.config.type === 'loop-group') {
+      for (const inner of step.config.steps) visit(inner);
+    }
+  };
+  for (const step of steps) visit(step);
   return refs;
 }
 

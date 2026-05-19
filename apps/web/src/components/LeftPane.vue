@@ -56,11 +56,27 @@
             :key="cap.id"
             class="capsule-row"
             :class="{active: uiStore.activeCapsuleEditId === cap.id}"
-            :title="`Open Capsule editor: ${cap.name || '(unnamed)'} (${cap.version}, ${cap.status})`"
-            @click="uiStore.openCapsuleEditor(cap.id)"
           >
-            <span class="capsule-row-name">{{ cap.name || '(unnamed)' }}</span>
-            <span class="capsule-row-meta">{{ cap.version }} · {{ cap.status }}</span>
+            <div
+              class="capsule-row-main"
+              :title="`Open Capsule editor: ${cap.name || '(unnamed)'} (${cap.version}, ${cap.status})`"
+              @click="uiStore.openCapsuleEditor(cap.id)"
+            >
+              <span class="capsule-row-name">{{ cap.name || '(unnamed)' }}</span>
+              <span class="capsule-row-meta">{{ cap.version }} · {{ cap.status }}</span>
+            </div>
+            <button
+              class="btn-insert-capsule"
+              type="button"
+              title="Insert Capsule instance into pipeline"
+              @click.stop="onInsertCapsule(cap.id)"
+            >↓ Insert</button>
+            <button
+              class="btn-dup-capsule"
+              type="button"
+              title="Duplicate as editable draft"
+              @click.stop="onDuplicateCapsule(cap.id)"
+            >⊕</button>
           </div>
           <p v-if="capsulesStore.capsules.length === 0" class="empty-hint">No Capsules yet.</p>
         </div>
@@ -193,6 +209,18 @@ async function onAddModel(model: DiscoveredModel) {
   showAddModel.value = false;
 }
 
+function onInsertCapsule(capsuleId: string) {
+  const cap = capsulesStore.getCapsule(capsuleId);
+  if (!cap) return;
+  const stepId = editorStore.insertCapsuleInstance(cap);
+  if (stepId) editorStore.selectStep(stepId);
+}
+
+function onDuplicateCapsule(capsuleId: string) {
+  const newId = capsulesStore.duplicateCapsule(capsuleId);
+  if (newId) uiStore.openCapsuleEditor(newId);
+}
+
 function onInsertSuggestion(suggestion: PipelineSuggestion) {
   const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
   const newSteps = instantiateSuggestion(suggestion, existingNamespaces);
@@ -295,13 +323,36 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .ep-list, .model-list, .capsule-list { display: flex; flex-direction: column; gap: 0.3rem; }
 
 .capsule-row {
-  padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #222;
-  cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; background: #1a1a1a;
+  padding: 0.3rem 0.45rem; border-radius: 4px; border: 1px solid #222;
+  display: flex; align-items: center; gap: 0.35rem; background: #1a1a1a;
 }
 .capsule-row:hover { background: #222; border-color: #333; }
 .capsule-row.active { background: #1e2d3d; border-color: #2a4d6e; }
+.capsule-row-main { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; }
 .capsule-row-name { font-size: 0.8rem; font-weight: 500; }
 .capsule-row-meta { font-size: 0.65rem; color: #555; }
+.btn-insert-capsule {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  background: #1a2430;
+  border: 1px solid #2a4a6a;
+  color: #9d6db8;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-insert-capsule:hover { background: #243040; }
+.btn-dup-capsule {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 2px 5px;
+  background: transparent;
+  border: 1px solid #333;
+  color: #888;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-dup-capsule:hover { color: #ccc; border-color: #555; }
 
 /* Suggestions */
 .suggestion-list { display: flex; flex-direction: column; gap: 0.3rem; }
