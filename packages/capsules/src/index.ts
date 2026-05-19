@@ -16,3 +16,4 @@ export type {
 export {validateCapsule} from './validate.js';
 export {executeCapsuleTestRun} from './executor.js';
 export type {CapsuleTestInput} from './executor.js';
+export {lockCapsule, nextVersion, createDraftFromLocked} from './lock.js';

@@ -1,6 +1,8 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
+import {lockCapsule, createDraftFromLocked} from '@lorca/capsules';
+import {newId} from '../utils/id.js';
 
 export const useCapsulesStore = defineStore('capsules', () => {
   const capsules = ref<CapsuleDefinition[]>([]);
@@ -40,5 +42,23 @@ export const useCapsulesStore = defineStore('capsules', () => {
       })[0];
   }
 
-  return {capsules, lockedCapsules, draftCapsules, addCapsule, updateCapsule, removeCapsule, getCapsule};
+  function lockCapsuleById(id: string): {ok: true} | {ok: false; message: string} {
+    const idx = capsules.value.findIndex((c) => c.id === id && c.status === 'draft');
+    if (idx === -1) return {ok: false, message: 'Draft capsule not found'};
+    const result = lockCapsule(capsules.value[idx]!);
+    if (!result.ok) return {ok: false, message: result.error.message};
+    capsules.value[idx] = result.value;
+    return {ok: true};
+  }
+
+  function editLockedCapsule(id: string): string | null {
+    const locked = capsules.value.find((c) => c.id === id && c.status === 'locked');
+    if (!locked) return null;
+    const newCapsuleId = newId('cap');
+    const draft = createDraftFromLocked(locked, newCapsuleId);
+    capsules.value.push(draft);
+    return newCapsuleId;
+  }
+
+  return {capsules, lockedCapsules, draftCapsules, addCapsule, updateCapsule, removeCapsule, getCapsule, lockCapsuleById, editLockedCapsule};
 });

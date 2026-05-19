@@ -45,6 +45,7 @@
       <button class="btn btn-sm" @click="$emit('add', 'manual-text')">+ Manual text</button>
       <button class="btn btn-sm" @click="$emit('add', 'template')">+ Template</button>
       <button class="btn btn-sm" @click="$emit('add', 'json-extract')">+ JSON extract</button>
+      <button v-if="showCapsuleAdd" class="btn btn-sm btn-capsule" @click="$emit('add', 'capsule-instance')">+ Capsule</button>
     </div>
   </div>
 </template>
@@ -57,6 +58,7 @@ const props = defineProps<{
   selectedNodeId: string | null;
   trace: PipelineTraceEvent[];
   finalArtifactKey: string | null;
+  showCapsuleAdd?: boolean;
 }>();
 
 defineEmits<{
@@ -161,6 +163,8 @@ function nodeDefaultTitle(node: PipelineNode): string {
 .btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 4px; cursor: pointer; }
 .btn-sm { padding: 3px 8px; font-size: 0.75rem; }
 .btn:hover { background: #222; color: #ccc; }
+.btn-capsule { border-color: #2a3d52; color: #5a9fd4; }
+.btn-capsule:hover { background: #1a2a3a; color: #7ec8e3; }
 
 .icon-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.8rem; padding: 0 3px; }
 .icon-btn:hover:not(:disabled) { color: #aaa; }

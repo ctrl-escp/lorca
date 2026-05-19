@@ -1,9 +1,11 @@
 <template>
   <div class="capsule-center">
     <div class="capsule-toolbar">
-      <input class="capsule-name" v-model="localName" @blur="editor.updateMeta({name: localName})" placeholder="Capsule name" />
+      <input class="capsule-name" v-model="localName" @blur="editor.updateMeta({name: localName})" placeholder="Capsule name" :readonly="def.status === 'locked'" />
       <span class="capsule-version">{{ def.version }}</span>
       <span class="capsule-status" :class="`status-${def.status}`">{{ def.status }}</span>
+      <button v-if="def.status === 'draft'" class="btn btn-lock" @click="handleLock">Lock</button>
+      <button v-else class="btn btn-edit" @click="handleEditLocked">Edit (new draft)</button>
     </div>
 
     <ChainEditor
@@ -75,6 +77,7 @@ import type {CapsuleDefinition} from '@lorca/core';
 import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
+import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {resolveOutputRef} from '@lorca/pipeline';
 import ChainEditor from '../pipeline/ChainEditor.vue';
@@ -84,6 +87,7 @@ const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
 
 const capsuleRunStore = useCapsuleRunStore();
 const uiStore = useUiStore();
+const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
 
 const editor = useCapsuleEditor(props.capsule);
@@ -101,6 +105,18 @@ const testPrompt = ref('');
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
+
+function handleLock() {
+  if (!uiStore.activeCapsuleEditId) return;
+  const result = capsulesStore.lockCapsuleById(uiStore.activeCapsuleEditId);
+  if (!result.ok) alert(`Cannot lock: ${result.message}`);
+}
+
+function handleEditLocked() {
+  if (!uiStore.activeCapsuleEditId) return;
+  const newId = capsulesStore.editLockedCapsule(uiStore.activeCapsuleEditId);
+  if (newId) uiStore.openCapsuleEditor(newId);
+}
 
 async function handleTestRun() {
   const inputValues: Record<string, unknown> = {};
@@ -181,4 +197,8 @@ async function handleTestRun() {
 .btn-run:disabled { opacity: 0.4; cursor: default; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
+.btn-lock { background: #1e2d1e; border-color: #2a4d2a; color: #5ddb9e; padding: 2px 8px; font-size: 0.72rem; }
+.btn-lock:hover { background: #253d25; }
+.btn-edit { background: #2d2a1e; border-color: #4d3d1a; color: #c8a85a; padding: 2px 8px; font-size: 0.72rem; }
+.btn-edit:hover { background: #3d3822; }
 </style>

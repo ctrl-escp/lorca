@@ -20,6 +20,7 @@
       :selected-node-id="uiStore.selectedNodeId"
       :trace="runStore.trace"
       :final-artifact-key="finalArtifactKey"
+      :show-capsule-add="true"
       @select="uiStore.selectNode"
       @add="editor.addNode"
       @remove="editor.removeNode"

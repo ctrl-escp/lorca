@@ -17,6 +17,7 @@
         :models="modelsStore.models"
         :endpoints="endpointsStore.endpoints"
         v-bind="capsule ? {capsule} : {}"
+        :locked-capsules="capsulesStore.lockedCapsules"
         @update="onUpdateNode"
       />
       <CapsuleInterfacePanel
@@ -47,6 +48,7 @@ import {useActiveRunStore} from '../stores/activeRun.js';
 import {useCapsuleRunStore} from '../stores/capsuleRun.js';
 import {useModelsStore} from '../stores/models.js';
 import {useEndpointsStore} from '../stores/endpoints.js';
+import {useCapsulesStore} from '../stores/capsules.js';
 import NodeInspector from './inspector/NodeInspector.vue';
 import CapsuleInterfacePanel from './capsule/CapsuleInterfacePanel.vue';
 import TracePanel from './pipeline/TracePanel.vue';
@@ -64,6 +66,7 @@ const runStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
+const capsulesStore = useCapsulesStore();
 
 const isCapsuleMode = computed(() => uiStore.editorContext === 'capsule');
 

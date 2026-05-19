@@ -107,6 +107,14 @@
         <label>Input artifact ref</label>
         <input v-model="localInputRef" @blur="emit('update', {inputArtifactRef: localInputRef})" placeholder="answer.text" />
       </div>
+
+      <!-- CapsuleInstanceNode -->
+      <CapsuleInstanceInspector
+        v-else-if="node.type === 'capsule-instance'"
+        :node="node"
+        :locked-capsules="lockedCapsules ?? []"
+        @update="emit('update', $event)"
+      />
     </template>
   </div>
 </template>
@@ -115,12 +123,14 @@
 import {ref, watch} from 'vue';
 import type {PipelineNode, DiscoveredModel, AiEndpointConfig, CapsuleDefinition} from '@lorca/core';
 import {isValidTag} from '@lorca/prompt';
+import CapsuleInstanceInspector from './CapsuleInstanceInspector.vue';
 
 const props = defineProps<{
   node: PipelineNode | null;
   models: DiscoveredModel[];
   endpoints: AiEndpointConfig[];
   capsule?: CapsuleDefinition;
+  lockedCapsules?: CapsuleDefinition[];
 }>();
 
 const emit = defineEmits<{update: [patch: Record<string, unknown>]}>();

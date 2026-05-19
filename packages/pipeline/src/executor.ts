@@ -6,6 +6,8 @@ import type {
   PipelineError,
   PipelineNode,
   ModelCallNode,
+  CapsuleInstanceNode,
+  CapsuleDefinition,
   AiEndpointConfig,
   Result,
 } from '@lorca/core';
@@ -20,6 +22,7 @@ import { topologicalOrder } from './order.js';
 import { outputKey, resolveOutputRef } from './artifacts.js';
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
+export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
 
 export interface ExecutorCallbacks {
   onTraceEvent(event: PipelineTraceEvent): void;
@@ -80,6 +83,7 @@ export async function executePipeline(
   ctx: PipelineRunContext,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
+  resolveCapsule?: CapsuleResolver,
 ): Promise<Result<string, PipelineError>> {
   // Validate first
   const validation = validatePipeline(def);
@@ -109,7 +113,7 @@ export async function executePipeline(
     const startMs = Date.now();
     callbacks.onTraceEvent(traceStarted(ctx.runId, nodeId));
 
-    const result = await executeNode(node, ctx, resolveEndpoint);
+    const result = await executeNode(node, ctx, resolveEndpoint, callbacks, resolveCapsule);
 
     if (!result.ok) {
       callbacks.onTraceEvent(traceFailed(ctx.runId, nodeId, startMs, result.error));
@@ -146,6 +150,8 @@ async function executeNode(
   node: PipelineNode,
   ctx: PipelineRunContext,
   resolveEndpoint: EndpointResolver,
+  callbacks: ExecutorCallbacks,
+  resolveCapsule?: CapsuleResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   switch (node.type) {
     case 'input':
@@ -210,7 +216,7 @@ async function executeNode(
       return executeModelCallNode(node, ctx, resolveEndpoint);
 
     case 'capsule-instance':
-      return { ok: false, error: { code: 'missing_capsule', message: 'CapsuleInstanceNode execution is not yet implemented (Phase 8)', nodeId: node.id } };
+      return executeCapsuleInstance(node, ctx, resolveEndpoint, callbacks, resolveCapsule);
   }
 }
 
@@ -275,6 +281,156 @@ async function executeModelCallNode(
   }
 
   return { ok: true, value: artifacts };
+}
+
+async function executeCapsuleInstance(
+  node: CapsuleInstanceNode,
+  ctx: PipelineRunContext,
+  resolveEndpoint: EndpointResolver,
+  callbacks: ExecutorCallbacks,
+  resolveCapsule?: CapsuleResolver,
+): Promise<Result<PipelineArtifact[], PipelineError>> {
+  if (!resolveCapsule) {
+    return {ok: false, error: {code: 'missing_capsule', message: 'No capsule resolver provided', nodeId: node.id}};
+  }
+
+  const {capsuleDefinitionId, capsuleVersion, inputBindings, outputBindings, parameterValues, modelSlotAssignments} = node.config;
+  const instancePrefix = node.artifactPrefix ?? node.id;
+
+  const capsule = resolveCapsule(capsuleDefinitionId, capsuleVersion);
+  if (!capsule) {
+    return {ok: false, error: {code: 'missing_capsule', message: `Capsule not found: ${capsuleDefinitionId} ${capsuleVersion}`, nodeId: node.id}};
+  }
+
+  const resolvedNodes = resolveCapsuleSlots(capsule.nodes, modelSlotAssignments);
+
+  // Pre-seed internal artifacts from parent via inputBindings
+  const internalArtifacts: Record<string, PipelineArtifact> = {};
+  for (const port of capsule.interface.inputs) {
+    const parentKey = inputBindings[port.name] ?? `${instancePrefix}.${port.name}`;
+    const parentArtifact = ctx.artifacts[parentKey];
+    if (parentArtifact) {
+      internalArtifacts[port.name] = {...parentArtifact, name: port.name};
+    }
+  }
+
+  const internalCtx: PipelineRunContext = {
+    runId: ctx.runId,
+    pipelineId: capsule.id,
+    startedAt: new Date().toISOString(),
+    ...(ctx.abortSignal !== undefined && {abortSignal: ctx.abortSignal}),
+    input: ctx.input,
+    artifacts: internalArtifacts,
+    trace: [],
+    ...(Object.keys(parameterValues).length > 0 && {params: parameterValues}),
+  };
+
+  const order = topologicalOrder({
+    schemaVersion: 1,
+    id: capsule.id,
+    name: capsule.name,
+    inputArtifactName: 'user_prompt',
+    nodes: resolvedNodes,
+    edges: capsule.edges,
+    outputRef: capsule.outputRef,
+    createdAt: capsule.createdAt,
+    updatedAt: capsule.updatedAt,
+  });
+
+  const nodeMap = new Map(resolvedNodes.map((n) => [n.id, n]));
+  let failed = false;
+  let failError: PipelineError | null = null;
+
+  for (const nodeId of order) {
+    const n = nodeMap.get(nodeId)!;
+
+    if (failed) {
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'skipped', timestamp: new Date().toISOString()});
+      continue;
+    }
+
+    if (ctx.abortSignal?.aborted) {
+      const cancelErr: PipelineError = {code: 'run_cancelled', message: 'Run was cancelled', nodeId, capsuleInstanceId: node.id};
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'cancelled', timestamp: new Date().toISOString(), error: cancelErr});
+      failed = true;
+      failError = cancelErr;
+      continue;
+    }
+
+    const startMs = Date.now();
+    callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'started', timestamp: new Date().toISOString()});
+
+    const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule);
+
+    if (!result.ok) {
+      const nodeErr: PipelineError = {...result.error, capsuleInstanceId: node.id};
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'failed', timestamp: new Date().toISOString(), durationMs: Date.now() - startMs, error: nodeErr});
+      failed = true;
+      failError = nodeErr;
+      continue;
+    }
+
+    const produced: string[] = [];
+    for (const artifact of result.value) {
+      internalCtx.artifacts[artifact.name] = artifact;
+      // Store internal artifacts in parent with namespaced key for trace inspection
+      const internalKey = `${instancePrefix}.internal.${artifact.name}`;
+      const internalArtifact = {...artifact, name: internalKey};
+      ctx.artifacts[internalKey] = internalArtifact;
+      callbacks.onArtifact(internalArtifact);
+      produced.push(internalKey);
+    }
+    callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'completed', timestamp: new Date().toISOString(), durationMs: Date.now() - startMs, outputArtifactNames: produced});
+  }
+
+  if (failed && failError) {
+    return {ok: false, error: {...failError, nodeId: node.id}};
+  }
+
+  // Copy declared public output ports to parent store
+  const publicOutputs: PipelineArtifact[] = [];
+  for (const port of capsule.interface.outputs) {
+    const sourceKey = port.sourceArtifactKey ?? resolveOutputRef(capsule.outputRef, resolvedNodes) ?? port.name;
+    const internalArtifact = internalCtx.artifacts[sourceKey];
+    if (!internalArtifact) continue;
+    const parentKey = outputBindings[port.name] ?? `${instancePrefix}.${port.name}`;
+    publicOutputs.push({...internalArtifact, name: parentKey});
+  }
+
+  // If no output ports declared, expose the primary capsule output
+  if (capsule.interface.outputs.length === 0) {
+    const primaryKey = resolveOutputRef(capsule.outputRef, resolvedNodes);
+    if (primaryKey) {
+      const internalArtifact = internalCtx.artifacts[primaryKey];
+      if (internalArtifact) {
+        const portName = capsule.outputRef.outputName;
+        const parentKey = outputBindings[portName] ?? `${instancePrefix}.${portName}`;
+        publicOutputs.push({...internalArtifact, name: parentKey});
+      }
+    }
+  }
+
+  return {ok: true, value: publicOutputs};
+}
+
+function resolveCapsuleSlots(
+  nodes: PipelineNode[],
+  assignments: Record<string, {endpointId: string; modelName: string}>,
+): PipelineNode[] {
+  return nodes.map((node) => {
+    if (node.type !== 'model-call') return node;
+    const {modelRef} = node.config;
+    if (modelRef.kind !== 'slot') return node;
+    const assignment = assignments[modelRef.slotName];
+    if (!assignment) return node;
+    return {
+      ...node,
+      config: {
+        ...node.config,
+        modelRef: {kind: 'fixed' as const, endpointId: assignment.endpointId, modelName: assignment.modelName},
+      },
+    };
+  });
 }
 
 function tryParseJson(text: string): unknown | null {

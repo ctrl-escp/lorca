@@ -4,6 +4,7 @@ import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineE
 import {buildUserPromptArtifacts} from '@lorca/prompt';
 import {executePipeline} from '@lorca/pipeline';
 import {useEndpointsStore} from './endpoints.js';
+import {useCapsulesStore} from './capsules.js';
 
 export type RunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -39,6 +40,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
 
   async function run(def: PipelineDefinition, userPromptRaw: string) {
     const endpointsStore = useEndpointsStore();
+    const capsulesStore = useCapsulesStore();
     reset();
 
     const id = `run-${crypto.randomUUID().slice(0, 8)}`;
@@ -72,6 +74,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
           ctx.artifacts[artifact.name] = artifact;
         },
       },
+      (id, version) => capsulesStore.getCapsule(id, version),
     );
 
     abortController.value = null;

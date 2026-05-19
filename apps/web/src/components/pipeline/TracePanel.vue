@@ -3,7 +3,8 @@
     <div v-if="trace.length === 0" class="trace-empty">No trace yet. Execute the pipeline to see step details.</div>
     <div v-for="event in trace" :key="`${event.nodeId}-${event.status}-${event.timestamp}`" class="trace-event" :class="`ev-${event.status}`">
       <div class="ev-header">
-        <span class="ev-node">{{ event.nodeId }}</span>
+        <span v-if="event.capsuleInstanceId" class="ev-capsule-id">{{ event.capsuleInstanceId }}</span>
+        <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}">{{ event.nodeId }}</span>
         <span class="ev-status">{{ event.status }}</span>
         <span v-if="event.durationMs !== undefined" class="ev-duration">{{ event.durationMs }}ms</span>
       </div>
@@ -31,8 +32,11 @@ defineProps<{trace: PipelineTraceEvent[]}>();
 .ev-failed { border-left: 2px solid #c0392b; }
 .ev-started { border-left: 2px solid #e8a020; }
 .ev-skipped, .ev-cancelled { opacity: 0.5; }
-.ev-header { display: flex; gap: 0.5rem; align-items: center; font-size: 0.78rem; }
+.ev-header { display: flex; gap: 0.5rem; align-items: center; font-size: 0.78rem; flex-wrap: wrap; }
+.ev-capsule-id { font-family: monospace; color: #5a9fd4; font-size: 0.68rem; }
+.ev-capsule-id::after { content: ' ›'; }
 .ev-node { font-family: monospace; color: #7ec8e3; }
+.ev-node-internal { color: #4a8db4; font-size: 0.72rem; }
 .ev-status { color: #888; }
 .ev-duration { color: #555; font-size: 0.72rem; margin-left: auto; }
 .ev-artifacts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
