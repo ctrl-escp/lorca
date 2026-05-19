@@ -508,6 +508,22 @@ interface StepHistoryEntry {
 
 The history is derived from run artifacts and trace events. It is not a separate mutable memory store.
 
+Before any step executes, a synthetic history entry for the pipeline input is prepended at `stepOrderAtRun: 0`:
+
+```ts
+{
+  stepId: 'pipeline-input',       // reserved id, never used by a PipelineStep
+  stepOrderAtRun: 0,
+  stepLabel: 'Pipeline Input',
+  artifactRefs: ['user_prompt.text'],
+  primaryArtifactRef: 'user_prompt.text',
+  status: 'completed',
+  startedAt: runStartedAt,
+}
+```
+
+This means every step — including the very first — can reference the original user prompt via a `historyReads` entry pointing to `sourceStepId: 'pipeline-input'`. The `pipeline-input` id is a reserved constant; no `PipelineStep` may use it.
+
 ### Read contract
 
 A step may declare reads from previous step history:
@@ -523,8 +539,8 @@ interface StepHistoryReadConfig {
 
 Rules:
 
-1. Every step output is saved as history when the step runs.
-2. A step may read any output from an earlier active step.
+1. The pipeline input is saved as the zeroth history entry before execution begins. Every step output is saved as history when the step runs.
+2. A step may read the pipeline input (`sourceStepId: 'pipeline-input'`) or any output from an earlier active step.
 3. A step may not read from itself.
 4. A step may not read from a later active step.
 5. Reordering a step can invalidate history reads that now point forward.
@@ -563,6 +579,7 @@ The chain editor should show a compact indicator when a step reads prior history
 History participates in dependency tracking:
 
 * Editing a source step marks downstream steps that read that step’s history affected.
+* Editing the pipeline input (`user_prompt`) marks any step with a history read on `pipeline-input` affected, in addition to the standard downstream staleness cascade.
 * Editing a history read config marks that step and downstream consumers affected.
 * Reordering can make history reads invalid if they point to a later step.
 * Deleting or disabling a source step blocks required readers.
@@ -572,6 +589,8 @@ History participates in dependency tracking:
 
 * A prompt reformatter step can read the output of Intent Extraction.
 * A final model step can read both Intent Extraction and Acceptance Criteria outputs without intermediate passthrough bindings.
+* Any step — including the first — can read the original pipeline input via `sourceStepId: 'pipeline-input'`.
+* The pipeline-input history entry is available in every run, including partial runs.
 * A step cannot read from a later active step.
 * Disabling a source step blocks required downstream history reads.
 * History values are visible in trace and inspector.
@@ -1047,8 +1066,9 @@ Required test cases:
 11. Disabling a source step blocks required history readers.
 12. Previous output placement renders before and after prompt blocks correctly.
 13. Adapter conversion uses structured prompt blocks and does not parse XML back into chat roles.
-14. Import/export preserves prompt blocks, enabled flags, previous-output placement, primary output names, and history read configs.
-15. Capsule extraction creates correct public inputs/outputs, including history-read boundaries.
+14. A step with `sourceStepId: 'pipeline-input'` resolves correctly to the pipeline input artifact in both full and partial runs.
+15. Import/export preserves prompt blocks, enabled flags, previous-output placement, primary output names, and history read configs.
+16. Capsule extraction creates correct public inputs/outputs, including history-read boundaries.
 
 ### E2E tests
 
