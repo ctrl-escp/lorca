@@ -19,13 +19,11 @@
 
       <!-- InputNode: read-only -->
       <div v-if="node.type === 'input'" class="inspector-readonly" title="The Input step always produces these artifacts from the target prompt">
-        <p>Produces: <code>user_prompt.raw</code>, <code>user_prompt.xml</code></p>
+        <p>Edit the target prompt in the center pane. Produces: <code>user_prompt.raw</code>, <code>user_prompt.xml</code></p>
       </div>
 
-      <!-- ManualTextNode -->
-      <div v-else-if="node.type === 'manual-text'" class="inspector-field">
-        <FieldLabel label="Text" required title="Static text written to this step's output artifact" />
-        <textarea v-model="localText" rows="6" title="Static text written to this step's output artifact" @blur="emit('update', {text: localText})" />
+      <div v-else-if="node.type === 'manual-text'" class="inspector-readonly">
+        <p>Edit the step text in the center pane.</p>
       </div>
 
       <!-- PromptWrapperNode -->
@@ -33,10 +31,6 @@
         <div class="inspector-field">
           <FieldLabel label="Tag name" required title="XML tag wrapping the instructions and input (must be a valid tag name)" />
           <input v-model="localWrapTag" @blur="emitWrapper" :class="{invalid: !isValidTag(localWrapTag)}" title="XML tag wrapping the instructions and input" />
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Instruction text" title="System-style instructions placed inside the wrapper tag" />
-          <textarea v-model="localWrapInstruction" rows="4" title="System-style instructions placed inside the wrapper tag" @blur="emitWrapper" />
         </div>
         <div class="inspector-field-row">
           <label title="When checked, the upstream artifact is included inside the wrapper">
@@ -54,12 +48,8 @@
       </template>
 
       <!-- TemplateNode -->
-      <div v-else-if="node.type === 'template'" class="inspector-field">
-        <label class="field-label-row">
-          <FieldLabel label="Template" required title="Text template with {{artifact.key}} and {{param.name}} placeholders" />
-          <span class="hint">use <code v-pre>{{artifact.key}}</code></span>
-        </label>
-        <textarea v-model="localTemplate" rows="8" title="Text template with {{artifact.key}} placeholders" @blur="emit('update', {template: localTemplate})" />
+      <div v-else-if="node.type === 'template'" class="inspector-readonly">
+        <p>Edit the template in the center pane. Use <code v-pre>{{artifact.key}}</code> placeholders.</p>
       </div>
 
       <!-- ModelCallNode -->
@@ -99,10 +89,6 @@
         <div class="inspector-field">
           <FieldLabel label="Input artifact ref" required title="Artifact key fed to the model (e.g. user_prompt.xml or prompt.text)" />
           <input v-model="localInputRef" @blur="emitModelCall" placeholder="user_prompt.xml" title="Artifact key fed to the model" />
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="System prompt (optional)" title="Separate system instruction (chat mode or Ollama generate system field)" />
-          <textarea v-model="localSystemPrompt" rows="3" title="Separate system instruction sent to the model" @blur="emitModelCall" />
         </div>
         <div class="inspector-field-row">
           <FieldLabel label="Expected output" title="When json, the adapter parses the model response as JSON" />

@@ -10,7 +10,7 @@
           :ref="(el) => setStepRef(node.id, el as HTMLElement | null)"
           class="chain-step"
           :class="{selected: selectedNodeId === node.id, [traceStatusClass(node.id)]: true}"
-          :title="`Select ${nodeTypeLabel(node)} step to configure in the Inspector`"
+          :title="`Select ${nodeTypeLabel(node)} step — edit its main prompt above, details in the Inspector`"
           @click="$emit('select', node.id)"
         >
           <div class="step-connector" v-if="i > 0">↓</div>

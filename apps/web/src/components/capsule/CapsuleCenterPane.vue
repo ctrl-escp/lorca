@@ -17,6 +17,14 @@
       <button class="btn btn-secondary" type="button" title="Import Capsule JSON" @click="handleImport">Import</button>
     </div>
 
+    <StepMainPrompt
+      :node="selectedNode"
+      :user-prompt="testPrompt"
+      input-prompt-label="User prompt"
+      @update:user-prompt="testPrompt = $event"
+      @update:node="onStepPromptNodeUpdate"
+    />
+
     <ChainEditor
       :nodes="def.nodes"
       :selected-node-id="uiStore.selectedNodeId"
@@ -42,11 +50,6 @@
       </div>
 
       <div class="test-fields">
-        <div class="test-field">
-          <FieldLabel label="User prompt" required title="Test input for the Capsule's Input step" />
-          <textarea v-model="testPrompt" rows="2" placeholder="Test prompt for InputNode…" title="Test input for the Capsule's Input step" />
-        </div>
-
         <!-- Input port values -->
         <template v-if="def.interface.inputs.length > 0">
           <div v-for="port in def.interface.inputs" :key="port.name" class="test-field">
@@ -99,6 +102,7 @@ import {pickJsonFile} from '../../utils/importFile.js';
 import {resolveOutputRef} from '@lorca/pipeline';
 import FieldLabel from '../common/FieldLabel.vue';
 import ChainEditor from '../pipeline/ChainEditor.vue';
+import StepMainPrompt from '../pipeline/StepMainPrompt.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -122,7 +126,15 @@ watch(() => def.value.name, (n) => { localName.value = n; });
 
 const finalArtifactKey = computed(() => resolveOutputRef(def.value.outputRef, def.value.nodes));
 
+const selectedNode = computed(() =>
+  uiStore.selectedNodeId ? def.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
+);
+
 const testPrompt = ref('');
+
+function onStepPromptNodeUpdate(patch: Record<string, unknown>) {
+  if (uiStore.selectedNodeId) updateNode(uiStore.selectedNodeId, patch);
+}
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});

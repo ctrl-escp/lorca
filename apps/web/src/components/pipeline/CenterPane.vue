@@ -23,15 +23,12 @@
       </div>
     </div>
 
-    <div class="prompt-input">
-      <FieldLabel label="Target prompt" required title="Your main input text — wrapped and passed through the pipeline on Execute" />
-      <textarea
-        v-model="userPrompt"
-        rows="3"
-        placeholder="Enter your target prompt…"
-        title="Your main input text — wrapped and passed through the pipeline on Execute"
-      />
-    </div>
+    <StepMainPrompt
+      :node="selectedNode"
+      :user-prompt="userPrompt"
+      @update:user-prompt="userPrompt = $event"
+      @update:node="onStepPromptNodeUpdate"
+    />
 
     <ChainEditor
       :nodes="def.nodes"
@@ -56,8 +53,8 @@ import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {pickJsonFile} from '../../utils/importFile.js';
-import FieldLabel from '../common/FieldLabel.vue';
 import ChainEditor from './ChainEditor.vue';
+import StepMainPrompt from './StepMainPrompt.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]}>();
@@ -83,7 +80,14 @@ function commitPipelineName() {
 
 watch(localPipelineName, () => commitPipelineName());
 
+const selectedNode = computed(() =>
+  uiStore.selectedNodeId ? def.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
+);
 const canRun = computed(() => userPrompt.value.trim().length > 0);
+
+function onStepPromptNodeUpdate(patch: Record<string, unknown>) {
+  if (uiStore.selectedNodeId) updateNode(uiStore.selectedNodeId, patch);
+}
 
 watch(def, (newDef) => emit('update', newDef), {deep: true});
 
@@ -126,7 +130,4 @@ function handleImport() {
 .btn-secondary:hover { background: #222; color: #ccc; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
-.prompt-input { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.prompt-input textarea { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 4px; padding: 6px 8px; font-size: 0.85rem; resize: vertical; font-family: inherit; }
-.prompt-input textarea:focus { outline: none; border-color: #3a6080; }
 </style>
