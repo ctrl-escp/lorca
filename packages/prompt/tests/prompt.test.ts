@@ -3,6 +3,7 @@ import {escapePromptText, unescapePromptText} from '../src/escape.js';
 import {buildUserPromptArtifacts} from '../src/envelope.js';
 import {renderTemplate} from '../src/template.js';
 import {isValidTag, isReservedTag} from '../src/tags.js';
+import {renderPromptComposition, previewPromptXml} from '../src/render.js';
 
 describe('escapePromptText', () => {
   it('escapes &', () => expect(escapePromptText('a & b')).toBe('a &amp; b'));
@@ -118,6 +119,82 @@ describe('renderTemplate', () => {
       expect(result.error.message).toContain('artifact.a');
       expect(result.error.message).toContain('artifact.b');
     }
+  });
+});
+
+describe('renderPromptComposition', () => {
+  const baseConfig = () => ({
+    previousOutput: {enabled: false, placement: 'afterOwnPrompt' as 'beforeOwnPrompt' | 'afterOwnPrompt', tagName: 'previous_output'},
+    historyReads: [],
+    blocks: [
+      {id: 'b1', label: 'System', tagName: 'system', body: 'You are helpful.', enabled: true, source: 'system-default' as const},
+    ],
+  });
+
+  it('renders enabled blocks to xmlText', () => {
+    const {xmlText} = renderPromptComposition(baseConfig());
+    expect(xmlText).toBe('<system>\nYou are helpful.\n</system>');
+  });
+
+  it('skips disabled blocks', () => {
+    const config = baseConfig();
+    config.blocks[0]!.enabled = false;
+    const {blocks, xmlText} = renderPromptComposition(config);
+    expect(blocks).toHaveLength(0);
+    expect(xmlText).toBe('');
+  });
+
+  it('skips blocks with invalid tag names', () => {
+    const config = baseConfig();
+    config.blocks[0]!.tagName = '1invalid';
+    const {blocks} = renderPromptComposition(config);
+    expect(blocks).toHaveLength(0);
+  });
+
+  it('omits previous-output block when resolvedPrevOutput is undefined', () => {
+    const config = baseConfig();
+    config.previousOutput.enabled = true;
+    const {blocks} = renderPromptComposition(config, undefined);
+    expect(blocks.every((b) => b.source !== 'previous-output')).toBe(true);
+  });
+
+  it('includes previous-output block when resolvedPrevOutput is provided', () => {
+    const config = baseConfig();
+    config.previousOutput.enabled = true;
+    config.previousOutput.placement = 'afterOwnPrompt';
+    const {blocks} = renderPromptComposition(config, 'prev text');
+    const prevBlock = blocks.find((b) => b.source === 'previous-output');
+    expect(prevBlock).toBeDefined();
+    expect(prevBlock?.body).toBe('prev text');
+    expect(prevBlock?.tagName).toBe('previous_output');
+  });
+
+  it('places previous output before own blocks when placement is beforeOwnPrompt', () => {
+    const config = baseConfig();
+    config.previousOutput.enabled = true;
+    config.previousOutput.placement = 'beforeOwnPrompt';
+    const {blocks} = renderPromptComposition(config, 'prev');
+    expect(blocks[0]?.source).toBe('previous-output');
+    expect(blocks[1]?.tagName).toBe('system');
+  });
+
+  it('places previous output after own blocks when placement is afterOwnPrompt', () => {
+    const config = baseConfig();
+    config.previousOutput.enabled = true;
+    config.previousOutput.placement = 'afterOwnPrompt';
+    const {blocks} = renderPromptComposition(config, 'prev');
+    expect(blocks[0]?.tagName).toBe('system');
+    expect(blocks[1]?.source).toBe('previous-output');
+  });
+
+  it('previewPromptXml shows placeholder for previous output', () => {
+    const config = baseConfig();
+    config.previousOutput.enabled = true;
+    config.previousOutput.placement = 'beforeOwnPrompt';
+    const xml = previewPromptXml(config);
+    expect(xml).toContain('…previous step output…');
+    expect(xml).toContain('<system>');
+    expect(xml.indexOf('previous_output')).toBeLessThan(xml.indexOf('<system>'));
   });
 });
 

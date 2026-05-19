@@ -68,32 +68,7 @@
         </div>
       </template>
 
-      <!-- Prompt Wrapper -->
-      <template v-else-if="step.config.type === 'prompt-wrapper'">
-        <div class="inspector-field">
-          <FieldLabel label="Previous output tag" title="XML tag name wrapping the previous step's output" />
-          <input
-            v-model="localPrevOutputTag"
-            :class="{invalid: localPrevOutputTag && !isValidTag(localPrevOutputTag)}"
-            placeholder="previous_output"
-            title="XML tag for previous step output"
-            @blur="commitPromptWrapper"
-          />
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Placement" title="Whether previous output appears before or after this step's prompt blocks" />
-          <select v-model="localPlacement" title="Placement relative to prompt blocks" @change="commitPromptWrapper">
-            <option value="beforeOwnPrompt">Before prompt blocks</option>
-            <option value="afterOwnPrompt">After prompt blocks</option>
-          </select>
-        </div>
-        <div class="inspector-field-row">
-          <label title="Include the previous step's output in this step's prompt">
-            <input type="checkbox" v-model="localPrevOutputEnabled" @change="commitPromptWrapper" />
-            Include previous output
-          </label>
-        </div>
-      </template>
+      <!-- Prompt Wrapper (no step-config fields; all config is in PromptCompositionEditor below) -->
 
       <!-- Manual Text -->
       <template v-else-if="step.config.type === 'manual-text'">
@@ -197,27 +172,11 @@
       </template>
 
       <!-- Prompt composition (shown for all prompt-bearing steps) -->
-      <template v-if="hasPromptBlocks">
-        <div class="inspector-section-divider">Prompt blocks</div>
-        <div class="prompt-block-list">
-          <div
-            v-for="(block, idx) in step.prompt?.blocks ?? []"
-            :key="block.id"
-            class="prompt-block-row"
-            :class="{disabled: !block.enabled}"
-          >
-            <input
-              type="checkbox"
-              :checked="block.enabled"
-              :title="block.enabled ? 'Disable this block' : 'Enable this block'"
-              @change="toggleBlock(idx)"
-            />
-            <code class="block-tag">&lt;{{ block.tagName }}&gt;</code>
-            <span class="block-body-preview" :title="block.body">{{ block.body.slice(0, 60) }}{{ block.body.length > 60 ? '…' : '' }}</span>
-          </div>
-          <p v-if="!step.prompt?.blocks?.length" class="empty-hint">No prompt blocks. Prompt editor coming in Phase 3.</p>
-        </div>
-      </template>
+      <PromptCompositionEditor
+        v-if="hasPromptBlocks"
+        :step-id="step.id"
+        :config="step.prompt"
+      />
     </template>
   </div>
 </template>
@@ -225,11 +184,11 @@
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
 import type {ModelCallStepConfig} from '@lorca/core';
-import {isValidTag} from '@lorca/prompt';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import FieldLabel from '../common/FieldLabel.vue';
+import PromptCompositionEditor from './PromptCompositionEditor.vue';
 
 const editorStore = usePipelineEditorStore();
 const modelsStore = useModelsStore();
@@ -258,9 +217,6 @@ const localModelKey = ref('');
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
 const localMaxTokens = ref('');
-const localPrevOutputTag = ref('previous_output');
-const localPlacement = ref<'beforeOwnPrompt' | 'afterOwnPrompt'>('beforeOwnPrompt');
-const localPrevOutputEnabled = ref(true);
 const localText = ref('');
 const localTemplate = ref('');
 const localSourceRef = ref('');
@@ -281,13 +237,6 @@ watch(step, (s) => {
     localMode.value = cfg.mode;
     localTemperature.value = cfg.temperature !== undefined ? String(cfg.temperature) : '';
     localMaxTokens.value = cfg.maxTokens !== undefined ? String(cfg.maxTokens) : '';
-  }
-
-  if (cfg.type === 'prompt-wrapper') {
-    const prev = s.prompt?.previousOutput;
-    localPrevOutputEnabled.value = prev?.enabled ?? true;
-    localPrevOutputTag.value = prev?.tagName ?? 'previous_output';
-    localPlacement.value = prev?.placement ?? 'beforeOwnPrompt';
   }
 
   if (cfg.type === 'manual-text') localText.value = cfg.text;
@@ -334,21 +283,6 @@ function commitModelCall() {
   editorStore.commitStepConfigEdit(s.id, {config: {...s.config, ...patch}}, 'Update model call');
 }
 
-function commitPromptWrapper() {
-  const s = step.value;
-  if (!s) return;
-  const prev = {
-    enabled: localPrevOutputEnabled.value,
-    placement: localPlacement.value,
-    tagName: localPrevOutputTag.value || 'previous_output',
-  };
-  const prompt = {
-    ...(s.prompt ?? {blocks: [], historyReads: []}),
-    previousOutput: prev,
-  };
-  editorStore.commitStepConfigEdit(s.id, {prompt}, 'Update prompt wrapper');
-}
-
 function commitManualText() {
   const s = step.value;
   if (!s || s.config.type !== 'manual-text') return;
@@ -382,12 +316,6 @@ function commitLoopGroup() {
   }, 'Update loop');
 }
 
-function toggleBlock(idx: number) {
-  const s = step.value;
-  if (!s?.prompt?.blocks) return;
-  const blocks = s.prompt.blocks.map((b, i) => i === idx ? {...b, enabled: !b.enabled} : b);
-  editorStore.updateStepConfig(s.id, {prompt: {...s.prompt, blocks}});
-}
 </script>
 
 <style scoped>
@@ -429,10 +357,5 @@ input[type="checkbox"] { width: auto; }
 .binding-arrow { color: #444; }
 .binding-ref { color: #5a8a5a; font-size: 0.72rem; }
 
-.prompt-block-list { display: flex; flex-direction: column; gap: 0.25rem; }
-.prompt-block-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; }
-.prompt-block-row.disabled { opacity: 0.4; }
-.block-tag { color: #7ec8e3; font-size: 0.68rem; flex-shrink: 0; }
-.block-body-preview { color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .empty-hint { font-size: 0.68rem; color: #444; margin: 0; }
 </style>

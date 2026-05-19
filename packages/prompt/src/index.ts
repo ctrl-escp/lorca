@@ -6,3 +6,5 @@ export {renderTemplate} from './template.js';
 export type {TemplateContext} from './template.js';
 export {TAG_PATTERN, RESERVED_TAGS, isValidTag, isReservedTag} from './tags.js';
 export type {ReservedTag} from './tags.js';
+export {renderPromptComposition, previewPromptXml} from './render.js';
+export type {RenderedPromptBlock, RenderedPromptPayload} from './render.js';
