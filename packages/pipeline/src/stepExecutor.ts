@@ -135,6 +135,26 @@ export async function executeStepChain(
       continue;
     }
 
+    if (compiledStep.execute === 'blocked') {
+      const blockErr: PipelineError = {
+        code: 'invalid_pipeline_graph',
+        message: compiledStep.blockedReason ?? 'Step has unresolved required inputs',
+        nodeId: step.id,
+      };
+      snapshots[step.id] = buildStepRunSnapshot(
+        step,
+        compiledStep,
+        pipeline,
+        userPromptSignature,
+        [],
+        'failed',
+      );
+      callbacks.onTraceEvent(traceEvent(runId, step.id, 'failed', {error: blockErr}));
+      failed = true;
+      failError = blockErr;
+      continue;
+    }
+
     callbacks.onTraceEvent(traceEvent(runId, step.id, 'started'));
     const startMs = Date.now();
 

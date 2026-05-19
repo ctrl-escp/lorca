@@ -9,7 +9,7 @@ import type {
   PromptWrapperConfig,
 } from '@lorca/core';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
-import {getStepHistoryReads} from './historyReads.js';
+import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
 import {newStepId} from './stepId.js';
 
 // ── Active chain ──────────────────────────────────────────────────────────────
@@ -58,14 +58,19 @@ export function compileStepChainToExecutionPlan(
     : -1;
   const slicedSteps = stopIdx >= 0 ? activeSteps.slice(0, stopIdx + 1) : activeSteps;
 
-  return compileActiveStepsToExecutionPlan(slicedSteps, options.stopAtStepId);
+  return compileActiveStepsToExecutionPlan(slicedSteps, {
+    allSteps: pipeline.steps,
+    ...(options.stopAtStepId ? {stopAtStepId: options.stopAtStepId} : {}),
+  });
 }
 
 /** Compile an ordered active step slice into an execution plan. */
 export function compileActiveStepsToExecutionPlan(
   steps: PipelineStep[],
-  stopAtStepId?: string,
+  options?: {stopAtStepId?: string; allSteps?: PipelineStep[]},
 ): ExecutionPlan {
+  const stopAtStepId = options?.stopAtStepId;
+  const allSteps = options?.allSteps ?? steps;
   const requiredHistorySources = new Set<string>();
   const compiled: CompiledExecutionStep[] = [];
 
@@ -88,14 +93,16 @@ export function compileActiveStepsToExecutionPlan(
       inputArtifactRefs.push(read.sourceArtifactRef);
     }
 
+    const blockReasons = getStepBlockReasons(step, allSteps);
     const compiledStep: CompiledExecutionStep = {
       stepId: step.id,
       stepOrder: i,
       type: step.type,
       inputArtifactRefs,
       outputNamespace: step.outputNamespace,
-      execute: 'run',
+      execute: blockReasons.length > 0 ? 'blocked' : 'run',
     };
+    if (blockReasons.length > 0) compiledStep.blockedReason = blockReasons.join('; ');
     if (historyReads.length > 0) compiledStep.historyReads = historyReads;
     if (previousOutputArtifactRef !== undefined) compiledStep.previousOutputArtifactRef = previousOutputArtifactRef;
     compiled.push(compiledStep);

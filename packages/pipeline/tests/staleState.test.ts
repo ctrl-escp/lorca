@@ -8,7 +8,7 @@ import {
   computeUserPromptSignature,
 } from '../src/staleState.js';
 
-function makeStep(id: string, label: string): PipelineStep {
+function makeStep(id: string, label: string, overrides?: Partial<PipelineStep>): PipelineStep {
   return {
     id,
     type: 'manual-text',
@@ -18,6 +18,7 @@ function makeStep(id: string, label: string): PipelineStep {
     primaryOutputName: 'text',
     lastEditedAt: new Date().toISOString(),
     config: {type: 'manual-text', text: label, outputNames: ['text']},
+    ...overrides,
   };
 }
 
@@ -94,6 +95,28 @@ describe('computeStepStaleStates', () => {
       'new prompt',
     );
     expect(states.find((s) => s.stepId === 'a')?.state).toBe('stale');
+  });
+
+  it('marks steps blocked when required history reads are unresolved', () => {
+    const source = makeStep('a', 'A', {enabled: false});
+    const consumer: PipelineStep = {
+      ...makeStep('b', 'B'),
+      prompt: {
+        previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+        historyReads: [{
+          sourceStepId: 'a',
+          sourceArtifactRef: 'a.text',
+          tagName: 'a_out',
+          required: true,
+        }],
+        blocks: [],
+      },
+    };
+    const pipeline = makePipeline([source, consumer]);
+    const states = computeStepStaleStates(pipeline, null, 'prompt');
+    const b = states.find((s) => s.stepId === 'b');
+    expect(b?.state).toBe('blocked');
+    expect(b?.blockReasons?.length).toBeGreaterThan(0);
   });
 
   it('marks non-executed steps as skipped-partial on partial runs', () => {

@@ -46,7 +46,7 @@
                   v-if="runStateFor(step.id)"
                   class="step-run-badge"
                   :class="`run-${runStateFor(step.id)}`"
-                  :title="stepRunUiStateLabel(runStateFor(step.id)!)"
+                  :title="runStateTitle(step.id)"
                 >
                   {{ stepRunUiStateLabel(runStateFor(step.id)!) }}
                 </span>
@@ -112,15 +112,14 @@
 <script setup lang="ts">
 import {ref, watch, nextTick, onMounted} from 'vue';
 import type {PipelineStep, PipelineTraceEvent, StepType} from '@lorca/core';
-import {getStepHistoryReads} from '@lorca/pipeline';
-import type {StepRunUiState} from '@lorca/pipeline';
-import {stepRunUiStateLabel} from '@lorca/pipeline';
+import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
+import type {StepStaleState} from '@lorca/pipeline';
 
 const props = defineProps<{
   steps: PipelineStep[];
   selectedStepId: string | null;
   trace: PipelineTraceEvent[];
-  stepRunStates?: Record<string, StepRunUiState>;
+  stepStates?: Record<string, StepStaleState>;
   runPartial?: boolean;
   finalArtifactKey: string | null;
   showCapsuleAdd?: boolean;
@@ -202,8 +201,18 @@ function historyReadCount(step: PipelineStep): number {
   return getStepHistoryReads(step).length;
 }
 
-function runStateFor(stepId: string): StepRunUiState | undefined {
-  return props.stepRunStates?.[stepId];
+function runStateFor(stepId: string) {
+  return props.stepStates?.[stepId]?.state;
+}
+
+function runStateTitle(stepId: string): string {
+  const entry = props.stepStates?.[stepId];
+  if (!entry) return '';
+  const label = stepRunUiStateLabel(entry.state);
+  if (entry.blockReasons?.length) {
+    return `${label}: ${entry.blockReasons.join('; ')}`;
+  }
+  return label;
 }
 </script>
 
@@ -328,6 +337,7 @@ function runStateFor(stepId: string): StepRunUiState | undefined {
 .run-failed-stale { background: #2e1a1a; color: #a05050; border: 1px dashed #804040; }
 .run-disabled { background: #1a1a1a; color: #444; }
 .run-skipped-partial { background: #1a1a2a; color: #606080; }
+.run-blocked { background: #2e1a1a; color: #e07070; border: 1px solid #5a3030; }
 
 .step-trace { display: flex; gap: 0.4rem; font-size: 0.68rem; margin-top: 0.15rem; }
 .status-completed { color: #3a9d6e; }

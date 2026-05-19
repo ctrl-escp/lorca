@@ -1,7 +1,15 @@
 <template>
   <div class="trace-panel">
-    <div v-if="trace.length === 0" class="trace-empty">No trace yet. Execute Pipeline to see step details.</div>
-    <div v-for="event in trace" :key="`${event.nodeId}-${event.status}-${event.timestamp}`" class="trace-event" :class="`ev-${event.status}`">
+    <div v-if="partialRun" class="trace-run-banner partial">Partial run — only steps up to the selected target executed.</div>
+    <div v-else-if="trace.length > 0" class="trace-run-banner full">Full pipeline run</div>
+
+    <div v-if="selectedStepId && filterToSelected" class="trace-filter-note">
+      Showing events for selected step
+      <button type="button" class="trace-filter-clear" @click="filterToSelected = false">Show all</button>
+    </div>
+
+    <div v-if="displayTrace.length === 0" class="trace-empty">No trace yet. Execute Pipeline to see step details.</div>
+    <div v-for="event in displayTrace" :key="`${event.nodeId}-${event.status}-${event.timestamp}`" class="trace-event" :class="`ev-${event.status}`">
       <div class="ev-header">
         <span v-if="event.capsuleInstanceId" class="ev-capsule-id">{{ event.capsuleInstanceId }}<template v-if="event.capsuleIteration !== undefined"> #{{ event.capsuleIteration }}</template></span>
         <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}">{{ event.nodeId }}</span>
@@ -20,12 +28,45 @@
 </template>
 
 <script setup lang="ts">
+import {ref, computed, watch} from 'vue';
 import type {PipelineTraceEvent} from '@lorca/core';
-defineProps<{trace: PipelineTraceEvent[]}>();
+
+const props = defineProps<{
+  trace: PipelineTraceEvent[];
+  partialRun?: boolean;
+  selectedStepId?: string | null;
+}>();
+
+const filterToSelected = ref(false);
+
+watch(() => props.selectedStepId, (id) => {
+  filterToSelected.value = Boolean(id);
+});
+
+const displayTrace = computed(() => {
+  if (!filterToSelected.value || !props.selectedStepId) return props.trace;
+  const id = props.selectedStepId;
+  return props.trace.filter(
+    (e) => e.nodeId === id || e.stepId === id,
+  );
+});
 </script>
 
 <style scoped>
 .trace-panel { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; overflow-y: auto; height: 100%; }
+.trace-run-banner {
+  font-size: 0.65rem; padding: 0.3rem 0.5rem; border-radius: 3px; text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.trace-run-banner.full { background: #1a2a1a; color: #5a9d5a; }
+.trace-run-banner.partial { background: #1a1a2a; color: #8080c0; }
+.trace-filter-note {
+  font-size: 0.68rem; color: #666; display: flex; align-items: center; gap: 0.4rem;
+}
+.trace-filter-clear {
+  background: none; border: none; color: #7ec8e3; cursor: pointer; font-size: 0.68rem; padding: 0;
+}
+.trace-filter-clear:hover { text-decoration: underline; }
 .trace-empty { color: #444; font-size: 0.78rem; }
 .trace-event { background: #111; border: 1px solid #1e1e1e; border-radius: 4px; padding: 0.4rem 0.6rem; }
 .ev-completed { border-left: 2px solid #3a9d6e; }

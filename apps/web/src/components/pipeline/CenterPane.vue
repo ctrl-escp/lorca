@@ -40,7 +40,7 @@
       :steps="editorStore.steps"
       :selected-step-id="editorStore.selectedStepId"
       :trace="runStore.trace"
-      :step-run-states="stepRunStates"
+      :step-states="stepStates"
       :run-partial="runStore.partial"
       :final-artifact-key="finalArtifactKey"
       :show-capsule-add="true"
@@ -66,10 +66,10 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch, onMounted} from 'vue';
+import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
 import type {PipelineDefinition, StepType} from '@lorca/core';
 import {computeStepStaleStates} from '@lorca/pipeline';
-import type {StepRunUiState} from '@lorca/pipeline';
+import type {StepStaleState} from '@lorca/pipeline';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
@@ -94,6 +94,21 @@ const localPipelineName = ref(props.def.name);
 onMounted(() => {
   editorStore.loadPipeline(props.def);
 });
+
+const onKeyDown = (e: KeyboardEvent) => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+  if (e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    if (editorStore.canUndo) editorStore.undo();
+  } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+    e.preventDefault();
+    if (editorStore.canRedo) editorStore.redo();
+  }
+};
+
+onMounted(() => window.addEventListener('keydown', onKeyDown));
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown));
 
 watch(() => props.def, (def) => {
   editorStore.loadPipeline(def);
@@ -125,13 +140,13 @@ const runButtonTitle = computed(() => {
   return needs.length ? `To run: ${needs.join(' and ')}` : 'Configure pipeline to run';
 });
 
-const stepRunStates = computed(() => {
+const stepStates = computed(() => {
   const states = computeStepStaleStates(
     editorStore.pipeline,
     runStore.runSnapshotContext,
     userPrompt.value,
   );
-  return Object.fromEntries(states.map((s) => [s.stepId, s.state])) as Record<string, StepRunUiState>;
+  return Object.fromEntries(states.map((s) => [s.stepId, s])) as Record<string, StepStaleState>;
 });
 
 function commitPipelineName() {

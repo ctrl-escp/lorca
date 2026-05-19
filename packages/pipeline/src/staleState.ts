@@ -6,7 +6,7 @@ import type {
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import type {CompiledExecutionStep} from './chainCompiler.js';
 import {buildActiveStepChain} from './chainCompiler.js';
-import {getStepHistoryReads} from './historyReads.js';
+import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
 
 function stableHash(value: unknown): string {
   const json = JSON.stringify(value, (_key, val) => {
@@ -96,11 +96,13 @@ export type StepRunUiState =
   | 'failed-current'
   | 'failed-stale'
   | 'disabled'
-  | 'skipped-partial';
+  | 'skipped-partial'
+  | 'blocked';
 
 export interface StepStaleState {
   stepId: string;
   state: StepRunUiState;
+  blockReasons?: string[];
 }
 
 export interface RunSnapshotContext {
@@ -144,10 +146,14 @@ export function computeStepStaleStates(
   userPromptRaw: string,
 ): StepStaleState[] {
   if (!runContext) {
-    return pipeline.steps.map((step) => ({
-      stepId: step.id,
-      state: step.enabled ? 'not-run' : 'disabled',
-    }));
+    return pipeline.steps.map((step) => {
+      if (!step.enabled) return {stepId: step.id, state: 'disabled'};
+      const blockReasons = getStepBlockReasons(step, pipeline.steps);
+      if (blockReasons.length > 0) {
+        return {stepId: step.id, state: 'blocked', blockReasons};
+      }
+      return {stepId: step.id, state: step.enabled ? 'not-run' : 'disabled'};
+    });
   }
 
   const {snapshots, userPromptSignature, partial, executedStepIds} = runContext;
@@ -173,6 +179,11 @@ export function computeStepStaleStates(
 
   return pipeline.steps.map((step) => {
     if (!step.enabled) return {stepId: step.id, state: 'disabled'};
+
+    const blockReasons = getStepBlockReasons(step, pipeline.steps);
+    if (blockReasons.length > 0) {
+      return {stepId: step.id, state: 'blocked', blockReasons};
+    }
 
     if (partial && !executedSet.has(step.id)) {
       return {stepId: step.id, state: 'skipped-partial'};
@@ -202,5 +213,6 @@ export function stepRunUiStateLabel(state: StepRunUiState): string {
     case 'failed-stale': return 'Failed (stale)';
     case 'disabled': return 'Disabled';
     case 'skipped-partial': return 'Skipped';
+    case 'blocked': return 'Blocked';
   }
 }

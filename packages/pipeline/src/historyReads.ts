@@ -164,6 +164,24 @@ export function validateHistoryRead(
   return {ok: issues.length === 0, issues};
 }
 
+export function getStepBlockReasons(step: PipelineStep, allSteps: PipelineStep[]): string[] {
+  if (!step.enabled) return [];
+  const reasons: string[] = [];
+  for (const read of getStepHistoryReads(step)) {
+    if (!read.required) continue;
+    const validation = validateHistoryRead(read, step.id, allSteps);
+    if (!validation.ok) {
+      const label = `${read.sourceArtifactRef}: ${validation.issues.map(historyReadIssueLabel).join(', ')}`;
+      reasons.push(label);
+    }
+  }
+  return reasons;
+}
+
+export function isStepBlocked(step: PipelineStep, allSteps: PipelineStep[]): boolean {
+  return getStepBlockReasons(step, allSteps).length > 0;
+}
+
 export function historyReadIssueLabel(issue: HistoryReadIssue): string {
   switch (issue) {
     case 'source-not-found': return 'Source step was deleted';

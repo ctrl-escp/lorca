@@ -32,6 +32,8 @@
       <TracePanel
         v-else-if="uiStore.rightPaneTab === 'trace'"
         :trace="activeTrace"
+        :partial-run="!isCapsuleMode && runStore.partial"
+        :selected-step-id="isCapsuleMode ? null : editorStore.selectedStepId"
       />
       <OutputPanel
         v-else-if="uiStore.rightPaneTab === 'output'"
@@ -39,6 +41,8 @@
         :output="activeOutput"
         :output-key="activeOutputKey"
         :error="activeError"
+        :output-stale="pipelineOutputStale"
+        :partial-run="!isCapsuleMode && runStore.partial"
       />
     </div>
   </aside>
@@ -47,9 +51,11 @@
 <script setup lang="ts">
 import {computed} from 'vue';
 import type {PipelineNode, CapsuleDefinition, CapsuleInterface} from '@lorca/core';
+import {computeStepStaleStates} from '@lorca/pipeline';
 import {useUiStore} from '../stores/ui.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useCapsuleRunStore} from '../stores/capsuleRun.js';
+import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
 import {useModelsStore} from '../stores/models.js';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useCapsulesStore} from '../stores/capsules.js';
@@ -68,6 +74,7 @@ const props = defineProps<{
 
 const uiStore = useUiStore();
 const runStore = useActiveRunStore();
+const editorStore = usePipelineEditorStore();
 const capsuleRunStore = useCapsuleRunStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
@@ -99,6 +106,21 @@ const activeStatus = computed(() => isCapsuleMode.value ? capsuleRunStore.status
 const activeOutput = computed(() => isCapsuleMode.value ? capsuleRunStore.finalOutput ?? null : runStore.finalOutput ?? null);
 const activeOutputKey = computed(() => isCapsuleMode.value ? capsuleRunStore.finalOutputKey : runStore.finalOutputKey);
 const activeError = computed(() => isCapsuleMode.value ? capsuleRunStore.error : runStore.error);
+
+const pipelineOutputStale = computed(() => {
+  if (isCapsuleMode.value || !runStore.finalOutputKey) return false;
+  const step = editorStore.steps.find(
+    (s) => `${s.outputNamespace}.${s.primaryOutputName}` === runStore.finalOutputKey,
+  );
+  if (!step) return false;
+  const states = computeStepStaleStates(
+    editorStore.pipeline,
+    runStore.runSnapshotContext,
+    editorStore.pipeline.input.raw,
+  );
+  const st = states.find((s) => s.stepId === step.id)?.state;
+  return st === 'stale' || st === 'failed-stale';
+});
 
 function onUpdateNode(patch: Record<string, unknown>) {
   if (uiStore.selectedNodeId) props.onUpdate(uiStore.selectedNodeId, patch);

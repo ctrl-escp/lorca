@@ -4,6 +4,7 @@ import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import {
   getStepHistoryReads,
   getPriorSourceSteps,
+  getStepBlockReasons,
   defaultArtifactRefForSource,
   validateHistoryRead,
   listStepOutputArtifacts,
@@ -93,6 +94,50 @@ describe('listStepOutputArtifacts', () => {
     const arts = listStepOutputArtifacts(step);
     expect(arts.find((a) => a.ref === 'intent.text')?.isPrimary).toBe(true);
     expect(arts.some((a) => a.ref === 'intent.rawResponse')).toBe(true);
+  });
+});
+
+describe('getStepBlockReasons', () => {
+  it('blocks required reads from disabled sources', () => {
+    const steps = [
+      makeStep('a', 'A', {enabled: false}),
+      {
+        ...makeStep('b', 'B'),
+        prompt: {
+          previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          historyReads: [{
+            sourceStepId: 'a',
+            sourceArtifactRef: 'a.text',
+            tagName: 'a_out',
+            required: true,
+          }],
+          blocks: [],
+        },
+      },
+    ];
+    const reasons = getStepBlockReasons(steps[1]!, steps);
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(reasons[0]).toContain('a.text');
+  });
+
+  it('does not block optional reads from disabled sources', () => {
+    const steps = [
+      makeStep('a', 'A', {enabled: false}),
+      {
+        ...makeStep('b', 'B'),
+        prompt: {
+          previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          historyReads: [{
+            sourceStepId: 'a',
+            sourceArtifactRef: 'a.text',
+            tagName: 'a_out',
+            required: false,
+          }],
+          blocks: [],
+        },
+      },
+    ];
+    expect(getStepBlockReasons(steps[1]!, steps)).toEqual([]);
   });
 });
 

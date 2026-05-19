@@ -22,6 +22,26 @@
         <code class="ns-value">{{ step.primaryOutputName }}</code>
       </div>
 
+      <!-- Run / validation status -->
+      <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
+        <div class="inspector-status-header">
+          <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
+          <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">
+            Last run {{ formatTime(lastSnapshot.completedAt) }}
+          </span>
+        </div>
+        <ul v-if="stepStatus.blockReasons?.length" class="inspector-status-issues">
+          <li v-for="(reason, i) in stepStatus.blockReasons" :key="i">{{ reason }}</li>
+        </ul>
+        <p v-else-if="stepStatus.state === 'stale' || stepStatus.state === 'failed-stale'" class="inspector-status-hint">
+          Upstream config or inputs changed since the last run.
+        </p>
+        <div v-if="lastSnapshot?.outputArtifactRefs.length" class="inspector-last-outputs">
+          <span class="inspector-last-label">Outputs:</span>
+          <code v-for="ref in lastSnapshot.outputArtifactRefs" :key="ref" class="inspector-artifact-ref">{{ ref }}</code>
+        </div>
+      </div>
+
       <!-- Model Call -->
       <template v-if="step.config.type === 'model-call'">
         <div class="inspector-field">
@@ -184,17 +204,45 @@
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
 import type {ModelCallStepConfig} from '@lorca/core';
+import {computeStepStaleStates, stepRunUiStateLabel} from '@lorca/pipeline';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import FieldLabel from '../common/FieldLabel.vue';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 
 const editorStore = usePipelineEditorStore();
+const runStore = useActiveRunStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
 
 const step = computed(() => editorStore.selectedStep);
+
+const stepStatus = computed(() => {
+  const s = step.value;
+  if (!s) return null;
+  const states = computeStepStaleStates(
+    editorStore.pipeline,
+    runStore.runSnapshotContext,
+    editorStore.pipeline.input.raw,
+  );
+  return states.find((st) => st.stepId === s.id) ?? null;
+});
+
+const lastSnapshot = computed(() => {
+  const s = step.value;
+  if (!s) return null;
+  return runStore.snapshots[s.id] ?? null;
+});
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString(undefined, {hour: '2-digit', minute: '2-digit'});
+  } catch {
+    return iso;
+  }
+}
 
 const TYPE_LABELS: Record<string, string> = {
   'model-call': 'Model Call',
@@ -331,6 +379,27 @@ function commitLoopGroup() {
 .ns-label { color: #444; }
 .ns-value { color: #5a8a5a; font-size: 0.65rem; }
 .ns-dot { color: #333; }
+
+.inspector-status {
+  border: 1px solid #2a2a2a; border-radius: 4px; padding: 0.45rem 0.55rem;
+  display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem;
+}
+.status-current { border-left: 2px solid #3a9d6e; background: #0f1a0f; }
+.status-stale, .status-failed-stale { border-left: 2px solid #c8a050; background: #1a180f; }
+.status-blocked { border-left: 2px solid #c0392b; background: #1a0f0f; }
+.status-not-run { border-left: 2px solid #444; background: #111; }
+.status-failed-current { border-left: 2px solid #c0392b; background: #1a1010; }
+.status-skipped-partial { border-left: 2px solid #606080; background: #101018; }
+.status-disabled { opacity: 0.6; }
+
+.inspector-status-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.inspector-status-label { color: #aaa; font-weight: 500; }
+.inspector-status-time { color: #555; font-size: 0.65rem; }
+.inspector-status-issues { margin: 0; padding-left: 1rem; color: #e07070; }
+.inspector-status-hint { margin: 0; color: #888; font-size: 0.68rem; }
+.inspector-last-outputs { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+.inspector-last-label { color: #555; font-size: 0.65rem; }
+.inspector-artifact-ref { color: #5a8a5a; font-size: 0.65rem; }
 
 .inspector-field { display: flex; flex-direction: column; gap: 0.2rem; }
 .inspector-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #888; }

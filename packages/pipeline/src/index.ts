@@ -34,6 +34,8 @@ export {
   suggestHistoryReadTagName,
   validateHistoryRead,
   historyReadIssueLabel,
+  getStepBlockReasons,
+  isStepBlocked,
 } from './historyReads.js';
 export type {
   SourceStepOption,
