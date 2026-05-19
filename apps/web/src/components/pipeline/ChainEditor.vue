@@ -42,6 +42,14 @@
                 <span v-if="historyReadCount(step) > 0" class="step-history-badge" :title="`${historyReadCount(step)} history read(s)`">
                   ↩ {{ historyReadCount(step) }}
                 </span>
+                <span
+                  v-if="runStateFor(step.id)"
+                  class="step-run-badge"
+                  :class="`run-${runStateFor(step.id)}`"
+                  :title="stepRunUiStateLabel(runStateFor(step.id)!)"
+                >
+                  {{ stepRunUiStateLabel(runStateFor(step.id)!) }}
+                </span>
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
               </div>
 
@@ -72,7 +80,7 @@
 
         <!-- Final output indicator -->
         <div v-if="steps.length > 0" class="chain-output-ref">
-          <span class="output-label">Output</span>
+          <span class="output-label">{{ runPartial ? 'Partial output' : 'Output' }}</span>
           <span class="output-key">{{ finalArtifactKey ?? '(none)' }}</span>
         </div>
 
@@ -105,11 +113,15 @@
 import {ref, watch, nextTick, onMounted} from 'vue';
 import type {PipelineStep, PipelineTraceEvent, StepType} from '@lorca/core';
 import {getStepHistoryReads} from '@lorca/pipeline';
+import type {StepRunUiState} from '@lorca/pipeline';
+import {stepRunUiStateLabel} from '@lorca/pipeline';
 
 const props = defineProps<{
   steps: PipelineStep[];
   selectedStepId: string | null;
   trace: PipelineTraceEvent[];
+  stepRunStates?: Record<string, StepRunUiState>;
+  runPartial?: boolean;
   finalArtifactKey: string | null;
   showCapsuleAdd?: boolean;
   showUndoRedo?: boolean;
@@ -188,6 +200,10 @@ function stepTypeLabel(type: StepType): string {
 
 function historyReadCount(step: PipelineStep): number {
   return getStepHistoryReads(step).length;
+}
+
+function runStateFor(stepId: string): StepRunUiState | undefined {
+  return props.stepRunStates?.[stepId];
 }
 </script>
 
@@ -301,6 +317,17 @@ function historyReadCount(step: PipelineStep): number {
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
+
+.step-run-badge {
+  border-radius: 2px; padding: 0 4px; font-size: 0.62rem; text-transform: lowercase;
+}
+.run-not-run { background: #1a1a1a; color: #555; }
+.run-current { background: #1a2e1a; color: #5a9d5a; }
+.run-stale { background: #2e2a1a; color: #c8a050; }
+.run-failed-current { background: #2e1a1a; color: #c07070; }
+.run-failed-stale { background: #2e1a1a; color: #a05050; border: 1px dashed #804040; }
+.run-disabled { background: #1a1a1a; color: #444; }
+.run-skipped-partial { background: #1a1a2a; color: #606080; }
 
 .step-trace { display: flex; gap: 0.4rem; font-size: 0.68rem; margin-top: 0.15rem; }
 .status-completed { color: #3a9d6e; }

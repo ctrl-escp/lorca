@@ -6,17 +6,28 @@ import type {
   PipelineError,
   CapsuleDefinition,
   AiEndpointConfig,
+  LoopGroupStepConfig,
+  LoopExitCondition,
+  StepRunSnapshot,
   Result,
   CapsuleInstanceNode,
 } from '@lorca/core';
-import {MODEL_CALL_TIMEOUT_MS} from '@lorca/core';
+import {MODEL_CALL_TIMEOUT_MS, LOOP_PREV_ARTIFACT_REF} from '@lorca/core';
 import {renderPromptComposition, renderTemplate} from '@lorca/prompt';
 import type {ResolvedHistoryRead} from '@lorca/prompt';
 import type {ModelCallRequest} from '@lorca/endpoints';
 import {executeModelCall} from '@lorca/endpoints';
-import {compileStepChainToExecutionPlan} from './chainCompiler.js';
+import {
+  buildActiveStepChain,
+  compileActiveStepsToExecutionPlan,
+  compileStepChainToExecutionPlan,
+} from './chainCompiler.js';
 import type {ExecutePipelineOptions, CompiledExecutionStep} from './chainCompiler.js';
 import {executePipeline} from './executor.js';
+import {
+  buildStepRunSnapshot,
+  computeUserPromptSignature,
+} from './staleState.js';
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
 export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
@@ -24,6 +35,14 @@ export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition
 export interface ExecutorCallbacks {
   onTraceEvent(event: PipelineTraceEvent): void;
   onArtifact(artifact: PipelineArtifact): void;
+}
+
+export interface StepChainRunResult {
+  finalOutputKey: string;
+  snapshots: Record<string, StepRunSnapshot>;
+  userPromptSignature: string;
+  partial: boolean;
+  executedStepIds: string[];
 }
 
 function makeArtifact(
@@ -50,6 +69,22 @@ function tryParseJson(text: string): unknown | null {
   try { return JSON.parse(text); } catch { return null; }
 }
 
+function getJsonField(obj: unknown, fieldPath: string): unknown {
+  let current: unknown = obj;
+  for (const segment of fieldPath.split('.')) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+function exitConditionMet(exitCondition: LoopExitCondition, lastOutputText: string): boolean {
+  if (exitCondition.type === 'iterations') return false;
+  const parsed = tryParseJson(lastOutputText);
+  if (parsed === null) return false;
+  return getJsonField(parsed, exitCondition.fieldPath) === exitCondition.value;
+}
+
 export async function executeStepChain(
   pipeline: PipelineDefinition,
   userPromptRaw: string,
@@ -57,10 +92,10 @@ export async function executeStepChain(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
-): Promise<Result<string, PipelineError>> {
+): Promise<Result<StepChainRunResult, PipelineError>> {
   const plan = compileStepChainToExecutionPlan(pipeline, options);
+  const userPromptSignature = computeUserPromptSignature(userPromptRaw);
 
-  // Build initial artifact store with user prompt
   const {buildUserPromptArtifacts} = await import('@lorca/prompt');
   const {raw, xml} = buildUserPromptArtifacts(userPromptRaw);
   const artifacts: Record<string, PipelineArtifact> = {
@@ -69,12 +104,15 @@ export async function executeStepChain(
   };
 
   const stepMap = new Map(pipeline.steps.map((s) => [s.id, s]));
+  const snapshots: Record<string, StepRunSnapshot> = {};
+  const executedStepIds: string[] = [];
 
   let failed = false;
   let failError: PipelineError | null = null;
 
   const abortSignal = options.abortSignal;
   const runId = `run-${pipeline.id.slice(0, 8)}`;
+  const partial = Boolean(options.stopAtStepId);
 
   for (const compiledStep of plan.steps) {
     const step = stepMap.get(compiledStep.stepId);
@@ -100,9 +138,25 @@ export async function executeStepChain(
     callbacks.onTraceEvent(traceEvent(runId, step.id, 'started'));
     const startMs = Date.now();
 
-    const result = await executeStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal);
+    const result = await executeStepInternal(
+      step,
+      compiledStep,
+      artifacts,
+      resolveEndpoint,
+      resolveCapsule,
+      pipeline,
+      abortSignal,
+    );
 
     if (!result.ok) {
+      snapshots[step.id] = buildStepRunSnapshot(
+        step,
+        compiledStep,
+        pipeline,
+        userPromptSignature,
+        [],
+        'failed',
+      );
       callbacks.onTraceEvent(traceEvent(runId, step.id, 'failed', {durationMs: Date.now() - startMs, error: result.error}));
       failed = true;
       failError = result.error;
@@ -115,21 +169,28 @@ export async function executeStepChain(
       callbacks.onArtifact(artifact);
       produced.push(artifact.name);
     }
+    executedStepIds.push(step.id);
+    snapshots[step.id] = buildStepRunSnapshot(
+      step,
+      compiledStep,
+      pipeline,
+      userPromptSignature,
+      produced,
+      'completed',
+    );
     callbacks.onTraceEvent(traceEvent(runId, step.id, 'completed', {durationMs: Date.now() - startMs, outputArtifactNames: produced}));
   }
 
   if (failed && failError) return {ok: false, error: failError};
 
-  // Determine final output key
   const lastCompiledStep = plan.steps.at(-1);
   if (!lastCompiledStep) {
     return {ok: false, error: {code: 'final_output_missing', message: 'No steps executed'}};
   }
   const lastStep = stepMap.get(lastCompiledStep.stepId)!;
 
-  // Use outputStepId if set, otherwise use the last step
   let finalStepId = lastStep.id;
-  if (pipeline.outputStepId) {
+  if (pipeline.outputStepId && !partial) {
     const outputStep = stepMap.get(pipeline.outputStepId);
     if (outputStep) finalStepId = outputStep.id;
   }
@@ -140,10 +201,19 @@ export async function executeStepChain(
     return {ok: false, error: {code: 'final_output_missing', message: `Final output artifact not found: ${finalKey}`}};
   }
 
-  return {ok: true, value: finalKey};
+  return {
+    ok: true,
+    value: {
+      finalOutputKey: finalKey,
+      snapshots,
+      userPromptSignature,
+      partial,
+      executedStepIds,
+    },
+  };
 }
 
-async function executeStep(
+export async function executeStepInternal(
   step: PipelineStep,
   compiledStep: CompiledExecutionStep,
   artifacts: Record<string, PipelineArtifact>,
@@ -193,7 +263,7 @@ async function executeStep(
     }
 
     case 'loop-group': {
-      return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'loop-group steps require the native loop executor (Phase 5a)', nodeId: step.id}};
+      return executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal);
     }
 
     default: {
@@ -201,6 +271,107 @@ async function executeStep(
       return {ok: false, error: {code: 'invalid_pipeline_graph', message: `Unknown step type: ${String((_exhaustive as {type: string}).type)}`, nodeId: step.id}};
     }
   }
+}
+
+async function executeLoopGroupStep(
+  step: PipelineStep,
+  _compiledStep: CompiledExecutionStep,
+  artifacts: Record<string, PipelineArtifact>,
+  resolveEndpoint: EndpointResolver,
+  resolveCapsule: CapsuleResolver | undefined,
+  pipeline: PipelineDefinition,
+  abortSignal?: AbortSignal,
+): Promise<Result<PipelineArtifact[], PipelineError>> {
+  if (step.config.type !== 'loop-group') {
+    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeLoopGroupStep called on non-loop step', nodeId: step.id}};
+  }
+
+  const config = step.config as LoopGroupStepConfig;
+  const innerActive = buildActiveStepChain(config.steps);
+  if (innerActive.length === 0) {
+    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Loop group must contain at least one enabled inner step', nodeId: step.id}};
+  }
+
+  if (innerActive.some((s) => s.config.type === 'loop-group')) {
+    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Nested loop groups are not supported in V1', nodeId: step.id}};
+  }
+
+  const innerPlan = compileActiveStepsToExecutionPlan(innerActive);
+  const innerStepMap = new Map(config.steps.map((s) => [s.id, s]));
+  const outerSnapshot: Record<string, PipelineArtifact> = {...artifacts};
+  const loopArtifacts: Record<string, PipelineArtifact> = {...outerSnapshot};
+
+  let previousIterationOutput: string | undefined;
+  let finalOutputText: string | undefined;
+
+  for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
+    if (abortSignal?.aborted) {
+      return {ok: false, error: {code: 'run_cancelled', message: 'Run was cancelled', nodeId: step.id}};
+    }
+
+    for (const key of Object.keys(loopArtifacts)) {
+      if (!(key in outerSnapshot)) delete loopArtifacts[key];
+    }
+    Object.assign(loopArtifacts, outerSnapshot);
+
+    if (previousIterationOutput !== undefined) {
+      loopArtifacts[LOOP_PREV_ARTIFACT_REF] = makeArtifact(
+        LOOP_PREV_ARTIFACT_REF,
+        step.id,
+        'text',
+        previousIterationOutput,
+      );
+    } else {
+      delete loopArtifacts[LOOP_PREV_ARTIFACT_REF];
+    }
+
+    for (const compiledInner of innerPlan.steps) {
+      const innerStep = innerStepMap.get(compiledInner.stepId);
+      if (!innerStep) {
+        return {ok: false, error: {code: 'invalid_pipeline_graph', message: `Inner step not found: ${compiledInner.stepId}`, nodeId: step.id}};
+      }
+
+      const result = await executeStepInternal(
+        innerStep,
+        compiledInner,
+        loopArtifacts,
+        resolveEndpoint,
+        resolveCapsule,
+        pipeline,
+        abortSignal,
+      );
+
+      if (!result.ok) {
+        return {ok: false, error: {...result.error, nodeId: step.id}};
+      }
+
+      for (const artifact of result.value) {
+        loopArtifacts[artifact.name] = artifact;
+      }
+    }
+
+    const lastInner = innerActive.at(-1)!;
+    const lastKey = `${lastInner.outputNamespace}.${lastInner.primaryOutputName}`;
+    const lastArtifact = loopArtifacts[lastKey];
+    if (!lastArtifact) {
+      return {ok: false, error: {code: 'final_output_missing', message: `Loop inner chain produced no output at ${lastKey}`, nodeId: step.id}};
+    }
+
+    finalOutputText = typeof lastArtifact.value === 'string'
+      ? lastArtifact.value
+      : JSON.stringify(lastArtifact.value);
+    previousIterationOutput = finalOutputText;
+
+    if (exitConditionMet(config.exitCondition, finalOutputText)) break;
+    if (iteration >= config.maxIterations) break;
+  }
+
+  if (finalOutputText === undefined) {
+    return {ok: false, error: {code: 'final_output_missing', message: 'Loop group produced no output', nodeId: step.id}};
+  }
+
+  const outputKey = `${step.outputNamespace}.${step.primaryOutputName}`;
+  return {ok: true, value: [makeArtifact(outputKey, step.id, 'text', finalOutputText)]};
 }
 
 async function executePromptStep(
@@ -212,7 +383,6 @@ async function executePromptStep(
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   const {config} = step;
 
-  // Resolve previous output value
   const prevArtifact = compiledStep.previousOutputArtifactRef
     ? artifacts[compiledStep.previousOutputArtifactRef]
     : artifacts['user_prompt.xml'];
@@ -220,7 +390,6 @@ async function executePromptStep(
     ? (typeof prevArtifact.value === 'string' ? prevArtifact.value : JSON.stringify(prevArtifact.value))
     : undefined;
 
-  // Resolve history read artifacts
   const resolvedHistory: ResolvedHistoryRead[] = [];
   for (const read of compiledStep.historyReads ?? []) {
     const artifact = artifacts[read.sourceArtifactRef];
@@ -242,7 +411,6 @@ async function executePromptStep(
     resolvedHistory.push({sourceArtifactRef: read.sourceArtifactRef, value});
   }
 
-  // Render prompt composition
   const renderedPrompt = step.prompt
     ? renderPromptComposition(step.prompt, prevValue, resolvedHistory)
     : {blocks: [], xmlText: prevValue ?? ''};
@@ -250,11 +418,9 @@ async function executePromptStep(
   const key = `${step.outputNamespace}.text`;
 
   if (config.type === 'prompt-wrapper') {
-    // prompt-wrapper just produces the rendered XML as its text output
     return {ok: true, value: [makeArtifact(key, step.id, 'text', renderedPrompt.xmlText)]};
   }
 
-  // config is now narrowed to model-call
   if (config.type !== 'model-call') {
     return {ok: false, error: {code: 'unknown_error', message: `Unexpected step type in executePromptStep: ${String((config as {type: string}).type)}`, nodeId: step.id}};
   }
@@ -291,7 +457,6 @@ async function executePromptStep(
     makeArtifact(`${step.outputNamespace}.rawResponse`, step.id, 'model-response', callResult.value.rawResponse),
   ];
 
-  // Opportunistic JSON parse
   const parsed = tryParseJson(callResult.value.text);
   if (parsed !== null) {
     produced.push(makeArtifact(`${step.outputNamespace}.parsedJson`, step.id, 'json', parsed));
@@ -321,7 +486,6 @@ async function executeCapsuleStep(
     return {ok: false, error: {code: 'missing_capsule', message: `Capsule not found: ${capsuleId} ${capsuleVersion}`, nodeId: step.id}};
   }
 
-  // Convert V2 step config to V1 CapsuleInstanceNode for delegation to legacy capsule executor
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
   for (const [slotName, ref] of Object.entries(modelSlotBindings ?? {})) {
     if (ref.kind === 'fixed') {
@@ -342,7 +506,6 @@ async function executeCapsuleStep(
     },
   };
 
-  // Build a synthetic legacy pipeline just for this capsule instance and delegate
   const runId = `run-${step.id}`;
   const ctx = {
     runId,
@@ -362,7 +525,6 @@ async function executeCapsuleStep(
     onArtifact(a: PipelineArtifact) { produced.push(a); },
   };
 
-  // Use legacy executePipeline to run the capsule's internal graph
   const legacyDef = {
     schemaVersion: 1 as const,
     id: capsule.id,

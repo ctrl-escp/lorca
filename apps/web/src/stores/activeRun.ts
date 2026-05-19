@@ -1,8 +1,8 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
-import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError} from '@lorca/core';
-// PipelineArtifact and PipelineTraceEvent used in store state types
+import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError, StepRunSnapshot} from '@lorca/core';
 import {executeStepChain} from '@lorca/pipeline';
+import type {RunSnapshotContext} from '@lorca/pipeline';
 import {useEndpointsStore} from './endpoints.js';
 import {useCapsulesStore} from './capsules.js';
 
@@ -16,12 +16,25 @@ export const useActiveRunStore = defineStore('activeRun', () => {
   const finalOutputKey = ref<string | null>(null);
   const error = ref<PipelineError | null>(null);
   const abortController = ref<AbortController | null>(null);
+  const snapshots = ref<Record<string, StepRunSnapshot>>({});
+  const userPromptSignature = ref<string | null>(null);
+  const partial = ref(false);
+  const executedStepIds = ref<string[]>([]);
 
   const isRunning = computed(() => status.value === 'running');
   const canCancel = computed(() => isRunning.value);
   const finalOutput = computed(() =>
     finalOutputKey.value ? artifacts.value[finalOutputKey.value] : null,
   );
+  const runSnapshotContext = computed((): RunSnapshotContext | null => {
+    if (status.value === 'idle') return null;
+    return {
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value ?? '',
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+    };
+  });
 
   function reset() {
     status.value = 'idle';
@@ -31,6 +44,10 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     finalOutputKey.value = null;
     error.value = null;
     abortController.value = null;
+    snapshots.value = {};
+    userPromptSignature.value = null;
+    partial.value = false;
+    executedStepIds.value = [];
   }
 
   function cancel() {
@@ -64,7 +81,11 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     abortController.value = null;
 
     if (result.ok) {
-      finalOutputKey.value = result.value;
+      finalOutputKey.value = result.value.finalOutputKey;
+      snapshots.value = result.value.snapshots;
+      userPromptSignature.value = result.value.userPromptSignature;
+      partial.value = result.value.partial;
+      executedStepIds.value = result.value.executedStepIds;
       status.value = 'completed';
     } else {
       error.value = result.error;
@@ -72,5 +93,23 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     }
   }
 
-  return {status, runId, artifacts, trace, finalOutputKey, error, isRunning, canCancel, finalOutput, reset, cancel, run};
+  return {
+    status,
+    runId,
+    artifacts,
+    trace,
+    finalOutputKey,
+    error,
+    isRunning,
+    canCancel,
+    finalOutput,
+    snapshots,
+    userPromptSignature,
+    partial,
+    executedStepIds,
+    runSnapshotContext,
+    reset,
+    cancel,
+    run,
+  };
 });

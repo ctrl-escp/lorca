@@ -58,12 +58,20 @@ export function compileStepChainToExecutionPlan(
     : -1;
   const slicedSteps = stopIdx >= 0 ? activeSteps.slice(0, stopIdx + 1) : activeSteps;
 
+  return compileActiveStepsToExecutionPlan(slicedSteps, options.stopAtStepId);
+}
+
+/** Compile an ordered active step slice into an execution plan. */
+export function compileActiveStepsToExecutionPlan(
+  steps: PipelineStep[],
+  stopAtStepId?: string,
+): ExecutionPlan {
   const requiredHistorySources = new Set<string>();
   const compiled: CompiledExecutionStep[] = [];
 
-  for (let i = 0; i < slicedSteps.length; i++) {
-    const step = slicedSteps[i]!;
-    const prevActiveStep = i > 0 ? slicedSteps[i - 1] : undefined;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]!;
+    const prevActiveStep = i > 0 ? steps[i - 1] : undefined;
 
     const historyReads = getStepHistoryReads(step);
     for (const read of historyReads) {
@@ -95,7 +103,7 @@ export function compileStepChainToExecutionPlan(
 
   return {
     steps: compiled,
-    ...(options.stopAtStepId ? {stopAtStepId: options.stopAtStepId} : {}),
+    ...(stopAtStepId ? {stopAtStepId} : {}),
     requiredHistorySources: [...requiredHistorySources],
   };
 }

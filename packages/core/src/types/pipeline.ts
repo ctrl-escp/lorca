@@ -431,3 +431,5 @@ export const MODEL_CALL_TIMEOUT_MS = 120_000;
 export const RECENT_RUN_RETENTION = 20;
 export const TRACE_PREVIEW_MAX_CHARS = 32_768;
 export const PIPELINE_INPUT_STEP_ID = 'pipeline-input' as const;
+export const LOOP_PREV_STEP_ID = 'loop.prev' as const;
+export const LOOP_PREV_ARTIFACT_REF = 'loop.prev.text' as const;

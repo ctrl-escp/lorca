@@ -40,6 +40,8 @@
       :steps="editorStore.steps"
       :selected-step-id="editorStore.selectedStepId"
       :trace="runStore.trace"
+      :step-run-states="stepRunStates"
+      :run-partial="runStore.partial"
       :final-artifact-key="finalArtifactKey"
       :show-capsule-add="true"
       :show-undo-redo="true"
@@ -66,6 +68,8 @@
 <script setup lang="ts">
 import {ref, computed, watch, onMounted} from 'vue';
 import type {PipelineDefinition, StepType} from '@lorca/core';
+import {computeStepStaleStates} from '@lorca/pipeline';
+import type {StepRunUiState} from '@lorca/pipeline';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
@@ -119,6 +123,15 @@ const runButtonTitle = computed(() => {
   const hasModel = editorStore.steps.some((s) => s.enabled && s.type === 'model-call');
   if (!hasModel) needs.push('add a model call step');
   return needs.length ? `To run: ${needs.join(' and ')}` : 'Configure pipeline to run';
+});
+
+const stepRunStates = computed(() => {
+  const states = computeStepStaleStates(
+    editorStore.pipeline,
+    runStore.runSnapshotContext,
+    userPrompt.value,
+  );
+  return Object.fromEntries(states.map((s) => [s.stepId, s.state])) as Record<string, StepRunUiState>;
 });
 
 function commitPipelineName() {

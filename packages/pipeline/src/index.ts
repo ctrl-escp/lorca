@@ -6,12 +6,24 @@ export type {ExecutorCallbacks, EndpointResolver, CapsuleResolver} from './execu
 export {
   buildActiveStepChain,
   compileStepChainToExecutionPlan,
+  compileActiveStepsToExecutionPlan,
   compilePipelineToLegacyGraph,
   migrateLegacyPipeline,
   makeEmptyPipeline,
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
 export {executeStepChain} from './stepExecutor.js';
+export type {StepChainRunResult} from './stepExecutor.js';
+export {
+  computeUserPromptSignature,
+  computeStepConfigSignature,
+  computeStepInputSignature,
+  computeHistoryReadSignatures,
+  buildStepRunSnapshot,
+  computeStepStaleStates,
+  stepRunUiStateLabel,
+} from './staleState.js';
+export type {StepRunUiState, StepStaleState, RunSnapshotContext} from './staleState.js';
 export {
   getStepHistoryReads,
   listPipelineInputArtifacts,
