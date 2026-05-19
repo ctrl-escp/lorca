@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia';
-import {ref, computed} from 'vue';
+import {ref, computed, toRaw} from 'vue';
 import type {PipelineDefinition, PipelineStep, StepType, StepConfig} from '@lorca/core';
 import {getDb} from '@lorca/storage';
 import {makeEmptyPipeline} from '@lorca/pipeline';
@@ -139,7 +139,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
 
   function snapshot(): PipelineEditorSnapshot {
     return {
-      steps: structuredClone(pipeline.value.steps),
+      steps: JSON.parse(JSON.stringify(toRaw(pipeline.value.steps))),
       pipelineName: pipeline.value.name,
       inputRaw: pipeline.value.input.raw,
       ...(pipeline.value.outputStepId !== undefined ? {outputStepId: pipeline.value.outputStepId} : {}),
@@ -176,7 +176,8 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   // ── Load ────────────────────────────────────────────────────────────────────
 
   function loadPipeline(def: PipelineDefinition) {
-    pipeline.value = structuredClone(def);
+    // cloneForStorage strips Vue reactivity (toRaw + JSON round-trip) before storing
+    pipeline.value = cloneForStorage(def);
     selectedStepId.value = null;
     undoStack.value = [];
     redoStack.value = [];
@@ -235,7 +236,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const original = pipeline.value.steps[idx]!;
     const ns = defaultNamespace(original.type, getExistingNamespaces());
     const dup: PipelineStep = {
-      ...structuredClone(original),
+      ...JSON.parse(JSON.stringify(toRaw(original))),
       id: newId(original.type.replace(/-/g, '_')),
       outputNamespace: ns,
       lastEditedAt: new Date().toISOString(),

@@ -12,8 +12,11 @@
     </div>
 
     <div class="right-content">
+      <StepInspector
+        v-if="uiStore.rightPaneTab === 'inspector' && !isCapsuleMode"
+      />
       <NodeInspector
-        v-if="uiStore.rightPaneTab === 'inspector'"
+        v-else-if="uiStore.rightPaneTab === 'inspector' && isCapsuleMode"
         :node="selectedNode"
         :models="modelsStore.models"
         :endpoints="endpointsStore.endpoints"
@@ -51,6 +54,7 @@ import {useModelsStore} from '../stores/models.js';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useCapsulesStore} from '../stores/capsules.js';
 import NodeInspector from './inspector/NodeInspector.vue';
+import StepInspector from './inspector/StepInspector.vue';
 import CapsuleInterfacePanel from './capsule/CapsuleInterfacePanel.vue';
 import TracePanel from './pipeline/TracePanel.vue';
 import OutputPanel from './pipeline/OutputPanel.vue';
