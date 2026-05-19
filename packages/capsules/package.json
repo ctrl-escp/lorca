@@ -6,6 +6,11 @@
   "main": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc --noEmit" },
-  "dependencies": { "@lorca/core": "*" },
+  "dependencies": {
+    "@lorca/core": "*",
+    "@lorca/pipeline": "*",
+    "@lorca/prompt": "*",
+    "@lorca/endpoints": "*"
+  },
   "devDependencies": { "typescript": "*" }
 }

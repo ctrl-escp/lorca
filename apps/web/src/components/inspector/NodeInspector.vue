@@ -54,11 +54,27 @@
       <!-- ModelCallNode -->
       <template v-else-if="node.type === 'model-call'">
         <div class="inspector-field">
+          <label>Model ref kind</label>
+          <select v-model="localModelRefKind" @change="onModelRefKindChange">
+            <option value="fixed">Fixed model</option>
+            <option value="slot" :disabled="!capsule">Model slot</option>
+          </select>
+        </div>
+        <div v-if="localModelRefKind === 'fixed'" class="inspector-field">
           <label>Model</label>
           <select v-model="localModelKey" @change="emitModelCall">
             <option value="">— select model —</option>
             <option v-for="m in models" :key="m.id" :value="`${m.endpointId}::${m.providerModelName}`">
               {{ m.displayName }} ({{ endpointName(m.endpointId) }})
+            </option>
+          </select>
+        </div>
+        <div v-else class="inspector-field">
+          <label>Slot name</label>
+          <select v-model="localSlotName" @change="emitModelCall">
+            <option value="">— select slot —</option>
+            <option v-for="slot in capsule?.interface.modelSlots ?? []" :key="slot.name" :value="slot.name">
+              {{ slot.name }}{{ slot.required ? ' *' : '' }}
             </option>
           </select>
         </div>
@@ -97,13 +113,14 @@
 
 <script setup lang="ts">
 import {ref, watch} from 'vue';
-import type {PipelineNode, DiscoveredModel, AiEndpointConfig} from '@lorca/core';
+import type {PipelineNode, DiscoveredModel, AiEndpointConfig, CapsuleDefinition} from '@lorca/core';
 import {isValidTag} from '@lorca/prompt';
 
 const props = defineProps<{
   node: PipelineNode | null;
   models: DiscoveredModel[];
   endpoints: AiEndpointConfig[];
+  capsule?: CapsuleDefinition;
 }>();
 
 const emit = defineEmits<{update: [patch: Record<string, unknown>]}>();
@@ -118,6 +135,8 @@ const localWrapInstruction = ref('');
 const localWrapInclude = ref(true);
 const localWrapPlacement = ref<'after-instructions' | 'before-instructions' | 'inside-template'>('after-instructions');
 const localModelKey = ref('');
+const localModelRefKind = ref<'fixed' | 'slot'>('fixed');
+const localSlotName = ref('');
 const localMode = ref<'generate' | 'chat'>('generate');
 const localInputRef = ref('');
 const localSystemPrompt = ref('');
@@ -137,7 +156,9 @@ watch(() => props.node, (node) => {
   }
   if (node.type === 'model-call') {
     const ref = node.config.modelRef;
+    localModelRefKind.value = ref.kind;
     localModelKey.value = ref.kind === 'fixed' ? `${ref.endpointId}::${ref.modelName}` : '';
+    localSlotName.value = ref.kind === 'slot' ? ref.slotName : '';
     localMode.value = node.config.mode;
     localInputRef.value = node.config.inputArtifactRef;
     localSystemPrompt.value = node.config.systemPrompt ?? '';
@@ -165,12 +186,22 @@ function emitWrapper() {
   }});
 }
 
+function onModelRefKindChange() {
+  localModelKey.value = '';
+  localSlotName.value = '';
+  emitModelCall();
+}
+
 function emitModelCall() {
-  const parts = localModelKey.value.split('::');
-  const endpointId = parts[0] ?? '';
-  const modelName = parts.slice(1).join('::');
+  let modelRef: Record<string, unknown>;
+  if (localModelRefKind.value === 'slot') {
+    modelRef = {kind: 'slot', slotName: localSlotName.value};
+  } else {
+    const parts = localModelKey.value.split('::');
+    modelRef = {kind: 'fixed', endpointId: parts[0] ?? '', modelName: parts.slice(1).join('::')};
+  }
   emit('update', {config: {
-    modelRef: {kind: 'fixed', endpointId, modelName},
+    modelRef,
     mode: localMode.value,
     inputArtifactRef: localInputRef.value,
     ...(localSystemPrompt.value && {systemPrompt: localSystemPrompt.value}),

@@ -13,4 +13,6 @@ export type {
   CapsuleParameterKind,
 } from '@lorca/core';
 
-// Capsule validation, locking, versioning, and loop execution are implemented in Phase 8–10.
+export {validateCapsule} from './validate.js';
+export {executeCapsuleTestRun} from './executor.js';
+export type {CapsuleTestInput} from './executor.js';

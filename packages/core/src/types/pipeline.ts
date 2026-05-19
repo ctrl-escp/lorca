@@ -250,6 +250,7 @@ export interface PipelineRunContext {
   };
   artifacts: Record<string, PipelineArtifact>;
   trace: PipelineTraceEvent[];
+  params?: Record<string, unknown>;
 }
 
 // ── Export/import types ──────────────────────────────────────────────────────

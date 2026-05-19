@@ -2,7 +2,7 @@ import {defineStore} from 'pinia';
 import {ref} from 'vue';
 
 export type EditorContext = 'pipeline' | 'capsule';
-export type RightPaneTab = 'inspector' | 'trace' | 'output';
+export type RightPaneTab = 'inspector' | 'interface' | 'trace' | 'output';
 
 export interface UiState {
   editorContext: EditorContext;

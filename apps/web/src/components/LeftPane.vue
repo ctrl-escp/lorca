@@ -24,6 +24,27 @@
       </div>
     </section>
 
+    <!-- Capsule library -->
+    <section class="pane-section">
+      <div class="section-header">
+        <span class="section-title">Capsules</span>
+        <button class="icon-btn" @click="onNewCapsule" title="New Capsule">+</button>
+      </div>
+      <div class="capsule-list">
+        <div
+          v-for="cap in capsulesStore.capsules"
+          :key="cap.id"
+          class="capsule-row"
+          :class="{active: uiStore.activeCapsuleEditId === cap.id}"
+          @click="uiStore.openCapsuleEditor(cap.id)"
+        >
+          <span class="capsule-row-name">{{ cap.name || '(unnamed)' }}</span>
+          <span class="capsule-row-meta">{{ cap.version }} · {{ cap.status }}</span>
+        </div>
+        <p v-if="capsulesStore.capsules.length === 0" class="empty-hint">No Capsules yet.</p>
+      </div>
+    </section>
+
     <section class="pane-section">
       <div class="section-header">
         <span class="section-title">Models</span>
@@ -56,7 +77,10 @@ import {ref, onMounted} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket} from '@lorca/core';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
+import {useCapsulesStore} from '../stores/capsules.js';
+import {useUiStore} from '../stores/ui.js';
 import {useEndpointActions} from '../composables/useEndpointActions.js';
+import {newId} from '../utils/id.js';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
@@ -64,6 +88,8 @@ import ModelBucketEditor from './models/ModelBucketEditor.vue';
 
 const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
+const capsulesStore = useCapsulesStore();
+const uiStore = useUiStore();
 const epActions = useEndpointActions();
 
 const showAddEndpoint = ref(false);
@@ -87,6 +113,26 @@ async function onRemoveEndpoint(id: string) {
 async function onAddModel(model: DiscoveredModel) {
   await modelsStore.addModel(model);
   showAddModel.value = false;
+}
+
+function onNewCapsule() {
+  const id = newId('cap');
+  const now = new Date().toISOString();
+  capsulesStore.addCapsule({
+    schemaVersion: 1,
+    id,
+    name: 'New Capsule',
+    version: 'v1',
+    status: 'draft',
+    interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
+    nodes: [{id: `${id}-input`, type: 'input'}],
+    edges: [],
+    outputRef: {nodeId: `${id}-input`, outputName: 'xml'},
+    tests: [],
+    createdAt: now,
+    updatedAt: now,
+  });
+  uiStore.openCapsuleEditor(id);
 }
 
 async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | undefined) {
@@ -152,7 +198,17 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
 .icon-btn.active { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 
-.ep-list, .model-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ep-list, .model-list, .capsule-list { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.capsule-row {
+  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid #222;
+  cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem;
+  background: #1a1a1a;
+}
+.capsule-row:hover { background: #222; border-color: #333; }
+.capsule-row.active { background: #1e2d3d; border-color: #2a4d6e; }
+.capsule-row-name { font-size: 0.82rem; font-weight: 500; }
+.capsule-row-meta { font-size: 0.68rem; color: #555; }
 
 .empty-hint { font-size: 0.75rem; color: #555; margin: 0; }
 

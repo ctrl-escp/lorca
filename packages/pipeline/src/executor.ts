@@ -162,7 +162,17 @@ async function executeNode(
     case 'prompt-wrapper': {
       const inputArtifact = ctx.artifacts[node.config.inputArtifactRef ?? 'user_prompt.xml'] ?? ctx.artifacts['user_prompt.xml'];
       const inputText = typeof inputArtifact?.value === 'string' ? inputArtifact.value : '';
-      const rendered = renderPromptWrapper(node.config, inputText);
+      let config = node.config;
+      if (ctx.params !== undefined) {
+        const instrResult = renderTemplate(node.config.instructionText, {
+          artifacts: {},
+          allowParams: true,
+          params: ctx.params,
+        });
+        if (!instrResult.ok) return { ok: false, error: { ...instrResult.error, nodeId: node.id } };
+        config = { ...node.config, instructionText: instrResult.value };
+      }
+      const rendered = renderPromptWrapper(config, inputText);
       const key = outputKey(node, 'text');
       return { ok: true, value: [makeArtifact(key, node.id, 'text', rendered)] };
     }
@@ -174,7 +184,8 @@ async function executeNode(
       }
       const renderResult = renderTemplate(node.template, {
         artifacts: artifactValues,
-        allowParams: false,
+        allowParams: ctx.params !== undefined,
+        ...(ctx.params !== undefined && {params: ctx.params}),
       });
       if (!renderResult.ok) return { ok: false, error: { ...renderResult.error, nodeId: node.id } };
       const key = outputKey(node, 'text');
