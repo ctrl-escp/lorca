@@ -1,15 +1,8 @@
-// Prompt envelope generation, template rendering, and escaping are implemented in Phase 4.
-// Reserved XML tags (must not be redefined):
-export const RESERVED_TAGS = [
-  'user_prompt',
-  'system_prompt',
-  'pipeline_context',
-  'model_output',
-  'acceptance_criteria',
-  'candidate_answer',
-  'verification_result',
-] as const;
-
-export type ReservedTag = (typeof RESERVED_TAGS)[number];
-
-export const TAG_PATTERN = /^[a-z][a-z0-9_\-]*$/;
+export { escapePromptText, unescapePromptText } from './escape.js';
+export { buildUserPromptArtifacts } from './envelope.js';
+export type { UserPromptArtifacts } from './envelope.js';
+export { renderPromptWrapper } from './wrapper.js';
+export { renderTemplate } from './template.js';
+export type { TemplateContext } from './template.js';
+export { TAG_PATTERN, RESERVED_TAGS, isValidTag, isReservedTag } from './tags.js';
+export type { ReservedTag } from './tags.js';

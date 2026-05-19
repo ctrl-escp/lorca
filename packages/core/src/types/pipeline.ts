@@ -82,6 +82,7 @@ export interface PromptWrapperConfig {
   includeInputArtifact: boolean;
   inputPlacement: 'before-instructions' | 'after-instructions' | 'inside-template';
   template?: string;
+  inputArtifactRef?: string;
 }
 
 export type ModelRef =

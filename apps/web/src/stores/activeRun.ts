@@ -1,87 +1,89 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
-import type {PipelineArtifact, PipelineTraceEvent, PipelineError} from '@lorca/core';
+import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError} from '@lorca/core';
+import {buildUserPromptArtifacts} from '@lorca/prompt';
+import {executePipeline} from '@lorca/pipeline';
+import {useEndpointsStore} from './endpoints.js';
 
 export type RunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-export interface ActiveRunState {
-  runId: string;
-  pipelineId: string;
-  startedAt: string;
-  status: RunStatus;
-  artifacts: Record<string, PipelineArtifact>;
-  trace: PipelineTraceEvent[];
-  finalOutputKey: string | null;
-  error: PipelineError | null;
-}
-
 export const useActiveRunStore = defineStore('activeRun', () => {
-  const run = ref<ActiveRunState | null>(null);
+  const status = ref<RunStatus>('idle');
+  const runId = ref<string | null>(null);
+  const artifacts = ref<Record<string, PipelineArtifact>>({});
+  const trace = ref<PipelineTraceEvent[]>([]);
+  const finalOutputKey = ref<string | null>(null);
+  const error = ref<PipelineError | null>(null);
   const abortController = ref<AbortController | null>(null);
 
-  const isRunning = computed(() => run.value?.status === 'running');
-  const canCancel = computed(() => isRunning.value && abortController.value != null);
+  const isRunning = computed(() => status.value === 'running');
+  const canCancel = computed(() => isRunning.value);
+  const finalOutput = computed(() =>
+    finalOutputKey.value ? artifacts.value[finalOutputKey.value] : null,
+  );
 
-  function startRun(runId: string, pipelineId: string) {
-    abortController.value = new AbortController();
-    run.value = {
-      runId,
-      pipelineId,
-      startedAt: new Date().toISOString(),
-      status: 'running',
-      artifacts: {},
-      trace: [],
-      finalOutputKey: null,
-      error: null,
-    };
-  }
-
-  function addArtifact(artifact: PipelineArtifact) {
-    if (!run.value) return;
-    run.value.artifacts[artifact.name] = artifact;
-  }
-
-  function addTraceEvent(event: PipelineTraceEvent) {
-    if (!run.value) return;
-    run.value.trace.push(event);
-  }
-
-  function completeRun(finalOutputKey: string) {
-    if (!run.value) return;
-    run.value.status = 'completed';
-    run.value.finalOutputKey = finalOutputKey;
+  function reset() {
+    status.value = 'idle';
+    runId.value = null;
+    artifacts.value = {};
+    trace.value = [];
+    finalOutputKey.value = null;
+    error.value = null;
     abortController.value = null;
   }
 
-  function failRun(error: PipelineError) {
-    if (!run.value) return;
-    run.value.status = 'failed';
-    run.value.error = error;
-    abortController.value = null;
-  }
-
-  function cancelRun() {
+  function cancel() {
     abortController.value?.abort();
-    if (run.value) run.value.status = 'cancelled';
-    abortController.value = null;
+    status.value = 'cancelled';
   }
 
-  function clearRun() {
-    run.value = null;
+  async function run(def: PipelineDefinition, userPromptRaw: string) {
+    const endpointsStore = useEndpointsStore();
+    reset();
+
+    const id = `run-${crypto.randomUUID().slice(0, 8)}`;
+    runId.value = id;
+    status.value = 'running';
+    const controller = new AbortController();
+    abortController.value = controller;
+
+    const {raw, xml} = buildUserPromptArtifacts(userPromptRaw);
+    const ctx = {
+      runId: id,
+      pipelineId: def.id,
+      startedAt: new Date().toISOString(),
+      abortSignal: controller.signal,
+      input: {userPromptRaw: raw, userPromptXml: xml},
+      artifacts: {} as Record<string, PipelineArtifact>,
+      trace: [] as PipelineTraceEvent[],
+    };
+
+    const result = await executePipeline(
+      def,
+      ctx,
+      (endpointId) => endpointsStore.getEndpoint(endpointId),
+      {
+        onTraceEvent(event) {
+          trace.value = [...trace.value, event];
+          ctx.trace.push(event);
+        },
+        onArtifact(artifact) {
+          artifacts.value = {...artifacts.value, [artifact.name]: artifact};
+          ctx.artifacts[artifact.name] = artifact;
+        },
+      },
+    );
+
     abortController.value = null;
+
+    if (result.ok) {
+      finalOutputKey.value = result.value;
+      status.value = 'completed';
+    } else {
+      error.value = result.error;
+      status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
+    }
   }
 
-  return {
-    run,
-    abortController,
-    isRunning,
-    canCancel,
-    startRun,
-    addArtifact,
-    addTraceEvent,
-    completeRun,
-    failRun,
-    cancelRun,
-    clearRun,
-  };
+  return {status, runId, artifacts, trace, finalOutputKey, error, isRunning, canCancel, finalOutput, reset, cancel, run};
 });
