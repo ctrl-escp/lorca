@@ -1,4 +1,4 @@
-import {ref} from 'vue';
+import {ref, toRaw} from 'vue';
 import type {CapsuleDefinition, PipelineNode, PipelineEdge} from '@lorca/core';
 import {newId} from '../utils/id.js';
 
@@ -50,7 +50,7 @@ function defaultNode(type: PipelineNode['type']): PipelineNode {
 }
 
 export function useCapsuleEditor(initialDef: CapsuleDefinition) {
-  const def = ref<CapsuleDefinition>(structuredClone(initialDef));
+  const def = ref<CapsuleDefinition>(structuredClone(toRaw(initialDef)));
 
   function sync() {
     def.value = {...def.value, edges: rebuildEdges(def.value.nodes), updatedAt: new Date().toISOString()};

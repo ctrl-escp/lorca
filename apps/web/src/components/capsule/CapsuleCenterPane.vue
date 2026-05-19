@@ -91,7 +91,9 @@ const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
 
 const editor = useCapsuleEditor(props.capsule);
-const {def} = editor;
+const {def, updateNode} = editor;
+
+defineExpose({updateNode});
 
 watch(def, (updated) => emit('update', updated));
 watch(() => props.capsule, (c) => { if (c.id !== def.value.id) Object.assign(def.value, structuredClone(c)); });

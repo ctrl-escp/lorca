@@ -19,12 +19,14 @@
       <div class="pane pane-center">
         <CapsuleCenterPane
           v-if="uiStore.editorContext === 'capsule' && activeCapsule"
+          ref="capsuleCenterPaneRef"
           :capsule="activeCapsule"
           @update="onUpdateCapsule"
         />
         <CenterPane
-          v-else
-          :def="activeDef"
+          v-else-if="pipelinesStore.loaded && pipelinesStore.activePipeline"
+          ref="centerPaneRef"
+          :def="pipelinesStore.activePipeline"
           @update="onUpdateDef"
         />
       </div>
@@ -46,9 +48,9 @@ import {useActiveRunStore} from './stores/activeRun.js';
 import {useCapsuleRunStore} from './stores/capsuleRun.js';
 import {useEndpointsStore} from './stores/endpoints.js';
 import {useModelsStore} from './stores/models.js';
+import {usePipelinesStore} from './stores/pipelines.js';
 import {useCapsulesStore} from './stores/capsules.js';
 import {useUiStore} from './stores/ui.js';
-import {usePipelineEditor} from './composables/usePipelineEditor.js';
 import LeftPane from './components/LeftPane.vue';
 import CenterPane from './components/pipeline/CenterPane.vue';
 import CapsuleCenterPane from './components/capsule/CapsuleCenterPane.vue';
@@ -57,26 +59,22 @@ import RightPane from './components/RightPane.vue';
 const runStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
 const uiStore = useUiStore();
+const pipelinesStore = usePipelinesStore();
 const capsulesStore = useCapsulesStore();
 
 const runStatus = computed(() =>
   uiStore.editorContext === 'capsule' ? capsuleRunStore.status : runStore.status,
 );
 
-const DEFAULT_PIPELINE: PipelineDefinition = {
-  schemaVersion: 1,
-  id: 'default',
-  name: 'New Pipeline',
-  inputArtifactName: 'user_prompt',
-  nodes: [{id: 'input-1', type: 'input'}],
-  edges: [],
-  outputRef: {nodeId: 'input-1', outputName: 'xml'},
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+type NodeEditorPane = {updateNode: (nodeId: string, patch: Record<string, unknown>) => void};
 
-const editor = usePipelineEditor(DEFAULT_PIPELINE);
-const activeDef = editor.def;
+const centerPaneRef = ref<NodeEditorPane | null>(null);
+const capsuleCenterPaneRef = ref<NodeEditorPane | null>(null);
+
+// Tracks the live pipeline definition as edited in CenterPane.
+// Starts null; gets set on first CenterPane update emit so the right pane
+// node list stays in sync with CenterPane's internal editor state.
+const currentDef = ref<PipelineDefinition | null>(null);
 
 const activeCapsule = computed(() =>
   uiStore.activeCapsuleEditId
@@ -84,28 +82,23 @@ const activeCapsule = computed(() =>
     : undefined,
 );
 
-const activeNodes = computed(() =>
-  uiStore.editorContext === 'capsule' && activeCapsule.value
-    ? activeCapsule.value.nodes
-    : activeDef.value.nodes,
-);
+const activeNodes = computed(() => {
+  if (uiStore.editorContext === 'capsule' && activeCapsule.value) {
+    return activeCapsule.value.nodes;
+  }
+  return (currentDef.value ?? pipelinesStore.activePipeline)?.nodes ?? [];
+});
 
-function onUpdateDef(def: PipelineDefinition) {
-  activeDef.value = def;
+async function onUpdateDef(def: PipelineDefinition) {
+  currentDef.value = def;
+  await pipelinesStore.save(def);
 }
 
 function onUpdateNode(nodeId: string, patch: Record<string, unknown>) {
-  if (uiStore.editorContext === 'capsule' && uiStore.activeCapsuleEditId) {
-    const cap = capsulesStore.getCapsule(uiStore.activeCapsuleEditId);
-    if (!cap) return;
-    const updated = {
-      ...cap,
-      nodes: cap.nodes.map((n) => n.id === nodeId ? deepMerge(n as unknown as Record<string, unknown>, patch) as unknown as typeof n : n),
-      updatedAt: new Date().toISOString(),
-    };
-    capsulesStore.updateCapsule(uiStore.activeCapsuleEditId, updated);
+  if (uiStore.editorContext === 'capsule') {
+    capsuleCenterPaneRef.value?.updateNode(nodeId, patch);
   } else {
-    editor.updateNode(nodeId, patch);
+    centerPaneRef.value?.updateNode(nodeId, patch);
   }
 }
 
@@ -124,21 +117,11 @@ function onUpdateCapsuleInterface(iface: CapsuleInterface) {
   }
 }
 
-function deepMerge(target: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
-  const out = {...target};
-  for (const [k, v] of Object.entries(patch)) {
-    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof out[k] === 'object' && out[k] !== null) {
-      out[k] = deepMerge(out[k] as Record<string, unknown>, v as Record<string, unknown>);
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
-}
-
 onMounted(async () => {
   await useEndpointsStore().load();
   await useModelsStore().load();
+  await pipelinesStore.load();
+  await capsulesStore.load();
 });
 </script>
 

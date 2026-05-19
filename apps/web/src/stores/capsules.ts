@@ -1,11 +1,14 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
+import {getDb} from '@lorca/storage';
 import {lockCapsule, createDraftFromLocked} from '@lorca/capsules';
 import {newId} from '../utils/id.js';
+import {cloneForStorage} from '../utils/storage.js';
 
 export const useCapsulesStore = defineStore('capsules', () => {
   const capsules = ref<CapsuleDefinition[]>([]);
+  const loaded = ref(false);
 
   const lockedCapsules = computed(() =>
     capsules.value.filter((c) => c.status === 'locked'),
@@ -15,24 +18,34 @@ export const useCapsulesStore = defineStore('capsules', () => {
     capsules.value.filter((c) => c.status === 'draft'),
   );
 
+  async function load() {
+    if (loaded.value) return;
+    capsules.value = await getDb().capsules.toArray();
+    loaded.value = true;
+  }
+
   function addCapsule(capsule: CapsuleDefinition) {
-    capsules.value.push(capsule);
+    const plain = cloneForStorage(capsule);
+    capsules.value.push(plain);
+    void getDb().capsules.put(plain);
   }
 
   function updateCapsule(id: string, patch: Partial<CapsuleDefinition>) {
     const idx = capsules.value.findIndex((c) => c.id === id);
     if (idx !== -1) {
-      capsules.value[idx] = {...capsules.value[idx]!, ...patch, updatedAt: new Date().toISOString()};
+      const updated = cloneForStorage({...capsules.value[idx]!, ...patch, updatedAt: new Date().toISOString()});
+      capsules.value[idx] = updated;
+      void getDb().capsules.put(updated);
     }
   }
 
   function removeCapsule(id: string) {
     capsules.value = capsules.value.filter((c) => c.id !== id);
+    void getDb().capsules.delete(id);
   }
 
   function getCapsule(id: string, version?: string): CapsuleDefinition | undefined {
     if (version) return capsules.value.find((c) => c.id === id && c.version === version);
-    // Return latest version when no version specified
     return capsules.value
       .filter((c) => c.id === id)
       .sort((a, b) => {
@@ -48,6 +61,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
     const result = lockCapsule(capsules.value[idx]!);
     if (!result.ok) return {ok: false, message: result.error.message};
     capsules.value[idx] = result.value;
+    void getDb().capsules.put(cloneForStorage(result.value));
     return {ok: true};
   }
 
@@ -57,8 +71,9 @@ export const useCapsulesStore = defineStore('capsules', () => {
     const newCapsuleId = newId('cap');
     const draft = createDraftFromLocked(locked, newCapsuleId);
     capsules.value.push(draft);
+    void getDb().capsules.put(cloneForStorage(draft));
     return newCapsuleId;
   }
 
-  return {capsules, lockedCapsules, draftCapsules, addCapsule, updateCapsule, removeCapsule, getCapsule, lockCapsuleById, editLockedCapsule};
+  return {capsules, lockedCapsules, draftCapsules, loaded, load, addCapsule, updateCapsule, removeCapsule, getCapsule, lockCapsuleById, editLockedCapsule};
 });

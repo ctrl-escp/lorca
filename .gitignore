@@ -3,6 +3,7 @@
 *.iml
 node_modules/
 dist/
+apps/web/test-results/
 *.tsbuildinfo
 .vite/
 .DS_Store

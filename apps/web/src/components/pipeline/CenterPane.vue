@@ -1,7 +1,12 @@
 <template>
   <div class="center-pane">
     <div class="center-toolbar">
-      <input class="pipeline-name" v-model="def.name" placeholder="Pipeline name" />
+      <input
+        class="pipeline-name"
+        v-model="localPipelineName"
+        placeholder="Pipeline name"
+        @change="commitPipelineName"
+      />
       <div class="run-controls">
         <button class="btn btn-run" :disabled="runStore.isRunning || !canRun" @click="handleRun">
           {{ runStore.isRunning ? 'Running…' : 'Execute' }}
@@ -31,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed} from 'vue';
+import {ref, computed, watch} from 'vue';
 import type {PipelineDefinition} from '@lorca/core';
 import {usePipelineEditor} from '../../composables/usePipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
@@ -44,10 +49,26 @@ const emit = defineEmits<{update: [def: PipelineDefinition]}>();
 const runStore = useActiveRunStore();
 const uiStore = useUiStore();
 const userPrompt = ref('');
+const localPipelineName = ref(props.def.name);
 const editor = usePipelineEditor(props.def);
-const {def, finalArtifactKey} = editor;
+const {def, finalArtifactKey, updateNode} = editor;
+
+defineExpose({updateNode});
+
+watch(() => props.def.name, (name) => {
+  localPipelineName.value = name;
+});
+
+function commitPipelineName() {
+  if (localPipelineName.value === def.value.name) return;
+  def.value = {...def.value, name: localPipelineName.value};
+}
+
+watch(localPipelineName, () => commitPipelineName());
 
 const canRun = computed(() => userPrompt.value.trim().length > 0);
+
+watch(def, (newDef) => emit('update', newDef), {deep: true});
 
 async function handleRun() {
   await runStore.run(def.value, userPrompt.value.trim());
