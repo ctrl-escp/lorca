@@ -59,6 +59,10 @@
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
               </div>
 
+              <div v-if="outputPreviewFor(step.id)" class="step-output-preview" :title="outputPreviewFor(step.id)!">
+                {{ outputPreviewFor(step.id) }}
+              </div>
+
               <div class="step-run-actions" v-if="step.enabled">
                 <button class="btn-run-up-to" @click.stop="$emit('run-up-to', step.id)" title="Execute pipeline up to this step">
                   ▷ Run up to here
@@ -131,6 +135,7 @@ const props = defineProps<{
   canRedo?: boolean;
   lastUndoLabel?: string | null;
   lastRedoLabel?: string | null;
+  runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
 }>();
 
 const emit = defineEmits<{
@@ -216,6 +221,10 @@ function historyReadCount(step: PipelineStep): number {
 
 function runStateFor(stepId: string) {
   return props.stepStates?.[stepId]?.state;
+}
+
+function outputPreviewFor(stepId: string): string | null {
+  return props.runSnapshots?.[stepId]?.primaryOutputPreview ?? null;
 }
 
 function runStateTitle(stepId: string): string {
@@ -362,6 +371,20 @@ function runStateTitle(stepId: string): string {
 .status-started, .status-running { color: #e8a020; }
 .status-skipped, .status-cancelled { color: #555; }
 .step-duration { color: #444; }
+
+.step-output-preview {
+  font-size: 0.7rem;
+  color: #888;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0.15rem 0.25rem;
+  background: #0d0d0d;
+  border-radius: 3px;
+  border: 1px solid #1e1e1e;
+}
 
 .step-run-actions { margin-top: 0.3rem; display: none; }
 .chain-step.selected .step-run-actions { display: block; }

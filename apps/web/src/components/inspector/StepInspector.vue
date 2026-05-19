@@ -40,6 +40,7 @@
           <span class="inspector-last-label">Outputs:</span>
           <code v-for="ref in lastSnapshot.outputArtifactRefs" :key="ref" class="inspector-artifact-ref">{{ ref }}</code>
         </div>
+        <pre v-if="lastSnapshot?.primaryOutputPreview" class="inspector-output-preview">{{ lastSnapshot.primaryOutputPreview }}</pre>
       </div>
 
       <!-- Model Call -->
@@ -394,6 +395,19 @@ function commitLoopGroup() {
 .inspector-last-outputs { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
 .inspector-last-label { color: #555; font-size: 0.65rem; }
 .inspector-artifact-ref { color: #5a8a5a; font-size: 0.65rem; }
+.inspector-output-preview {
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.68rem;
+  color: #999;
+  background: #0d0d0d;
+  border: 1px solid #1e1e1e;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 6rem;
+  overflow-y: auto;
+}
 
 .inspector-field { display: flex; flex-direction: column; gap: 0.2rem; }
 .inspector-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #888; }

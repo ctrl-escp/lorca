@@ -81,8 +81,9 @@ export function buildStepRunSnapshot(
   userPromptSignature: string,
   outputArtifactRefs: string[],
   status: StepRunSnapshot['status'],
+  primaryOutputPreview?: string,
 ): StepRunSnapshot {
-  return {
+  const snap: StepRunSnapshot = {
     stepId: step.id,
     inputSignature: computeStepInputSignature(step, pipeline.steps),
     configSignature: computeStepConfigSignature(step),
@@ -91,6 +92,8 @@ export function buildStepRunSnapshot(
     completedAt: new Date().toISOString(),
     status,
   };
+  if (primaryOutputPreview !== undefined) snap.primaryOutputPreview = primaryOutputPreview;
+  return snap;
 }
 
 export type StepRunUiState =

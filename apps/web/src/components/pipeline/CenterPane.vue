@@ -52,6 +52,7 @@
       :last-undo-label="editorStore.lastUndoLabel"
       :last-redo-label="editorStore.lastRedoLabel"
       :selection-range="selectionRange"
+      :run-snapshots="runStore.snapshots"
       @select="handleSelectStep"
       @append="handleAppend"
       @insert-after="handleInsertAfter"

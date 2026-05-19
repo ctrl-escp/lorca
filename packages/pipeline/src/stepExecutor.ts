@@ -8,9 +8,10 @@ import type {
   AiEndpointConfig,
   LoopGroupStepConfig,
   LoopExitCondition,
-  StepRunSnapshot,
   Result,
   CapsuleInstanceNode,
+  TraceHistoryReadInput,
+  StepRunSnapshot,
 } from '@lorca/core';
 import {MODEL_CALL_TIMEOUT_MS, LOOP_PREV_ARTIFACT_REF} from '@lorca/core';
 import {renderPromptComposition, renderTemplate} from '@lorca/prompt';
@@ -28,6 +29,20 @@ import {
   buildStepRunSnapshot,
   computeUserPromptSignature,
 } from './staleState.js';
+import {
+  historyReadsForTrace,
+  primaryOutputPreview,
+  rawResponsePreview,
+} from './stepTrace.js';
+
+interface StepExecutionResult {
+  artifacts: PipelineArtifact[];
+  traceExtras?: Partial<PipelineTraceEvent>;
+}
+
+function stepOk(artifacts: PipelineArtifact[], traceExtras?: Partial<PipelineTraceEvent>): Result<StepExecutionResult, PipelineError> {
+  return {ok: true, value: {artifacts, ...(traceExtras ? {traceExtras} : {})}};
+}
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
 export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
@@ -60,7 +75,7 @@ function traceEvent(
   status: PipelineTraceEvent['status'],
   extra?: Partial<PipelineTraceEvent>,
 ): PipelineTraceEvent {
-  return {runId, nodeId: stepId, status, timestamp: new Date().toISOString(), ...extra};
+  return {runId, stepId, nodeId: stepId, status, timestamp: new Date().toISOString(), ...extra};
 }
 
 function tryParseJson(text: string): unknown | null {
@@ -156,7 +171,9 @@ export async function executeStepChain(
       continue;
     }
 
-    callbacks.onTraceEvent(traceEvent(runId, step.id, 'started'));
+    callbacks.onTraceEvent(traceEvent(runId, step.id, 'started', {
+      inputArtifactNames: compiledStep.inputArtifactRefs,
+    }));
     const startMs = Date.now();
 
     const result = await executeStepInternal(
@@ -185,12 +202,13 @@ export async function executeStepChain(
     }
 
     const produced: string[] = [];
-    for (const artifact of result.value) {
+    for (const artifact of result.value.artifacts) {
       artifacts[artifact.name] = artifact;
       callbacks.onArtifact(artifact);
       produced.push(artifact.name);
     }
     executedStepIds.push(step.id);
+    const preview = primaryOutputPreview(step, artifacts);
     snapshots[step.id] = buildStepRunSnapshot(
       step,
       compiledStep,
@@ -198,8 +216,14 @@ export async function executeStepChain(
       userPromptSignature,
       produced,
       'completed',
+      preview,
     );
-    callbacks.onTraceEvent(traceEvent(runId, step.id, 'completed', {durationMs: Date.now() - startMs, outputArtifactNames: produced}));
+    callbacks.onTraceEvent(traceEvent(runId, step.id, 'completed', {
+      durationMs: Date.now() - startMs,
+      outputArtifactNames: produced,
+      inputArtifactNames: compiledStep.inputArtifactRefs,
+      ...result.value.traceExtras,
+    }));
   }
 
   if (failed && failError) return {ok: false, error: failError};
@@ -242,13 +266,14 @@ export async function executeStepInternal(
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
   abortSignal?: AbortSignal,
-): Promise<Result<PipelineArtifact[], PipelineError>> {
+): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
+  const inputArtifactNames = compiledStep.inputArtifactRefs;
 
   switch (config.type) {
     case 'manual-text': {
       const key = `${step.outputNamespace}.text`;
-      return {ok: true, value: [makeArtifact(key, step.id, 'text', config.text)]};
+      return stepOk([makeArtifact(key, step.id, 'text', config.text)], {inputArtifactNames});
     }
 
     case 'template': {
@@ -257,7 +282,7 @@ export async function executeStepInternal(
       const renderResult = renderTemplate(config.template, {artifacts: artifactValues, allowParams: false});
       if (!renderResult.ok) return {ok: false, error: {...renderResult.error, nodeId: step.id}};
       const key = `${step.outputNamespace}.text`;
-      return {ok: true, value: [makeArtifact(key, step.id, 'text', renderResult.value)]};
+      return stepOk([makeArtifact(key, step.id, 'text', renderResult.value)], {inputArtifactNames});
     }
 
     case 'json-extract': {
@@ -271,7 +296,7 @@ export async function executeStepInternal(
         return {ok: false, error: {code: 'json_parse_failed', message: `Could not extract JSON from: ${config.sourceArtifactRef}`, nodeId: step.id}};
       }
       const key = `${step.outputNamespace}.json`;
-      return {ok: true, value: [makeArtifact(key, step.id, 'json', parsed)]};
+      return stepOk([makeArtifact(key, step.id, 'json', parsed)], {inputArtifactNames});
     }
 
     case 'prompt-wrapper':
@@ -280,11 +305,15 @@ export async function executeStepInternal(
     }
 
     case 'capsule-instance': {
-      return executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline);
+      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline);
+      if (!capResult.ok) return capResult;
+      return stepOk(capResult.value, {inputArtifactNames});
     }
 
     case 'loop-group': {
-      return executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal);
+      const loopResult = await executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal);
+      if (!loopResult.ok) return loopResult;
+      return stepOk(loopResult.value, {inputArtifactNames});
     }
 
     default: {
@@ -370,7 +399,7 @@ async function executeLoopGroupStep(
         return {ok: false, error: {...result.error, nodeId: step.id}};
       }
 
-      for (const artifact of result.value) {
+      for (const artifact of result.value.artifacts) {
         loopArtifacts[artifact.name] = artifact;
       }
     }
@@ -405,7 +434,7 @@ async function executePromptStep(
   artifacts: Record<string, PipelineArtifact>,
   resolveEndpoint: EndpointResolver,
   abortSignal?: AbortSignal,
-): Promise<Result<PipelineArtifact[], PipelineError>> {
+): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
 
   const prevArtifact = compiledStep.previousOutputArtifactRef
@@ -416,6 +445,7 @@ async function executePromptStep(
     : undefined;
 
   const resolvedHistory: ResolvedHistoryRead[] = [];
+  const historyReadInputs: TraceHistoryReadInput[] = [];
   for (const read of compiledStep.historyReads ?? []) {
     const artifact = artifacts[read.sourceArtifactRef];
     if (!artifact) {
@@ -430,10 +460,12 @@ async function executePromptStep(
         };
       }
       resolvedHistory.push({sourceArtifactRef: read.sourceArtifactRef, omitted: true});
+      historyReadInputs.push({sourceArtifactRef: read.sourceArtifactRef, omitted: true});
       continue;
     }
     const value = typeof artifact.value === 'string' ? artifact.value : JSON.stringify(artifact.value);
     resolvedHistory.push({sourceArtifactRef: read.sourceArtifactRef, value});
+    historyReadInputs.push({sourceArtifactRef: read.sourceArtifactRef, omitted: false, preview: value});
   }
 
   const renderedPrompt = step.prompt
@@ -442,8 +474,14 @@ async function executePromptStep(
 
   const key = `${step.outputNamespace}.text`;
 
+  const traceBase: Partial<PipelineTraceEvent> = {
+    inputArtifactNames: compiledStep.inputArtifactRefs,
+    renderedPromptXml: renderedPrompt.xmlText,
+    historyReadInputs: historyReadsForTrace(historyReadInputs),
+  };
+
   if (config.type === 'prompt-wrapper') {
-    return {ok: true, value: [makeArtifact(key, step.id, 'text', renderedPrompt.xmlText)]};
+    return stepOk([makeArtifact(key, step.id, 'text', renderedPrompt.xmlText)], traceBase);
   }
 
   if (config.type !== 'model-call') {
@@ -487,7 +525,10 @@ async function executePromptStep(
     produced.push(makeArtifact(`${step.outputNamespace}.parsedJson`, step.id, 'json', parsed));
   }
 
-  return {ok: true, value: produced};
+  return stepOk(produced, {
+    ...traceBase,
+    rawModelResponsePreview: rawResponsePreview(callResult.value.rawResponse),
+  });
 }
 
 async function executeCapsuleStep(

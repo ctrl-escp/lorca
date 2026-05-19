@@ -364,6 +364,12 @@ export interface PipelineArtifact {
   metadata?: Record<string, unknown>;
 }
 
+export interface TraceHistoryReadInput {
+  sourceArtifactRef: string;
+  omitted: boolean;
+  preview?: string;
+}
+
 export interface PipelineTraceEvent {
   runId: string;
   stepId?: string;
@@ -375,6 +381,12 @@ export interface PipelineTraceEvent {
   durationMs?: number;
   inputArtifactNames?: string[];
   outputArtifactNames?: string[];
+  /** Full composed prompt XML sent to a model-call step. */
+  renderedPromptXml?: string;
+  /** History-read inputs resolved for this step's prompt composition. */
+  historyReadInputs?: TraceHistoryReadInput[];
+  /** Truncated JSON/text preview of the model adapter raw response. */
+  rawModelResponsePreview?: string;
   error?: PipelineError;
 }
 
@@ -401,6 +413,8 @@ export interface StepRunSnapshot {
   configSignature: string;
   historyReadSignatures: Record<string, string>;
   outputArtifactRefs: string[];
+  /** Truncated primary output for chain-row preview. */
+  primaryOutputPreview?: string;
   completedAt: string;
   status: 'completed' | 'failed' | 'skipped';
 }

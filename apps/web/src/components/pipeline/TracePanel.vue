@@ -9,16 +9,53 @@
     </div>
 
     <div v-if="displayTrace.length === 0" class="trace-empty">No trace yet. Execute Pipeline to see step details.</div>
-    <div v-for="event in displayTrace" :key="`${event.nodeId}-${event.status}-${event.timestamp}`" class="trace-event" :class="`ev-${event.status}`">
+    <div
+      v-for="event in displayTrace"
+      :key="`${event.stepId ?? event.nodeId}-${event.status}-${event.timestamp}`"
+      class="trace-event"
+      :class="`ev-${event.status}`"
+    >
       <div class="ev-header">
         <span v-if="event.capsuleInstanceId" class="ev-capsule-id">{{ event.capsuleInstanceId }}<template v-if="event.capsuleIteration !== undefined"> #{{ event.capsuleIteration }}</template></span>
-        <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}">{{ event.nodeId }}</span>
+        <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}">{{ event.stepId ?? event.nodeId }}</span>
         <span class="ev-status">{{ event.status }}</span>
         <span v-if="event.durationMs !== undefined" class="ev-duration">{{ event.durationMs }}ms</span>
+        <button
+          v-if="hasDetails(event)"
+          type="button"
+          class="ev-expand"
+          @click="toggleExpand(event.stepId ?? event.nodeId ?? '')"
+        >{{ expanded.has(event.stepId ?? event.nodeId ?? '') ? '▾' : '▸' }}</button>
+      </div>
+
+      <div v-if="event.inputArtifactNames?.length" class="ev-artifacts">
+        <span class="ev-artifacts-label">inputs</span>
+        <span v-for="name in event.inputArtifactNames" :key="name" class="artifact-tag">{{ name }}</span>
       </div>
       <div v-if="event.outputArtifactNames?.length" class="ev-artifacts">
-        <span v-for="name in event.outputArtifactNames" :key="name" class="artifact-tag">{{ name }}</span>
+        <span class="ev-artifacts-label">outputs</span>
+        <span v-for="name in event.outputArtifactNames" :key="name" class="artifact-tag out">{{ name }}</span>
       </div>
+
+      <template v-if="expanded.has(event.stepId ?? event.nodeId ?? '') && hasDetails(event)">
+        <div v-if="event.historyReadInputs?.length" class="ev-detail">
+          <div class="ev-detail-title">History reads</div>
+          <div v-for="(hr, i) in event.historyReadInputs" :key="i" class="ev-history-row">
+            <span class="artifact-tag" :class="{omitted: hr.omitted}">{{ hr.sourceArtifactRef }}</span>
+            <span v-if="hr.omitted" class="ev-omitted">omitted</span>
+            <pre v-else-if="hr.preview" class="ev-preview">{{ hr.preview }}</pre>
+          </div>
+        </div>
+        <div v-if="event.renderedPromptXml" class="ev-detail">
+          <div class="ev-detail-title">Rendered prompt</div>
+          <pre class="ev-prompt">{{ event.renderedPromptXml }}</pre>
+        </div>
+        <div v-if="event.rawModelResponsePreview" class="ev-detail">
+          <div class="ev-detail-title">Raw model response</div>
+          <pre class="ev-preview">{{ event.rawModelResponsePreview }}</pre>
+        </div>
+      </template>
+
       <div v-if="event.error" class="ev-error">
         <span class="ev-error-code">{{ event.error.code }}</span>
         <span class="ev-error-msg">{{ event.error.message }}</span>
@@ -38,9 +75,11 @@ const props = defineProps<{
 }>();
 
 const filterToSelected = ref(false);
+const expanded = ref(new Set<string>());
 
 watch(() => props.selectedStepId, (id) => {
   filterToSelected.value = Boolean(id);
+  if (id) expanded.value = new Set([id]);
 });
 
 const displayTrace = computed(() => {
@@ -50,6 +89,21 @@ const displayTrace = computed(() => {
     (e) => e.nodeId === id || e.stepId === id,
   );
 });
+
+function hasDetails(event: PipelineTraceEvent): boolean {
+  return Boolean(
+    event.renderedPromptXml
+    || event.rawModelResponsePreview
+    || (event.historyReadInputs && event.historyReadInputs.length > 0),
+  );
+}
+
+function toggleExpand(id: string) {
+  const next = new Set(expanded.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expanded.value = next;
+}
 </script>
 
 <style scoped>
@@ -80,8 +134,24 @@ const displayTrace = computed(() => {
 .ev-node-internal { color: #4a8db4; font-size: 0.72rem; }
 .ev-status { color: #888; }
 .ev-duration { color: #555; font-size: 0.72rem; margin-left: auto; }
-.ev-artifacts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+.ev-expand {
+  background: none; border: none; color: #666; cursor: pointer; font-size: 0.7rem; padding: 0 4px;
+}
+.ev-expand:hover { color: #aaa; }
+.ev-artifacts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; align-items: center; }
+.ev-artifacts-label { font-size: 0.62rem; color: #555; text-transform: uppercase; margin-right: 0.15rem; }
 .artifact-tag { background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 3px; padding: 1px 5px; font-size: 0.68rem; color: #888; font-family: monospace; }
+.artifact-tag.out { color: #7ec8e3; }
+.artifact-tag.omitted { opacity: 0.5; text-decoration: line-through; }
+.ev-detail { margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid #1a1a1a; }
+.ev-detail-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-bottom: 0.2rem; }
+.ev-history-row { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.25rem; }
+.ev-omitted { font-size: 0.68rem; color: #666; font-style: italic; }
+.ev-prompt, .ev-preview {
+  margin: 0; font-size: 0.72rem; color: #bbb; background: #0a0a0a;
+  border: 1px solid #222; border-radius: 3px; padding: 0.35rem 0.45rem;
+  white-space: pre-wrap; word-break: break-word; max-height: 12rem; overflow-y: auto;
+}
 .ev-error { margin-top: 0.25rem; font-size: 0.75rem; }
 .ev-error-code { color: #e07070; margin-right: 0.4rem; font-family: monospace; }
 .ev-error-msg { color: #c88; }
