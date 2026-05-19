@@ -128,6 +128,8 @@ export interface CapsuleInstanceStepConfig {
   outputBindings: Record<string, string>;
   parameterValues?: Record<string, string>;
   modelSlotBindings?: Record<string, ModelRef>;
+  /** Content signature captured when the instance was created or rebound. */
+  boundContentSignature?: string;
 }
 
 export type LoopExitCondition =
@@ -340,6 +342,10 @@ export interface CapsuleDefinition {
   nodes: PipelineNode[];
   edges: PipelineEdge[];
   outputRef: PipelineOutputRef;
+  /** V2 step-chain body when extracted from a pipeline (preferred for execution). */
+  steps?: PipelineStep[];
+  /** Default input config for step-chain capsules (mirrors pipeline input). */
+  input?: PipelineInputConfig;
   tests: CapsuleTestCase[];
   createdAt: string;
   updatedAt: string;

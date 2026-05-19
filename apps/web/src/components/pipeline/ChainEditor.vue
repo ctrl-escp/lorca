@@ -15,10 +15,11 @@
             class="chain-step"
             :class="{
               selected: selectedStepId === step.id,
+              'in-selection-range': isInSelectionRange(step.id),
               disabled: !step.enabled,
               [traceStatusClass(step.id)]: true,
             }"
-            @click="$emit('select', step.id)"
+            @click="onStepClick(step.id, $event)"
           >
             <div v-if="i > 0" class="step-connector">↓</div>
             <div class="step-card">
@@ -118,6 +119,7 @@ import type {StepStaleState} from '@lorca/pipeline';
 const props = defineProps<{
   steps: PipelineStep[];
   selectedStepId: string | null;
+  selectionRange?: {startIndex: number; endIndex: number; stepIds: string[]} | null;
   trace: PipelineTraceEvent[];
   stepStates?: Record<string, StepStaleState>;
   runPartial?: boolean;
@@ -130,8 +132,8 @@ const props = defineProps<{
   lastRedoLabel?: string | null;
 }>();
 
-defineEmits<{
-  select: [stepId: string];
+const emit = defineEmits<{
+  select: [stepId: string, extendRange?: boolean];
   'insert-after': [anchorStepId: string];
   'insert-at': [index: number];
   'move-up': [stepId: string];
@@ -146,6 +148,16 @@ defineEmits<{
 }>();
 
 const scrollRef = ref<HTMLElement | null>(null);
+
+function isInSelectionRange(stepId: string): boolean {
+  const range = props.selectionRange;
+  if (!range || range.stepIds.length < 2) return false;
+  return range.stepIds.includes(stepId);
+}
+
+function onStepClick(stepId: string, event: MouseEvent) {
+  emit('select', stepId, event.shiftKey);
+}
 const stepRefs = new Map<string, HTMLElement>();
 
 function setStepRef(stepId: string, el: HTMLElement | null) {
@@ -287,6 +299,10 @@ function runStateTitle(stepId: string): string {
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 .chain-step:not(.selected) .step-card { opacity: 0.7; transform: scale(0.98); }
+.chain-step.in-selection-range:not(.selected) .step-card {
+  border-color: #4a3a6a;
+  box-shadow: 0 0 0 1px #4a3a6a44;
+}
 .chain-step.selected .step-card {
   opacity: 1;
   transform: scale(1);

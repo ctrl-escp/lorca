@@ -117,6 +117,7 @@ const pipelineOutputStale = computed(() => {
     editorStore.pipeline,
     runStore.runSnapshotContext,
     editorStore.pipeline.input.raw,
+    (id, version) => capsulesStore.getCapsule(id, version),
   );
   const st = states.find((s) => s.stepId === step.id)?.state;
   return st === 'stale' || st === 'failed-stale';

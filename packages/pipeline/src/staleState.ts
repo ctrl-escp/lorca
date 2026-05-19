@@ -1,4 +1,5 @@
 import type {
+  CapsuleDefinition,
   PipelineDefinition,
   PipelineStep,
   StepRunSnapshot,
@@ -6,7 +7,10 @@ import type {
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import type {CompiledExecutionStep} from './chainCompiler.js';
 import {buildActiveStepChain} from './chainCompiler.js';
+import {computeCapsuleContentSignature} from './capsuleExtraction.js';
 import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
+
+export type CapsuleSignatureResolver = (capsuleId: string, version: string) => CapsuleDefinition | undefined;
 
 function stableHash(value: unknown): string {
   const json = JSON.stringify(value, (_key, val) => {
@@ -112,15 +116,30 @@ export interface RunSnapshotContext {
   executedStepIds: string[];
 }
 
+function isCapsuleDefinitionStale(
+  step: PipelineStep,
+  resolveCapsule?: CapsuleSignatureResolver,
+): boolean {
+  if (step.config.type !== 'capsule-instance') return false;
+  const bound = step.config.boundContentSignature;
+  if (!bound || !resolveCapsule) return false;
+  const capsule = resolveCapsule(step.config.capsuleId, step.config.capsuleVersion);
+  if (!capsule) return true;
+  return computeCapsuleContentSignature(capsule) !== bound;
+}
+
 function isDirectlyStale(
   step: PipelineStep,
   snapshot: StepRunSnapshot,
   pipeline: PipelineDefinition,
   userPromptRaw: string,
   runUserPromptSignature: string,
+  resolveCapsule?: CapsuleSignatureResolver,
 ): boolean {
   const userSig = computeUserPromptSignature(userPromptRaw);
   if (userSig !== runUserPromptSignature) return true;
+
+  if (isCapsuleDefinitionStale(step, resolveCapsule)) return true;
 
   const configSig = computeStepConfigSignature(step);
   if (configSig !== snapshot.configSignature) return true;
@@ -144,6 +163,7 @@ export function computeStepStaleStates(
   pipeline: PipelineDefinition,
   runContext: RunSnapshotContext | null,
   userPromptRaw: string,
+  resolveCapsule?: CapsuleSignatureResolver,
 ): StepStaleState[] {
   if (!runContext) {
     return pipeline.steps.map((step) => {
@@ -165,7 +185,9 @@ export function computeStepStaleStates(
     const snapshot = snapshots[step.id];
     directlyStale.set(
       step.id,
-      snapshot ? isDirectlyStale(step, snapshot, pipeline, userPromptRaw, userPromptSignature) : false,
+      snapshot
+        ? isDirectlyStale(step, snapshot, pipeline, userPromptRaw, userPromptSignature, resolveCapsule)
+        : isCapsuleDefinitionStale(step, resolveCapsule),
     );
   }
 

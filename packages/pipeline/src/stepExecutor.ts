@@ -101,6 +101,7 @@ export async function executeStepChain(
   const artifacts: Record<string, PipelineArtifact> = {
     'user_prompt.raw': makeArtifact('user_prompt.raw', 'pipeline-input', 'text', raw),
     'user_prompt.xml': makeArtifact('user_prompt.xml', 'pipeline-input', 'text', xml),
+    ...(options.seedArtifacts ?? {}),
   };
 
   const stepMap = new Map(pipeline.steps.map((s) => [s.id, s]));
@@ -506,6 +507,10 @@ async function executeCapsuleStep(
     return {ok: false, error: {code: 'missing_capsule', message: `Capsule not found: ${capsuleId} ${capsuleVersion}`, nodeId: step.id}};
   }
 
+  if (capsule.steps && capsule.steps.length > 0) {
+    return executeCapsuleStepChain(step, capsule, artifacts, resolveEndpoint, resolveCapsule, pipeline);
+  }
+
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
   for (const [slotName, ref] of Object.entries(modelSlotBindings ?? {})) {
     if (ref.kind === 'fixed') {
@@ -567,4 +572,126 @@ async function executeCapsuleStep(
   if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
 
   return {ok: true, value: produced};
+}
+
+async function executeCapsuleStepChain(
+  step: PipelineStep,
+  capsule: CapsuleDefinition,
+  parentArtifacts: Record<string, PipelineArtifact>,
+  resolveEndpoint: EndpointResolver,
+  resolveCapsule: CapsuleResolver | undefined,
+  parentPipeline: PipelineDefinition,
+): Promise<Result<PipelineArtifact[], PipelineError>> {
+  if (step.config.type !== 'capsule-instance') {
+    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Not a capsule step', nodeId: step.id}};
+  }
+
+  const {inputBindings, outputBindings} = step.config;
+  const instancePrefix = step.outputNamespace;
+  const innerArtifacts: Record<string, PipelineArtifact> = {
+    ...parentArtifacts,
+  };
+
+  for (const [portName, parentKey] of Object.entries(inputBindings)) {
+    const parentArtifact = parentArtifacts[parentKey];
+    if (!parentArtifact) continue;
+    const portRef = portName === 'user_prompt' ? 'user_prompt.xml' : `${portName}.${artifactOutputSuffix(parentKey)}`;
+    innerArtifacts[portRef] = {...parentArtifact, name: portRef, stepId: step.id};
+    if (portName === 'user_prompt') {
+      innerArtifacts['user_prompt.raw'] = {
+        ...parentArtifact,
+        name: 'user_prompt.raw',
+        stepId: step.id,
+      };
+      innerArtifacts['user_prompt.xml'] = {
+        ...parentArtifact,
+        name: 'user_prompt.xml',
+        stepId: step.id,
+      };
+    }
+  }
+
+  const userPromptRaw = typeof parentArtifacts['user_prompt.raw']?.value === 'string'
+    ? parentArtifacts['user_prompt.raw'].value
+    : '';
+
+  const resolvedSteps = applyCapsuleModelSlotBindings(capsule.steps!, step.config.modelSlotBindings ?? {});
+
+  const innerPipeline: PipelineDefinition = {
+    schemaVersion: 2,
+    id: capsule.id,
+    name: capsule.name,
+    input: capsule.input ?? parentPipeline.input,
+    steps: resolvedSteps,
+    createdAt: capsule.createdAt,
+    updatedAt: capsule.updatedAt,
+  };
+
+  const innerCallbacks: ExecutorCallbacks = {
+    onTraceEvent() { /* outer run owns trace aggregation */ },
+    onArtifact(a) {
+      innerArtifacts[a.name] = a;
+      const internalKey = `${instancePrefix}.internal.${a.name}`;
+      innerArtifacts[internalKey] = {...a, name: internalKey, stepId: step.id};
+    },
+  };
+
+  const result = await executeStepChain(
+    innerPipeline,
+    userPromptRaw,
+    {seedArtifacts: innerArtifacts},
+    resolveEndpoint,
+    innerCallbacks,
+    resolveCapsule,
+  );
+  if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
+
+  const publicOutputs: PipelineArtifact[] = [];
+  for (const [portName, parentKey] of Object.entries(outputBindings)) {
+    const sourceKey = capsule.interface.outputs.find((o) => o.name === portName)?.sourceArtifactKey
+      ?? parentKey;
+    const internal = innerArtifacts[sourceKey] ?? innerArtifacts[parentKey];
+    if (!internal) continue;
+    publicOutputs.push({...internal, name: parentKey, stepId: step.id});
+  }
+
+  if (publicOutputs.length === 0) {
+    const last = capsule.steps!.at(-1)!;
+    const primaryKey = `${last.outputNamespace}.${last.primaryOutputName}`;
+    const internal = innerArtifacts[primaryKey];
+    if (internal) {
+      const parentKey = outputBindings[portNameForRef(primaryKey)] ?? primaryKey;
+      publicOutputs.push({...internal, name: parentKey, stepId: step.id});
+    }
+  }
+
+  return {ok: true, value: publicOutputs};
+}
+
+function artifactOutputSuffix(ref: string): string {
+  const dot = ref.lastIndexOf('.');
+  return dot >= 0 ? ref.slice(dot + 1) : 'text';
+}
+
+function portNameForRef(ref: string): string {
+  const dot = ref.lastIndexOf('.');
+  return dot >= 0 ? ref.slice(0, dot).replace(/-/g, '_') : ref;
+}
+
+function applyCapsuleModelSlotBindings(
+  steps: PipelineStep[],
+  bindings: Record<string, import('@lorca/core').ModelRef>,
+): PipelineStep[] {
+  return steps.map((s) => {
+    if (s.config.type !== 'model-call' || s.config.modelRef.kind !== 'slot') return s;
+    const bound = bindings[s.config.modelRef.slotName];
+    if (!bound || bound.kind !== 'fixed') return s;
+    return {
+      ...s,
+      config: {
+        ...s.config,
+        modelRef: {kind: 'fixed', endpointId: bound.endpointId, modelName: bound.modelName},
+      },
+    };
+  });
 }

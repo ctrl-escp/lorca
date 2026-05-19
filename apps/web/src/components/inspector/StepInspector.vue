@@ -187,7 +187,7 @@
           </div>
         </template>
         <div class="inspector-readonly">
-          <p>{{ step.config.steps.length }} inner step(s). Full inner-chain editor coming in Phase 9.</p>
+          <p>{{ step.config.steps.length }} inner step(s). Open the Capsule editor to edit the inner chain.</p>
         </div>
       </template>
 
@@ -209,6 +209,7 @@ import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
+import {useCapsulesStore} from '../../stores/capsules.js';
 import FieldLabel from '../common/FieldLabel.vue';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 
@@ -216,6 +217,7 @@ const editorStore = usePipelineEditorStore();
 const runStore = useActiveRunStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
+const capsulesStore = useCapsulesStore();
 
 const step = computed(() => editorStore.selectedStep);
 
@@ -226,6 +228,7 @@ const stepStatus = computed(() => {
     editorStore.pipeline,
     runStore.runSnapshotContext,
     editorStore.pipeline.input.raw,
+    (id, version) => capsulesStore.getCapsule(id, version),
   );
   return states.find((st) => st.stepId === s.id) ?? null;
 });

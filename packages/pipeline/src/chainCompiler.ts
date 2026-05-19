@@ -43,6 +43,8 @@ export interface ExecutePipelineOptions {
   includeDisabled?: boolean;
   reuseValidArtifacts?: boolean;
   abortSignal?: AbortSignal;
+  /** Pre-seeded artifacts (e.g. Capsule input port values). */
+  seedArtifacts?: Record<string, import('@lorca/core').PipelineArtifact>;
 }
 
 export function compileStepChainToExecutionPlan(

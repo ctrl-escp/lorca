@@ -25,6 +25,18 @@ export {
 } from './staleState.js';
 export type {StepRunUiState, StepStaleState, RunSnapshotContext} from './staleState.js';
 export {
+  extractStepsToCapsule,
+  extractFullPipelineToCapsule,
+  computeCapsuleContentSignature,
+} from './capsuleExtraction.js';
+export type {
+  CapsuleExtractionRequest,
+  CapsuleExtractionResult,
+  CapsuleExtractionError,
+  CapsuleExtractionErrorCode,
+} from './capsuleExtraction.js';
+export type {CapsuleSignatureResolver} from './staleState.js';
+export {
   getStepHistoryReads,
   listPipelineInputArtifacts,
   listStepOutputArtifacts,

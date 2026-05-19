@@ -2,7 +2,13 @@ import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
 import type {PipelineDefinition, PipelineStep, StepType, StepConfig} from '@lorca/core';
 import {getDb} from '@lorca/storage';
-import {makeEmptyPipeline} from '@lorca/pipeline';
+import {
+  makeEmptyPipeline,
+  extractStepsToCapsule,
+  extractFullPipelineToCapsule,
+} from '@lorca/pipeline';
+import type {CapsuleExtractionResult} from '@lorca/pipeline';
+import type {CapsuleDefinition} from '@lorca/core';
 import {cloneForStorage} from '../utils/storage.js';
 
 // ── ID helpers ───────────────────────────────────────────────────────────────
@@ -121,6 +127,7 @@ const MAX_UNDO = 50;
 export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   const pipeline = ref<PipelineDefinition>(makeEmptyPipeline('default', 'New Pipeline'));
   const selectedStepId = ref<string | null>(null);
+  const selectionAnchorId = ref<string | null>(null);
   const undoStack = ref<UndoEntry[]>([]);
   const redoStack = ref<UndoEntry[]>([]);
 
@@ -179,6 +186,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     // cloneForStorage strips Vue reactivity (toRaw + JSON round-trip) before storing
     pipeline.value = cloneForStorage(def);
     selectedStepId.value = null;
+    selectionAnchorId.value = null;
     undoStack.value = [];
     redoStack.value = [];
   }
@@ -292,8 +300,71 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     recordUndo(label, before);
   }
 
-  function selectStep(stepId: string | null) {
-    selectedStepId.value = stepId;
+  function selectStep(stepId: string | null, options?: {extendRange?: boolean}) {
+    if (!stepId) {
+      selectedStepId.value = null;
+      selectionAnchorId.value = null;
+      return;
+    }
+    if (options?.extendRange && selectionAnchorId.value) {
+      selectedStepId.value = stepId;
+    } else {
+      selectionAnchorId.value = stepId;
+      selectedStepId.value = stepId;
+    }
+  }
+
+  function getSelectionRange(): {startIndex: number; endIndex: number} | null {
+    const anchor = selectionAnchorId.value;
+    const end = selectedStepId.value;
+    if (!anchor || !end) return null;
+    const startIndex = pipeline.value.steps.findIndex((s) => s.id === anchor);
+    const endIndex = pipeline.value.steps.findIndex((s) => s.id === end);
+    if (startIndex < 0 || endIndex < 0) return null;
+    return {
+      startIndex: Math.min(startIndex, endIndex),
+      endIndex: Math.max(startIndex, endIndex),
+    };
+  }
+
+  function applyCapsuleExtraction(result: CapsuleExtractionResult, undoLabel: string) {
+    const before = snapshot();
+    pipeline.value = result.pipeline;
+    pipeline.value.updatedAt = new Date().toISOString();
+    selectedStepId.value = result.instanceStep.id;
+    selectionAnchorId.value = result.instanceStep.id;
+    recordUndo(undoLabel, before);
+  }
+
+  function extractSelectionToCapsule(
+    capsuleName: string,
+    options?: {capsuleId?: string; instanceLabel?: string},
+  ): {ok: true; capsule: CapsuleDefinition} | {ok: false; message: string} {
+    const range = getSelectionRange();
+    if (!range) return {ok: false, message: 'Select one or more steps (Shift+click for a range)'};
+    const capsuleId = options?.capsuleId ?? newId('cap');
+    const result = extractStepsToCapsule({
+      pipeline: pipeline.value,
+      startIndex: range.startIndex,
+      endIndex: range.endIndex,
+      capsuleId,
+      capsuleName,
+      instanceLabel: options?.instanceLabel,
+    });
+    if (!result.ok) return {ok: false, message: result.error.message};
+    applyCapsuleExtraction(result.value, `Extract "${capsuleName}"`);
+    return {ok: true, capsule: result.value.capsule};
+  }
+
+  function convertPipelineToCapsule(
+    capsuleName: string,
+    options?: {capsuleId?: string},
+  ): {ok: true; capsule: CapsuleDefinition} | {ok: false; message: string} {
+    const capsuleId = options?.capsuleId ?? newId('cap');
+    const result = extractFullPipelineToCapsule(pipeline.value, capsuleId, capsuleName);
+    if (!result.ok) return {ok: false, message: result.error.message};
+    applyCapsuleExtraction(result.value, `Convert pipeline to "${capsuleName}"`);
+    return {ok: true, capsule: result.value.capsule};
   }
 
   function updatePipelineName(name: string) {
@@ -334,8 +405,13 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   return {
     pipeline,
     selectedStepId,
+    selectionAnchorId,
     steps,
     selectedStep,
+    getSelectionRange,
+    applyCapsuleExtraction,
+    extractSelectionToCapsule,
+    convertPipelineToCapsule,
     canUndo,
     canRedo,
     lastUndoLabel,

@@ -10,6 +10,8 @@
         @keydown.enter="commitPipelineName"
       />
       <div class="run-controls">
+        <button class="btn btn-secondary" type="button" title="Save selected steps as a draft Capsule (Shift+click to select a range)" @click="handleExtractSelection">Extract to Capsule</button>
+        <button class="btn btn-secondary" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
         <button class="btn btn-secondary" type="button" @click="handleExport">Export</button>
         <button class="btn btn-secondary" type="button" @click="handleImport">Import</button>
         <button
@@ -49,7 +51,8 @@
       :can-redo="editorStore.canRedo"
       :last-undo-label="editorStore.lastUndoLabel"
       :last-redo-label="editorStore.lastRedoLabel"
-      @select="editorStore.selectStep"
+      :selection-range="selectionRange"
+      @select="handleSelectStep"
       @append="handleAppend"
       @insert-after="handleInsertAfter"
       @insert-at="handleInsertAt"
@@ -75,6 +78,7 @@ import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
 import {usePipelinesStore} from '../../stores/pipelines.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
+import {useUiStore} from '../../stores/ui.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import ChainEditor from './ChainEditor.vue';
@@ -85,6 +89,7 @@ const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
 const runStore = useActiveRunStore();
 const pipelinesStore = usePipelinesStore();
 const capsulesStore = useCapsulesStore();
+const uiStore = useUiStore();
 const importStore = useImportExportStore();
 const editorStore = usePipelineEditorStore();
 
@@ -140,14 +145,69 @@ const runButtonTitle = computed(() => {
   return needs.length ? `To run: ${needs.join(' and ')}` : 'Configure pipeline to run';
 });
 
+const resolveCapsule = (id: string, version: string) => capsulesStore.getCapsule(id, version);
+
 const stepStates = computed(() => {
   const states = computeStepStaleStates(
     editorStore.pipeline,
     runStore.runSnapshotContext,
     userPrompt.value,
+    resolveCapsule,
   );
   return Object.fromEntries(states.map((s) => [s.stepId, s])) as Record<string, StepStaleState>;
 });
+
+const selectionRange = computed(() => {
+  const range = editorStore.getSelectionRange();
+  if (!range) return null;
+  const ids = editorStore.steps.slice(range.startIndex, range.endIndex + 1).map((s) => s.id);
+  return {startIndex: range.startIndex, endIndex: range.endIndex, stepIds: ids};
+});
+
+function handleSelectStep(stepId: string, extendRange?: boolean) {
+  editorStore.selectStep(stepId, extendRange ? {extendRange: true} : undefined);
+}
+
+function promptCapsuleName(defaultName: string): string | null {
+  const name = window.prompt('Capsule name', defaultName);
+  if (!name?.trim()) return null;
+  return name.trim();
+}
+
+function handleExtractSelection() {
+  const range = editorStore.getSelectionRange();
+  if (!range) {
+    window.alert('Select steps to extract. Shift+click another step to define a range.');
+    return;
+  }
+  const defaultName = editorStore.selectedStep?.label ?? 'Extracted Capsule';
+  const name = promptCapsuleName(defaultName);
+  if (!name) return;
+  const result = editorStore.extractSelectionToCapsule(name);
+  if (!result.ok) {
+    window.alert(result.message);
+    return;
+  }
+  capsulesStore.addCapsule(result.capsule);
+  uiStore.openCapsuleEditor(result.capsule.id);
+}
+
+function handleConvertPipeline() {
+  if (editorStore.steps.length === 0) {
+    window.alert('Add steps before converting the pipeline to a Capsule.');
+    return;
+  }
+  const name = promptCapsuleName(editorStore.pipeline.name || 'Pipeline Capsule');
+  if (!name) return;
+  if (!window.confirm(`Replace all ${editorStore.steps.length} step(s) with a single Capsule instance?`)) return;
+  const result = editorStore.convertPipelineToCapsule(name);
+  if (!result.ok) {
+    window.alert(result.message);
+    return;
+  }
+  capsulesStore.addCapsule(result.capsule);
+  uiStore.openCapsuleEditor(result.capsule.id);
+}
 
 function commitPipelineName() {
   const name = localPipelineName.value.trim() || 'Untitled';
