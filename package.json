@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "lint": "eslint --ignore-pattern 'apps/web/dist/**' --ignore-pattern '**/dist/**' --ignore-pattern '**/coverage/**' .",
+    "lint": "npx eslint --ignore-pattern 'apps/web/dist/**' --ignore-pattern '**/dist/**' --ignore-pattern '**/coverage/**' .",
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
