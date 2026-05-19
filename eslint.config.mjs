@@ -1,5 +1,7 @@
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
+import pluginVue from 'eslint-plugin-vue';
+import vueParser from 'vue-eslint-parser';
 
 const lintTargets = [
   'eslint.config.mjs',
@@ -11,6 +13,10 @@ const lintTargets = [
   'packages/*/src/**/*.ts',
   'packages/*/tests/**/*.ts',
 ];
+
+const vueLintTargets = ['apps/web/src/**/*.vue'];
+
+const tsLintTargets = lintTargets.filter((target) => target.endsWith('.ts'));
 
 const baseRules = {
   indent: ['error', 2, {SwitchCase: 1}],
@@ -44,6 +50,22 @@ const baseRules = {
   'object-shorthand': ['error', 'always'],
 };
 
+const tsRules = {
+  ...tsPlugin.configs.recommended.rules,
+  'consistent-return': 'off',
+  '@typescript-eslint/consistent-return': 'error',
+  'no-unused-vars': 'off',
+  '@typescript-eslint/no-unused-vars': [
+    'warn',
+    {argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_'},
+  ],
+};
+
+/** Core indent conflicts with vue/html-indent in SFCs. */
+const vueRuleOverrides = {
+  indent: 'off',
+};
+
 export default [
   {
     ignores: [
@@ -65,21 +87,36 @@ export default [
     rules: baseRules,
   },
   {
-    files: lintTargets.filter((target) => target.endsWith('.ts')),
+    files: tsLintTargets,
     plugins: {'@typescript-eslint': tsPlugin},
     languageOptions: {
       parser: tsParser,
       parserOptions: {projectService: true},
     },
+    rules: tsRules,
+  },
+  ...pluginVue.configs['flat/essential'],
+  {
+    files: vueLintTargets,
     rules: {
-      ...tsPlugin.configs.recommended.rules,
-      'consistent-return': 'off',
-      '@typescript-eslint/consistent-return': 'error',
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        {argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_'},
-      ],
+      ...baseRules,
+      ...vueRuleOverrides,
+    },
+  },
+  {
+    files: vueLintTargets,
+    plugins: {'@typescript-eslint': tsPlugin},
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: tsParser,
+        projectService: true,
+        extraFileExtensions: ['.vue'],
+      },
+    },
+    rules: {
+      ...tsRules,
+      ...vueRuleOverrides,
     },
   },
 ];
