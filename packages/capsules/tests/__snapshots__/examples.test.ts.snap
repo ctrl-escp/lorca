@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-acceptance-criteria 1`] = `
+"Generate clear, testable acceptance criteria for the request below.
+Respond with JSON only:
+{ "criteria": string[], "assumptions": string[] }
+
+<acceptance_criteria>
+Request:
+Build a todo app with offline sync
+</acceptance_criteria>"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-answer-verification 1`] = `
+"Verify whether the candidate answer satisfies every acceptance criterion.
+Respond with JSON only:
+{ "passed": boolean, "failures": string[], "notes": string }
+
+Acceptance criteria:
+{
+  "criteria": [
+    "Supports add",
+    "Works offline"
+  ],
+  "assumptions": []
+}
+
+Candidate answer:
+The app stores todos locally and syncs when online."
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-candidate-answer 1`] = `
+"Write a complete candidate answer that satisfies the acceptance criteria.
+
+Acceptance criteria:
+{
+  "criteria": [
+    "Supports add",
+    "Works offline"
+  ],
+  "assumptions": []
+}
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-constraint-extraction 1`] = `
+"Extract explicit constraints from the user prompt.
+Respond with JSON only:
+{ "must": string[], "must_not": string[], "preferences": string[] }
+
+Prompt:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-drift-check 1`] = `
+"Compare baseline and current text. Detect meaning drift, omissions, or contradictions.
+Respond with JSON only:
+{ "drifted": boolean, "severity": "none" | "low" | "high", "differences": string[] }
+
+Baseline:
+The service returns 200 for healthy checks.
+
+Current:
+The service returns 503 for healthy checks."
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-intent-extraction 1`] = `
+"Extract the user intent from the prompt below.
+Respond with JSON only using this shape:
+{ "intent": string, "topics": string[], "confidence": number }
+
+User prompt:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-prompt-rewrite 1`] = `
+"Rewrite the user prompt in this style: concise
+Return only the rewritten prompt with no commentary.
+
+Original:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-summary 1`] = `
+"Summarize the following text. Preserve factual claims and omit filler.
+
+Source:
+Long paragraph about project history and goals that should be shortened."
+`;

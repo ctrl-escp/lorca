@@ -2,7 +2,13 @@ import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
 import {getDb} from '@lorca/storage';
-import {lockCapsule, createDraftFromLocked} from '@lorca/capsules';
+import {
+  lockCapsule,
+  createDraftFromLocked,
+  getBuiltinExamples,
+  getBuiltinExample,
+  duplicateExampleCapsule,
+} from '@lorca/capsules';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -10,9 +16,14 @@ export const useCapsulesStore = defineStore('capsules', () => {
   const capsules = ref<CapsuleDefinition[]>([]);
   const loaded = ref(false);
 
-  const lockedCapsules = computed(() =>
-    capsules.value.filter((c) => c.status === 'locked'),
-  );
+  const lockedCapsules = computed(() => {
+    const userLocked = capsules.value.filter((c) => c.status === 'locked');
+    const userIds = new Set(userLocked.map((c) => c.id));
+    const builtins = getBuiltinExamples().filter((c) => !userIds.has(c.id));
+    return [...userLocked, ...builtins];
+  });
+
+  const builtinExamples = computed(() => getBuiltinExamples());
 
   const draftCapsules = computed(() =>
     capsules.value.filter((c) => c.status === 'draft'),
@@ -45,14 +56,26 @@ export const useCapsulesStore = defineStore('capsules', () => {
   }
 
   function getCapsule(id: string, version?: string): CapsuleDefinition | undefined {
-    if (version) return capsules.value.find((c) => c.id === id && c.version === version);
-    return capsules.value
+    if (version) {
+      const match = capsules.value.find((c) => c.id === id && c.version === version);
+      return match ?? getBuiltinExample(id, version);
+    }
+    const fromDb = capsules.value
       .filter((c) => c.id === id)
       .sort((a, b) => {
         const av = parseInt(a.version.slice(1), 10);
         const bv = parseInt(b.version.slice(1), 10);
         return bv - av;
       })[0];
+    return fromDb ?? getBuiltinExample(id);
+  }
+
+  function duplicateFromExample(exampleId: string): string | null {
+    const example = getBuiltinExample(exampleId);
+    if (!example) return null;
+    const id = newId('cap');
+    addCapsule(duplicateExampleCapsule(example, id));
+    return id;
   }
 
   function lockCapsuleById(id: string): {ok: true} | {ok: false; message: string} {
@@ -75,5 +98,19 @@ export const useCapsulesStore = defineStore('capsules', () => {
     return newCapsuleId;
   }
 
-  return {capsules, lockedCapsules, draftCapsules, loaded, load, addCapsule, updateCapsule, removeCapsule, getCapsule, lockCapsuleById, editLockedCapsule};
+  return {
+    capsules,
+    lockedCapsules,
+    builtinExamples,
+    draftCapsules,
+    loaded,
+    load,
+    addCapsule,
+    updateCapsule,
+    removeCapsule,
+    getCapsule,
+    lockCapsuleById,
+    editLockedCapsule,
+    duplicateFromExample,
+  };
 });

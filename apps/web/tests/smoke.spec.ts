@@ -259,6 +259,14 @@ test('smoke: export and import capsule', async ({page}) => {
   await expect(page.locator('.capsule-row-meta').filter({hasText: 'locked'})).toBeVisible();
 });
 
+test('smoke: duplicate example capsule', async ({page}) => {
+  await expect(page.getByText('Intent Extraction')).toBeVisible({timeout: 5000});
+  const row = page.locator('.example-row').filter({hasText: 'Intent Extraction'});
+  await row.getByRole('button', {name: 'Duplicate'}).click();
+  await expect(page.getByPlaceholder('Capsule name')).toHaveValue('Intent Extraction (copy)', {timeout: 5000});
+  await expect(page.locator('.capsule-status.status-draft')).toBeVisible();
+});
+
 test('smoke: reject invalid capsule import', async ({page}) => {
   const importChooser = page.waitForEvent('filechooser');
   await page.getByTitle('Import Capsule').click();

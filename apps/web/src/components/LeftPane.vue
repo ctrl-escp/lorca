@@ -24,6 +24,32 @@
       </div>
     </section>
 
+    <section class="pane-section examples-section">
+      <div class="section-header">
+        <span class="section-title">Examples</span>
+      </div>
+      <div class="example-list">
+        <div
+          v-for="ex in capsulesStore.builtinExamples"
+          :key="ex.id"
+          class="example-row"
+        >
+          <div class="example-row-main">
+            <span class="example-row-name">{{ ex.name }}</span>
+            <span class="example-row-desc">{{ ex.description }}</span>
+          </div>
+          <button
+            class="btn-duplicate"
+            type="button"
+            title="Duplicate example Capsule"
+            @click.stop="onDuplicateExample(ex.id)"
+          >
+            Duplicate
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Capsule library -->
     <section class="pane-section">
       <div class="section-header">
@@ -117,6 +143,11 @@ async function onRemoveEndpoint(id: string) {
 async function onAddModel(model: DiscoveredModel) {
   await modelsStore.addModel(model);
   showAddModel.value = false;
+}
+
+function onDuplicateExample(exampleId: string) {
+  const id = capsulesStore.duplicateFromExample(exampleId);
+  if (id) uiStore.openCapsuleEditor(id);
 }
 
 function onNewCapsule() {
@@ -224,6 +255,22 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .capsule-row.active { background: #1e2d3d; border-color: #2a4d6e; }
 .capsule-row-name { font-size: 0.82rem; font-weight: 500; }
 .capsule-row-meta { font-size: 0.68rem; color: #555; }
+
+.example-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 220px; overflow-y: auto; }
+.example-row {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid #222;
+  background: #161616;
+}
+.example-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.example-row-name { font-size: 0.78rem; font-weight: 500; }
+.example-row-desc { font-size: 0.65rem; color: #666; line-height: 1.3; }
+.btn-duplicate {
+  flex-shrink: 0; font-size: 0.68rem; padding: 2px 6px;
+  background: #1e2d3d; border: 1px solid #2a4d6e; color: #7ec8e3;
+  border-radius: 3px; cursor: pointer;
+}
+.btn-duplicate:hover { background: #243d52; }
 
 .empty-hint { font-size: 0.75rem; color: #555; margin: 0; }
 
