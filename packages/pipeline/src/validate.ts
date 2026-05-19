@@ -1,9 +1,30 @@
-import type {PipelineDefinition, PipelineError, Result} from '@lorca/core';
+import type {LegacyPipelineDefinition, PipelineDefinition, PipelineError, Result} from '@lorca/core';
 import {ok, err} from '@lorca/core';
 import {outputKey} from './artifacts.js';
 
 export function validatePipeline(
   def: PipelineDefinition,
+): Result<void, PipelineError> {
+  const stepIds = new Set(def.steps.map((s) => s.id));
+  if (stepIds.size !== def.steps.length) {
+    return err({code: 'invalid_pipeline_graph', message: 'Duplicate step IDs detected'});
+  }
+  for (const step of def.steps) {
+    const names = step.config.type === 'capsule-instance'
+      ? null
+      : (step.config as {outputNames: readonly string[]}).outputNames as readonly string[];
+    if (names && !names.includes(step.primaryOutputName)) {
+      return err({
+        code: 'invalid_pipeline_graph',
+        message: `Step "${step.id}" primaryOutputName "${step.primaryOutputName}" is not in outputNames`,
+      });
+    }
+  }
+  return ok(undefined);
+}
+
+export function validateLegacyPipeline(
+  def: LegacyPipelineDefinition,
 ): Result<void, PipelineError> {
   // Unique node IDs
   const nodeIds = new Set(def.nodes.map((n) => n.id));
@@ -56,7 +77,7 @@ export function validatePipeline(
   return ok(undefined);
 }
 
-function detectCycle(def: PipelineDefinition): Result<never, PipelineError> | null {
+function detectCycle(def: LegacyPipelineDefinition): Result<never, PipelineError> | null {
   const adj = new Map<string, string[]>();
   for (const node of def.nodes) adj.set(node.id, []);
   for (const edge of def.edges) {
@@ -86,7 +107,7 @@ function detectCycle(def: PipelineDefinition): Result<never, PipelineError> | nu
 }
 
 function checkDuplicateArtifactKeys(
-  def: PipelineDefinition,
+  def: LegacyPipelineDefinition,
 ): Result<never, PipelineError> | null {
   const seen = new Set<string>();
   for (const node of def.nodes) {
@@ -105,7 +126,7 @@ function checkDuplicateArtifactKeys(
   return null;
 }
 
-function nodeOutputKeys(node: PipelineDefinition['nodes'][number]): string[] {
+function nodeOutputKeys(node: LegacyPipelineDefinition['nodes'][number]): string[] {
   switch (node.type) {
     case 'input':
       return ['user_prompt.raw', 'user_prompt.xml'];

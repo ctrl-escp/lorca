@@ -1,8 +1,8 @@
-import type {PipelineDefinition} from '@lorca/core';
+import type {LegacyPipelineDefinition} from '@lorca/core';
 
 // Topological sort (Kahn's algorithm) — returns node IDs in execution order.
 // Assumes the graph has already been validated (no cycles).
-export function topologicalOrder(def: PipelineDefinition): string[] {
+export function topologicalOrder(def: LegacyPipelineDefinition): string[] {
   const inDegree = new Map<string, number>();
   const adj = new Map<string, string[]>();
 

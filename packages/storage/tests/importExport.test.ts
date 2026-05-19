@@ -14,27 +14,27 @@ import {
 
 function makePipeline(): PipelineDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'pipe-1',
     name: 'Export Me',
-    inputArtifactName: 'user_prompt',
-    nodes: [
-      {id: 'input-1', type: 'input'},
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+    steps: [
       {
-        id: 'model-1',
+        id: 'step-1',
         type: 'model-call',
-        artifactPrefix: 'answer',
+        label: 'Main Model',
+        enabled: true,
+        outputNamespace: 'answer',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
         config: {
+          type: 'model-call',
           modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
           mode: 'generate',
-          inputArtifactRef: 'user_prompt.xml',
+          outputNames: ['text', 'rawResponse'],
         },
       },
     ],
-    edges: [
-      {id: 'e-1', fromNodeId: 'input-1', fromOutput: 'xml', toNodeId: 'model-1', toInput: 'input'},
-    ],
-    outputRef: {nodeId: 'model-1', outputName: 'text'},
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
@@ -92,12 +92,12 @@ describe('importExport', () => {
   it('applies model remaps to imported pipeline', () => {
     const pipeline = makePipeline();
     const remapped = prepareImportedPipeline(pipeline, 'pipe-new', {
-      'model-1': {endpointId: 'ep-local', modelName: 'llama3:latest'},
+      'step-1': {endpointId: 'ep-local', modelName: 'llama3:latest'},
     });
-    const modelNode = remapped.nodes.find((n) => n.id === 'model-1');
-    expect(modelNode?.type).toBe('model-call');
-    if (modelNode?.type === 'model-call') {
-      expect(modelNode.config.modelRef).toEqual({
+    const modelStep = remapped.steps.find((s) => s.id === 'step-1');
+    expect(modelStep?.type).toBe('model-call');
+    if (modelStep?.config.type === 'model-call') {
+      expect(modelStep.config.modelRef).toEqual({
         kind: 'fixed',
         endpointId: 'ep-local',
         modelName: 'llama3:latest',

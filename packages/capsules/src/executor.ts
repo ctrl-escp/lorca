@@ -1,6 +1,6 @@
 import type {
   CapsuleDefinition,
-  PipelineDefinition,
+  LegacyPipelineDefinition,
   PipelineNode,
   PipelineArtifact,
   PipelineRunContext,
@@ -32,7 +32,7 @@ export async function executeCapsuleTestRun(
   // Resolve slot model refs → fixed refs using provided slot assignments
   const resolvedNodes = resolveSlots(def.nodes, testInput.slotAssignments);
 
-  const syntheticDef: PipelineDefinition = {
+  const syntheticDef: LegacyPipelineDefinition = {
     schemaVersion: 1,
     id: def.id,
     name: def.name,

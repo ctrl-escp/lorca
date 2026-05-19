@@ -1,21 +1,54 @@
 import {describe, it, expect} from 'vitest';
 import type {
   PipelineDefinition,
+  LegacyPipelineDefinition,
   CapsuleDefinition,
   CapsuleInterface,
   AiEndpointConfig,
   PipelineError,
   CapsuleTestRunSummary,
+  PipelineStep,
 } from '../src/index.js';
 import {ok, err, CAPSULE_LOOP_MAX_COUNT} from '../src/index.js';
 
-// ── Minimal pipeline fixture ─────────────────────────────────────────────────
+// ── V2 Pipeline fixtures ──────────────────────────────────────────────────────
 
 function makeMinimalPipeline(): PipelineDefinition {
+  const now = '2026-01-01T00:00:00Z';
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'pipe-1',
     name: 'Test Pipeline',
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+    steps: [
+      {
+        id: 'model-1',
+        type: 'model-call',
+        label: 'Main Model Call',
+        enabled: true,
+        outputNamespace: 'answer',
+        primaryOutputName: 'text',
+        lastEditedAt: now,
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'llama3'},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// ── Legacy V1 fixtures (Capsule still uses V1 graph) ─────────────────────────
+
+function makeMinimalLegacyPipeline(): LegacyPipelineDefinition {
+  return {
+    schemaVersion: 1,
+    id: 'pipe-legacy',
+    name: 'Legacy Pipeline',
     inputArtifactName: 'user_prompt',
     nodes: [
       {id: 'input-1', type: 'input'},
@@ -38,8 +71,6 @@ function makeMinimalPipeline(): PipelineDefinition {
     updatedAt: '2026-01-01T00:00:00Z',
   };
 }
-
-// ── Minimal Capsule fixture ──────────────────────────────────────────────────
 
 function makeMinimalCapsule(): CapsuleDefinition {
   return {
@@ -77,30 +108,73 @@ function makeMinimalCapsule(): CapsuleDefinition {
   };
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('PipelineDefinition schema', () => {
-  it('accepts a minimal valid pipeline', () => {
+describe('PipelineDefinition V2 (step-chain)', () => {
+  it('accepts a minimal valid V2 pipeline', () => {
     const pipeline = makeMinimalPipeline();
+    expect(pipeline.schemaVersion).toBe(2);
+    expect(pipeline.steps).toHaveLength(1);
+    expect(pipeline.input.outputNamespace).toBe('user_prompt');
+  });
+
+  it('step has required fields', () => {
+    const step = makeMinimalPipeline().steps[0]!;
+    expect(step.id).toBe('model-1');
+    expect(step.primaryOutputName).toBe('text');
+    expect(step.outputNamespace).toBe('answer');
+    expect(step.enabled).toBe(true);
+  });
+
+  it('step config carries outputNames', () => {
+    const step = makeMinimalPipeline().steps[0]!;
+    if (step.config.type === 'model-call') {
+      expect(step.config.outputNames).toContain('text');
+      expect(step.config.outputNames).toContain('rawResponse');
+    }
+  });
+
+  it('primaryOutputName is in outputNames', () => {
+    const step = makeMinimalPipeline().steps[0]!;
+    const config = step.config;
+    if (config.type !== 'capsule-instance') {
+      expect(config.outputNames).toContain(step.primaryOutputName);
+    }
+  });
+
+  it('accepts pipeline with no steps (empty)', () => {
+    const pipeline: PipelineDefinition = {
+      schemaVersion: 2,
+      id: 'p2',
+      name: 'Empty',
+      input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+      steps: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    expect(pipeline.steps).toHaveLength(0);
+  });
+
+  it('accepts outputStepId field', () => {
+    const pipeline: PipelineDefinition = {
+      ...makeMinimalPipeline(),
+      outputStepId: 'model-1',
+    };
+    expect(pipeline.outputStepId).toBe('model-1');
+  });
+});
+
+describe('LegacyPipelineDefinition V1 (graph)', () => {
+  it('accepts a minimal V1 pipeline', () => {
+    const pipeline = makeMinimalLegacyPipeline();
     expect(pipeline.schemaVersion).toBe(1);
     expect(pipeline.nodes).toHaveLength(2);
     expect(pipeline.edges).toHaveLength(1);
     expect(pipeline.outputRef.nodeId).toBe('model-1');
   });
 
-  it('input artifact name defaults to user_prompt', () => {
-    const pipeline = makeMinimalPipeline();
-    expect(pipeline.inputArtifactName).toBe('user_prompt');
-  });
-
-  it('outputRef uses nodeId + outputName only (no persisted artifactKey)', () => {
-    const pipeline = makeMinimalPipeline();
-    expect(pipeline.outputRef).toEqual({nodeId: 'model-1', outputName: 'text'});
-    expect('artifactKey' in pipeline.outputRef).toBe(false);
-  });
-
   it('nodes carry optional artifactPrefix', () => {
-    const pipeline = makeMinimalPipeline();
+    const pipeline = makeMinimalLegacyPipeline();
     const modelNode = pipeline.nodes.find((n) => n.type === 'model-call');
     expect(modelNode?.artifactPrefix).toBe('answer');
   });

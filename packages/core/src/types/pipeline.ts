@@ -47,7 +47,147 @@ export interface CapsuleInterface {
   modelSlots: CapsuleModelSlot[];
 }
 
-// ── Pipeline graph primitives ────────────────────────────────────────────────
+// ── V2 Step-chain types ──────────────────────────────────────────────────────
+
+export type StepType =
+  | 'model-call'
+  | 'prompt-wrapper'
+  | 'template'
+  | 'json-extract'
+  | 'manual-text'
+  | 'capsule-instance'
+  | 'loop-group';
+
+export interface PromptBlock {
+  id: string;
+  label: string;
+  tagName: string;
+  body: string;
+  enabled: boolean;
+  source?: 'system-default' | 'user-input' | 'custom' | 'history-read' | 'previous-output';
+}
+
+export interface StepHistoryReadConfig {
+  sourceStepId: string;
+  sourceArtifactRef: string;
+  tagName: string;
+  required: boolean;
+}
+
+export interface PromptCompositionConfig {
+  previousOutput: {
+    enabled: boolean;
+    placement: 'beforeOwnPrompt' | 'afterOwnPrompt';
+    tagName: string;
+  };
+  historyReads: StepHistoryReadConfig[];
+  blocks: PromptBlock[];
+}
+
+export type ModelRef =
+  | { kind: 'fixed'; endpointId: string; modelName: string }
+  | { kind: 'slot'; slotName: string };
+
+export interface ModelCallStepConfig {
+  type: 'model-call';
+  modelRef: ModelRef;
+  mode: 'generate' | 'chat';
+  temperature?: number;
+  maxTokens?: number;
+  outputNames: readonly ['text', 'rawResponse'];
+}
+
+export interface PromptWrapperStepConfig {
+  type: 'prompt-wrapper';
+  outputNames: readonly ['text'];
+}
+
+export interface TemplateStepConfig {
+  type: 'template';
+  template: string;
+  outputNames: readonly ['text'];
+}
+
+export interface JsonExtractStepConfig {
+  type: 'json-extract';
+  sourceArtifactRef: string;
+  outputNames: readonly ['json'];
+}
+
+export interface ManualTextStepConfig {
+  type: 'manual-text';
+  text: string;
+  outputNames: readonly ['text'];
+}
+
+export interface CapsuleInstanceStepConfig {
+  type: 'capsule-instance';
+  capsuleId: string;
+  capsuleVersion: string;
+  inputBindings: Record<string, string>;
+  outputBindings: Record<string, string>;
+  parameterValues?: Record<string, string>;
+  modelSlotBindings?: Record<string, ModelRef>;
+}
+
+export type LoopExitCondition =
+  | { type: 'json-field-equals'; fieldPath: string; value: boolean | string | number }
+  | { type: 'iterations' };
+
+export interface LoopGroupStepConfig {
+  type: 'loop-group';
+  maxIterations: number;
+  exitCondition: LoopExitCondition;
+  steps: PipelineStep[];
+  outputNames: readonly ['text'];
+}
+
+export type StepConfig =
+  | ModelCallStepConfig
+  | PromptWrapperStepConfig
+  | TemplateStepConfig
+  | JsonExtractStepConfig
+  | ManualTextStepConfig
+  | CapsuleInstanceStepConfig
+  | LoopGroupStepConfig;
+
+export interface PipelineStep {
+  id: string;
+  type: StepType;
+  label: string;
+  description?: string;
+  enabled: boolean;
+  collapsed?: boolean;
+  createdFromSuggestionId?: string;
+  outputNamespace: string;
+  primaryOutputName: string;
+  config: StepConfig;
+  prompt?: PromptCompositionConfig;
+  historyReads?: StepHistoryReadConfig[];
+  lastEditedAt: string;
+}
+
+export interface PipelineInputConfig {
+  raw: string;
+  tagName: string;
+  outputNamespace: 'user_prompt';
+}
+
+// ── Pipeline definition (V2 step-chain) ─────────────────────────────────────
+
+export interface PipelineDefinition {
+  schemaVersion: 2;
+  id: string;
+  name: string;
+  description?: string;
+  input: PipelineInputConfig;
+  steps: PipelineStep[];
+  outputStepId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Legacy graph types (V1 — used only for Capsule internals and migration) ──
 
 export interface PipelineOutputRef {
   nodeId: string;
@@ -74,8 +214,6 @@ export interface PipelineNodeBase {
   layout?: NodeLayout;
 }
 
-// ── Node config types ────────────────────────────────────────────────────────
-
 export interface PromptWrapperConfig {
   tagName: string;
   instructionText: string;
@@ -84,10 +222,6 @@ export interface PromptWrapperConfig {
   template?: string;
   inputArtifactRef?: string;
 }
-
-export type ModelRef =
-  | { kind: 'fixed'; endpointId: string; modelName: string }
-  | { kind: 'slot'; slotName: string };
 
 export interface ModelCallConfig {
   modelRef: ModelRef;
@@ -118,8 +252,6 @@ export interface CapsuleInstanceConfig {
   modelSlotAssignments: Record<string, { endpointId: string; modelName: string }>;
   loop?: CapsuleLoopConfig;
 }
-
-// ── Node types ───────────────────────────────────────────────────────────────
 
 export interface InputNode extends PipelineNodeBase {
   type: 'input';
@@ -164,9 +296,8 @@ export type PipelineNode =
   | ManualTextNode
   | CapsuleInstanceNode;
 
-// ── Pipeline definition ──────────────────────────────────────────────────────
-
-export interface PipelineDefinition {
+/** Legacy V1 graph-backed pipeline — only used for Capsule internals and migration */
+export interface LegacyPipelineDefinition {
   schemaVersion: 1;
   id: string;
   name: string;
@@ -179,7 +310,7 @@ export interface PipelineDefinition {
   updatedAt: string;
 }
 
-// ── Capsule definition ───────────────────────────────────────────────────────
+// ── Capsule definition (still uses graph model) ──────────────────────────────
 
 export interface CapsuleTestRunSummary {
   runId: string;
@@ -219,7 +350,8 @@ export interface CapsuleDefinition {
 
 export interface PipelineArtifact {
   name: string;
-  nodeId: string;
+  stepId?: string;
+  nodeId?: string;
   kind: 'text' | 'json' | 'model-response' | 'error';
   value: unknown;
   createdAt: string;
@@ -228,7 +360,8 @@ export interface PipelineArtifact {
 
 export interface PipelineTraceEvent {
   runId: string;
-  nodeId: string;
+  stepId?: string;
+  nodeId?: string;
   capsuleInstanceId?: string;
   capsuleIteration?: number;
   status: 'started' | 'completed' | 'failed' | 'skipped' | 'cancelled';
@@ -243,6 +376,7 @@ export interface PipelineRunContext {
   runId: string;
   pipelineId: string;
   startedAt: string;
+  partial?: boolean;
   abortSignal?: AbortSignal;
   input: {
     userPromptRaw: string;
@@ -253,6 +387,18 @@ export interface PipelineRunContext {
   params?: Record<string, unknown>;
 }
 
+// ── Step run snapshot (for stale tracking) ──────────────────────────────────
+
+export interface StepRunSnapshot {
+  stepId: string;
+  inputSignature: string;
+  configSignature: string;
+  historyReadSignatures: Record<string, string>;
+  outputArtifactRefs: string[];
+  completedAt: string;
+  status: 'completed' | 'failed' | 'skipped';
+}
+
 // ── Export/import types ──────────────────────────────────────────────────────
 
 export interface PipelineExportFile {
@@ -260,6 +406,14 @@ export interface PipelineExportFile {
   app: 'lorca';
   kind: 'pipeline';
   pipeline: PipelineDefinition;
+  includedCapsules?: CapsuleDefinition[];
+}
+
+export interface LegacyPipelineExportFile {
+  exportedAt: string;
+  app: 'lorca';
+  kind: 'pipeline';
+  pipeline: LegacyPipelineDefinition;
   includedCapsules?: CapsuleDefinition[];
 }
 
@@ -276,3 +430,4 @@ export const CAPSULE_LOOP_MAX_COUNT = 10;
 export const MODEL_CALL_TIMEOUT_MS = 120_000;
 export const RECENT_RUN_RETENTION = 20;
 export const TRACE_PREVIEW_MAX_CHARS = 32_768;
+export const PIPELINE_INPUT_STEP_ID = 'pipeline-input' as const;

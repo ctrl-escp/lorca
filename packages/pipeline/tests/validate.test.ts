@@ -1,8 +1,8 @@
 import {describe, it, expect} from 'vitest';
-import type {PipelineDefinition} from '@lorca/core';
-import {validatePipeline, topologicalOrder, resolveOutputRef} from '../src/index.js';
+import type {LegacyPipelineDefinition} from '@lorca/core';
+import {validateLegacyPipeline, topologicalOrder, resolveOutputRef} from '../src/index.js';
 
-function base(): PipelineDefinition {
+function base(): LegacyPipelineDefinition {
   return {
     schemaVersion: 1,
     id: 'p1',
@@ -21,21 +21,21 @@ function base(): PipelineDefinition {
 
 describe('validatePipeline', () => {
   it('accepts a valid minimal pipeline', () => {
-    expect(validatePipeline(base()).ok).toBe(true);
+    expect(validateLegacyPipeline(base()).ok).toBe(true);
   });
 
   it('rejects pipeline with no InputNode', () => {
     const def = base();
     def.nodes = def.nodes.filter((n) => n.type !== 'input');
     def.edges = [];
-    const result = validatePipeline(def);
+    const result = validateLegacyPipeline(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('invalid_pipeline_graph');
   });
 
   it('rejects outputRef pointing to unknown node', () => {
     const def = {...base(), outputRef: {nodeId: 'ghost', outputName: 'text'}};
-    const result = validatePipeline(def);
+    const result = validateLegacyPipeline(def);
     expect(result.ok).toBe(false);
   });
 
@@ -43,7 +43,7 @@ describe('validatePipeline', () => {
     const def = base();
     // Add a back-edge mc → in
     def.edges.push({id: 'e2', fromNodeId: 'mc', fromOutput: 'text', toNodeId: 'in', toInput: 'x'});
-    const result = validatePipeline(def);
+    const result = validateLegacyPipeline(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('cycle_detected');
   });
@@ -51,7 +51,7 @@ describe('validatePipeline', () => {
   it('detects duplicate artifact keys from two nodes with same prefix', () => {
     const def = base();
     def.nodes.push({id: 'mc2', type: 'model-call', artifactPrefix: 'answer', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}});
-    const result = validatePipeline(def);
+    const result = validateLegacyPipeline(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
   });
@@ -64,7 +64,7 @@ describe('topologicalOrder', () => {
   });
 
   it('handles a three-node chain', () => {
-    const def: PipelineDefinition = {
+    const def: LegacyPipelineDefinition = {
       ...base(),
       nodes: [
         {id: 'n1', type: 'input'},

@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {PipelineDefinition, CapsuleDefinition, PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
+import type {LegacyPipelineDefinition, CapsuleDefinition, PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
 import {executePipeline} from '../src/executor.js';
 
 const ENDPOINT = {
@@ -12,7 +12,7 @@ const ENDPOINT = {
 // interface input: carried_text (text); outputRef → template node's .text output
 function makeRefinerCapsule(id: string): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     id,
     name: 'Refiner',
     version: 'v1',
@@ -35,9 +35,9 @@ function makeRefinerCapsule(id: string): CapsuleDefinition {
   };
 }
 
-function makePipelineWithLoop(capsule: CapsuleDefinition, count: number): PipelineDefinition {
+function makePipelineWithLoop(capsule: CapsuleDefinition, count: number): LegacyPipelineDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     id: 'pipe1',
     name: 'Test',
     inputArtifactName: 'user_prompt',

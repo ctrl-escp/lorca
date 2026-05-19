@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {PipelineDefinition, CapsuleDefinition, AiEndpointConfig} from '@lorca/core';
+import type {LegacyPipelineDefinition, CapsuleDefinition, AiEndpointConfig} from '@lorca/core';
 import {executePipeline} from '../src/executor.js';
 
 const ENDPOINT: AiEndpointConfig = {
@@ -14,7 +14,7 @@ const ENDPOINT: AiEndpointConfig = {
   updatedAt: '2025-01-01T00:00:00.000Z',
 };
 
-function makePipeline(nodes: PipelineDefinition['nodes'], outputNodeId: string, outputName = 'text'): PipelineDefinition {
+function makePipeline(nodes: LegacyPipelineDefinition['nodes'], outputNodeId: string, outputName = 'text'): LegacyPipelineDefinition {
   const edges = [];
   for (let i = 0; i < nodes.length - 1; i++) {
     const from = nodes[i]!;
@@ -22,7 +22,7 @@ function makePipeline(nodes: PipelineDefinition['nodes'], outputNodeId: string, 
     edges.push({id: `e-${i}`, fromNodeId: from.id, fromOutput: 'text', toNodeId: to.id, toInput: 'input'});
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     id: 'pipe1',
     name: 'Test',
     inputArtifactName: 'user_prompt',
@@ -36,7 +36,7 @@ function makePipeline(nodes: PipelineDefinition['nodes'], outputNodeId: string, 
 
 function makeCapsule(id: string, text: string): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     id,
     name: 'My Capsule',
     version: 'v1',
@@ -201,7 +201,7 @@ describe('CapsuleInstanceNode execution', () => {
 
   it('pre-seeds input ports from parent artifacts via inputBindings', async () => {
     const capsule: CapsuleDefinition = {
-      schemaVersion: 1,
+      schemaVersion: 1 as const,
       id: 'cap3',
       name: 'Input Capsule',
       version: 'v1',

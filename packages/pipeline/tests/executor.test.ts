@@ -2,7 +2,7 @@
 import {describe, it, expect, beforeAll, afterAll, afterEach} from 'vitest';
 import {http, HttpResponse} from 'msw';
 import {setupServer} from 'msw/node';
-import type {PipelineDefinition, PipelineRunContext, AiEndpointConfig} from '@lorca/core';
+import type {LegacyPipelineDefinition, PipelineRunContext, AiEndpointConfig} from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
 import {executePipeline} from '../src/executor.js';
 
@@ -37,9 +37,9 @@ function makeCtx(overrides?: Partial<PipelineRunContext>): PipelineRunContext {
   };
 }
 
-function makeDef(): PipelineDefinition {
+function makeDef(): LegacyPipelineDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     id: 'p1',
     name: 'Test',
     inputArtifactName: 'user_prompt',
@@ -111,8 +111,8 @@ describe('executePipeline — full run', () => {
   });
 
   it('executes a ManualTextNode', async () => {
-    const def: PipelineDefinition = {
-      schemaVersion: 1,
+    const def: LegacyPipelineDefinition = {
+      schemaVersion: 1 as const,
       id: 'p2',
       name: 'Manual',
       inputArtifactName: 'user_prompt',

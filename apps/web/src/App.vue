@@ -115,7 +115,8 @@ const activeNodes = computed(() => {
   if (uiStore.editorContext === 'capsule' && activeCapsule.value) {
     return activeCapsule.value.nodes;
   }
-  return (currentDef.value ?? pipelinesStore.activePipeline)?.nodes ?? [];
+  // Pipeline inspector uses usePipelineEditorStore directly (Phase 10)
+  return [];
 });
 
 async function onUpdateDef(def: PipelineDefinition) {

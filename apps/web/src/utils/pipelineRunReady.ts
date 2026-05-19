@@ -1,4 +1,4 @@
-import type {CapsuleDefinition, ModelRef, PipelineDefinition} from '@lorca/core';
+import type {CapsuleDefinition, ModelRef, PipelineDefinition, ModelCallStepConfig} from '@lorca/core';
 
 export function isModelRefConfigured(ref: ModelRef): boolean {
   if (ref.kind === 'fixed') {
@@ -9,29 +9,9 @@ export function isModelRefConfigured(ref: ModelRef): boolean {
 
 export function pipelineHasConfiguredModel(
   def: PipelineDefinition,
-  getCapsule?: (id: string, version: string) => CapsuleDefinition | undefined,
+  _getCapsule?: (id: string, version: string) => CapsuleDefinition | undefined,
 ): boolean {
-  const modelCalls = def.nodes.filter((n) => n.type === 'model-call');
-  if (modelCalls.length > 0) {
-    return modelCalls.every(
-      (n) => n.type === 'model-call' && isModelRefConfigured(n.config.modelRef),
-    );
-  }
-
-  const capsuleNodes = def.nodes.filter((n) => n.type === 'capsule-instance');
-  if (capsuleNodes.length === 0 || !getCapsule) return false;
-
-  return capsuleNodes.every((node) => {
-    if (node.type !== 'capsule-instance') return false;
-    const capsule = getCapsule(node.config.capsuleDefinitionId, node.config.capsuleVersion);
-    if (!capsule) return false;
-    const requiredSlots = capsule.interface.modelSlots.filter((s) => s.required);
-    if (requiredSlots.length === 0) return false;
-    return requiredSlots.every((slot) => {
-      const assignment = node.config.modelSlotAssignments[slot.name];
-      return Boolean(assignment?.endpointId.trim() && assignment?.modelName.trim());
-    });
-  });
+  return pipelineStepChainRunReady(def, 'x'); // delegate to V2 check
 }
 
 export function pipelineRunReady(
@@ -40,4 +20,16 @@ export function pipelineRunReady(
   getCapsule?: (id: string, version: string) => CapsuleDefinition | undefined,
 ): boolean {
   return userPrompt.trim().length > 0 && pipelineHasConfiguredModel(def, getCapsule);
+}
+
+// ── V2 step-chain helpers ────────────────────────────────────────────────────
+
+export function pipelineStepChainRunReady(def: PipelineDefinition, userPrompt: string): boolean {
+  if (!userPrompt.trim()) return false;
+  const activeSteps = def.steps.filter((s) => s.enabled);
+  return activeSteps.some((s) => {
+    if (s.config.type !== 'model-call') return false;
+    const cfg = s.config as ModelCallStepConfig;
+    return isModelRefConfigured(cfg.modelRef);
+  });
 }

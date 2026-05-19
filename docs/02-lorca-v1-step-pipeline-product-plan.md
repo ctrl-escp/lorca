@@ -46,6 +46,9 @@ Use these names consistently in the UI:
 | History Read              | A prompt input that includes a selected prior step output from step history.                                                               |
 | Previous Output Placement | A prompt composition setting that places the previous active step’s output before or after the current step’s own prompt blocks.           |
 | Output Step               | The step whose primary output is treated as the pipeline’s final output. If unset, the last enabled executable step is used.               |
+| Loop Group                | A step type containing an inner ordered chain that runs repeatedly until an exit condition is met or a maximum iteration count is reached. |
+| Exit Condition            | A rule evaluated after each loop iteration to decide whether the loop should run again. V1 supports JSON field equality checks.            |
+| Loop Previous             | The reserved namespace `loop.prev` that exposes the previous loop iteration’s output to inner steps in the current iteration.             |
 
 Avoid using “Example” as the primary UI label. “Examples” implies disposable demo state; “Step Suggestions” implies insertable building blocks.
 
@@ -101,7 +104,8 @@ type StepType =
   | 'template'
   | 'json-extract'
   | 'manual-text'
-  | 'capsule-instance';
+  | 'capsule-instance'
+  | 'loop-group';
 
 interface PipelineDefinition {
   id: string;
@@ -182,7 +186,23 @@ interface CapsuleInstanceStepConfig {
   parameterValues?: Record<string, string>;
   modelSlotBindings?: Record<string, ModelRef>;
 }
+
+type LoopExitCondition =
+  | { type: 'json-field-equals'; fieldPath: string; value: boolean | string | number }
+  | { type: 'iterations' };
+
+interface LoopGroupStepConfig {
+  type: 'loop-group';
+  maxIterations: number;           // default 3
+  exitCondition: LoopExitCondition;
+  steps: PipelineStep[];           // inner chain
+  outputNames: readonly ['text'];
+}
 ```
+
+`loop-group` is a step that contains an inner ordered chain. It runs that chain repeatedly until either the exit condition is satisfied or `maxIterations` is reached. When `exitCondition.type` is `json-field-equals`, the executor parses the last inner step's primary output as JSON and checks whether the field at `fieldPath` equals `value`. Inner steps can read from the outer pipeline's history via `historyReads` and from the previous iteration's output via the reserved namespace `loop.prev`.
+
+`loop-group` cannot be compiled to the legacy V1 graph format. It requires the native step executor path introduced in Phase 5a.
 
 Every step must declare `primaryOutputName`, and that name must be a member of the step config’s `outputNames` array (or, for `capsule-instance` steps, a member of the declared Capsule output bindings). This invariant must be enforced at schema validation time — not only at runtime — so that a mismatch is caught on load/save and cannot produce a silent bug during execution. The validator lives in `@lorca/core` and must reject any `PipelineStep` where `primaryOutputName` is absent from `outputNames`.
 
@@ -202,8 +222,6 @@ For V1, step insertion defaults `primaryOutputName` as follows:
 * `capsule-instance`: the Capsule’s default public output, or the first bound output only if the Capsule declares exactly one public output
 
 If a Capsule has multiple public outputs and no default output, the user must choose the instance’s `primaryOutputName` before previous-output placement can consume it.
-
-````
 
 Do not persist `nodes[]` and `edges[]` as the canonical model for V1. If existing saved data uses nodes/edges, migrate it into `steps[]` during load/import.
 
@@ -679,6 +697,53 @@ When running up to a step:
 * Disabled steps are skipped.
 * Partial run traces clearly show that the run is partial.
 * Final pipeline output is not silently replaced by an intermediate output.
+
+## Phase 5a — Loop Group Execution
+
+### Objective
+
+Support bounded feedback loops directly inside the step chain without requiring a graph model.
+
+### Motivation
+
+A common pipeline pattern requires a verification step that checks whether an earlier step's output meets acceptance criteria, feeds back instructions if it does not, and runs the main generation step again up to a fixed number of times. This pattern cannot be expressed as a simple linear chain but does not require an arbitrary graph. A bounded loop group is sufficient and keeps the pipeline model representable as an ordered list of steps.
+
+### Loop execution model
+
+A `loop-group` step contains an inner chain of steps (`config.steps`). The executor runs the inner chain sequentially on each iteration. After each iteration:
+
+1. Parse the last inner step's primary output as JSON.
+2. Check `exitCondition`. For `json-field-equals`: read the field at `fieldPath` using dot-path notation and compare to `value`.
+3. If the condition is met or the iteration count equals `maxIterations`, exit the loop.
+4. Otherwise run the inner chain again, making the previous iteration's output available under the reserved namespace `loop.prev`.
+
+The loop group's own primary output is the last inner step's primary output from the final iteration.
+
+### Reserved namespace: `loop.prev`
+
+Inside a loop's inner chain, `loop.prev.text` resolves to the previous iteration's last-step output. On the first iteration, `loop.prev` is empty. Steps that declare a `historyReads` entry pointing to `loop.prev` with `required: false` will silently skip that block on the first iteration.
+
+### Outer pipeline history access
+
+Inner steps may read from the outer pipeline's step history via `historyReads` exactly as any regular step does. The outer history is available as a read-only snapshot at the time the loop group begins.
+
+### Partial run semantics
+
+Running up to a `loop-group` step runs all inner iterations fully. Running up to a step inside a loop group is not supported in V1.
+
+### Validator rule
+
+`loop-group` steps are validated recursively. The inner `steps[]` array is validated as a nested step chain. Inner step IDs must be unique within the inner chain but may collide with outer step IDs (different scope). Inner steps must not reference a later inner step's output via `historyReads`.
+
+### Acceptance criteria
+
+* A loop group with `maxIterations: 3` and `exitCondition: { type: 'json-field-equals', fieldPath: 'passed', value: true }` exits after the first iteration whose output parses as JSON with `{ passed: true }`.
+* If no iteration produces `{ passed: true }`, the loop runs exactly 3 times and exits.
+* On the second and later iterations, `loop.prev.text` resolves to the last inner step's output from the previous iteration.
+* On the first iteration, `loop.prev` is empty; optional history reads on `loop.prev` are skipped silently.
+* A loop group step with `exitCondition: { type: 'iterations' }` always runs exactly `maxIterations` times.
+* Inner steps can read outer pipeline history (intent, AC, user prompt) via `historyReads`.
+* The loop group's primary output (the final iteration's last inner step output) is saved into outer pipeline history.
 
 ## Phase 6 — Affected/Stale Output Tracking
 
@@ -1189,6 +1254,7 @@ Defer until after MVP:
 9. Add step history read types, validation, and renderer integration.
 10. Add history input UI in the step inspector.
 11. Add `compileStepChainToExecutionPlan` and `stopAtStepId` partial execution.
+11a. Add native step executor with `loop-group` support (loop iteration, `loop.prev` namespace, exit condition evaluation).
 12. Add stale/affected tracking for artifacts and history reads.
 13. Measure undo snapshot size with realistic long prompt content; switch to patch entries or cap depth if needed.
 14. Add undo/redo toolbar, keyboard shortcuts, and text-field focus/blur batching.

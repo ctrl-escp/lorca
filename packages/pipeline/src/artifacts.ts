@@ -1,4 +1,4 @@
-import type {PipelineNode, PipelineOutputRef} from '@lorca/core';
+import type {PipelineNode, PipelineOutputRef, PipelineStep} from '@lorca/core';
 
 // Derives the artifact key prefix for a node.
 export function nodePrefix(node: PipelineNode): string {
@@ -13,6 +13,11 @@ export function outputKey(node: PipelineNode, outputName: string): string {
     if (outputName === 'xml') return 'user_prompt.xml';
   }
   return `${nodePrefix(node)}.${outputName}`;
+}
+
+// Derives a full artifact key for a step's named output.
+export function stepArtifactKey(step: PipelineStep, outputName?: string): string {
+  return `${step.outputNamespace}.${outputName ?? step.primaryOutputName}`;
 }
 
 // Resolves an outputRef to an artifact key given the node list.

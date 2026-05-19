@@ -1,24 +1,53 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
-import type {PipelineDefinition} from '@lorca/core';
+import type {PipelineDefinition, LegacyPipelineDefinition} from '@lorca/core';
 import {getDb} from '@lorca/storage';
-import {newId} from '../utils/id.js';
+import {migrateLegacyPipeline, makeEmptyPipeline} from '@lorca/pipeline';
 import {cloneForStorage} from '../utils/storage.js';
 
+let _counter = 0;
+function newId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
+}
+
 export function createDefaultPipeline(preserveId?: string): PipelineDefinition {
-  const inputId = newId('input');
   const now = new Date().toISOString();
+  const id = preserveId ?? newId('pipeline');
+  const modelStepId = newId('model_call');
   return {
-    schemaVersion: 1,
-    id: preserveId ?? newId('pipeline'),
+    schemaVersion: 2,
+    id,
     name: 'New Pipeline',
-    inputArtifactName: 'user_prompt',
-    nodes: [{id: inputId, type: 'input'}],
-    edges: [],
-    outputRef: {nodeId: inputId, outputName: 'xml'},
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+    steps: [
+      {
+        id: modelStepId,
+        type: 'model-call',
+        label: 'Model Call',
+        enabled: true,
+        outputNamespace: 'answer',
+        primaryOutputName: 'text',
+        lastEditedAt: now,
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'fixed', endpointId: '', modelName: ''},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+      },
+    ],
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function isLegacyPipeline(def: unknown): def is LegacyPipelineDefinition {
+  return (
+    typeof def === 'object' &&
+    def !== null &&
+    (def as {schemaVersion?: unknown}).schemaVersion === 1 &&
+    'nodes' in def
+  );
 }
 
 export const usePipelinesStore = defineStore('pipelines', () => {
@@ -36,11 +65,15 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     if (loaded.value) return;
     const stored = await getDb().pipelines.toArray();
     if (stored.length > 0) {
-      pipelines.value = stored;
-      activePipelineId.value = stored[0]!.id;
+      // Migrate any V1 pipelines on load
+      const migrated = stored.map((p) =>
+        isLegacyPipeline(p) ? migrateLegacyPipeline(p) : p as PipelineDefinition,
+      );
+      pipelines.value = migrated;
+      activePipelineId.value = migrated[0]!.id;
     } else {
       const def = createDefaultPipeline();
-      await getDb().pipelines.put(def);
+      await getDb().pipelines.put(cloneForStorage(def));
       pipelines.value = [def];
       activePipelineId.value = def.id;
     }

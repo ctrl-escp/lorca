@@ -26,3 +26,10 @@ export {
   duplicateExampleCapsule,
   collectExampleTemplateStrings,
 } from './examples/index.js';
+
+export {
+  BUILTIN_SUGGESTIONS,
+  instantiateSuggestion,
+  getBuiltinSuggestion,
+} from './suggestions/index.js';
+export type {PipelineSuggestion, SuggestionCategory} from './suggestions/index.js';

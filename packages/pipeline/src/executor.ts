@@ -1,5 +1,5 @@
 import type {
-  PipelineDefinition,
+  LegacyPipelineDefinition,
   PipelineRunContext,
   PipelineArtifact,
   PipelineTraceEvent,
@@ -15,7 +15,7 @@ import {MODEL_CALL_TIMEOUT_MS, CAPSULE_LOOP_MAX_COUNT} from '@lorca/core';
 import {renderPromptWrapper, renderTemplate} from '@lorca/prompt';
 import type {ModelCallRequest} from '@lorca/endpoints';
 import {executeModelCall} from '@lorca/endpoints';
-import {validatePipeline} from './validate.js';
+import {validateLegacyPipeline} from './validate.js';
 import {topologicalOrder} from './order.js';
 import {outputKey, resolveOutputRef} from './artifacts.js';
 
@@ -77,14 +77,14 @@ function traceSkipped(runId: string, nodeId: string): PipelineTraceEvent {
 }
 
 export async function executePipeline(
-  def: PipelineDefinition,
+  def: LegacyPipelineDefinition,
   ctx: PipelineRunContext,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
 ): Promise<Result<string, PipelineError>> {
   // Validate first
-  const validation = validatePipeline(def);
+  const validation = validateLegacyPipeline(def);
   if (!validation.ok) return validation;
 
   const order = topologicalOrder(def);

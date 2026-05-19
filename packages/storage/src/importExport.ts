@@ -1,14 +1,17 @@
 import type {
   CapsuleDefinition,
   PipelineDefinition,
+  PipelineStep,
   PipelineExportFile,
   CapsuleExportFile,
   PipelineNode,
+  ModelRef,
 } from '@lorca/core';
 import {validatePipeline} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
 
-const CURRENT_SCHEMA_VERSION = 1;
+const PIPELINE_SCHEMA_VERSION = 2;
+const CAPSULE_SCHEMA_VERSION = 1;
 
 export interface ImportContext {
   knownEndpointIds: ReadonlySet<string>;
@@ -89,18 +92,18 @@ export function parsePipelineExport(data: unknown): PipelineExportFile | ImportP
   if (errors.length > 0) return {ok: false, errors};
 
   const file = data as PipelineExportFile;
-  const schemaErr = schemaVersionError(file.pipeline.schemaVersion, 'pipeline');
+  const schemaErr = schemaVersionError(file.pipeline.schemaVersion, 'pipeline', PIPELINE_SCHEMA_VERSION);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
 
   if (file.includedCapsules) {
     for (const cap of file.includedCapsules) {
-      const capErr = schemaVersionError(cap.schemaVersion, 'capsule');
+      const capErr = schemaVersionError(cap.schemaVersion, 'capsule', CAPSULE_SCHEMA_VERSION);
       if (capErr) return {ok: false, errors: [capErr]};
     }
   }
 
-  const graph = validatePipeline(file.pipeline);
-  if (!graph.ok) return {ok: false, errors: [graph.error.message]};
+  const result = validatePipeline(file.pipeline);
+  if (!result.ok) return {ok: false, errors: [result.error.message]};
 
   for (const cap of file.includedCapsules ?? []) {
     const capVal = validateCapsule(cap);
@@ -115,7 +118,7 @@ export function parseCapsuleExport(data: unknown): CapsuleExportFile | ImportPar
   if (errors.length > 0) return {ok: false, errors};
 
   const file = data as CapsuleExportFile;
-  const schemaErr = schemaVersionError(file.capsule.schemaVersion, 'capsule');
+  const schemaErr = schemaVersionError(file.capsule.schemaVersion, 'capsule', CAPSULE_SCHEMA_VERSION);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
 
   const graph = validateCapsule(file.capsule);
@@ -129,8 +132,8 @@ export function previewPipelineImport(
   ctx: ImportContext,
 ): PipelineImportPreview | ImportParseError {
   const includedCapsules = file.includedCapsules ?? [];
-  const missingModels = findMissingModels(collectModelRefs(file.pipeline.nodes), ctx);
-  const missingCapsules = findMissingCapsules(file.pipeline.nodes, includedCapsules, ctx);
+  const missingModels = findMissingModels(collectModelRefsFromSteps(file.pipeline.steps), ctx);
+  const missingCapsules = findMissingCapsulesFromSteps(file.pipeline.steps, includedCapsules, ctx);
   return {
     ok: true,
     kind: 'pipeline',
@@ -153,6 +156,7 @@ export function previewCapsuleImport(
   };
 }
 
+// Used for capsule nodes (CapsuleDefinition still uses the legacy node model)
 export function applyModelRemapsToNodes(
   nodes: PipelineNode[],
   remaps: Record<string, ModelRemap>,
@@ -188,6 +192,42 @@ export function applyModelRemapsToNodes(
   });
 }
 
+// Used for V2 pipeline steps
+export function applyModelRemapsToSteps(
+  steps: PipelineStep[],
+  remaps: Record<string, ModelRemap>,
+): PipelineStep[] {
+  return steps.map((step) => {
+    if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
+      const remap = remaps[step.id];
+      if (remap) {
+        return {
+          ...step,
+          config: {
+            ...step.config,
+            modelRef: {kind: 'fixed' as const, endpointId: remap.endpointId, modelName: remap.modelName},
+          },
+        };
+      }
+    }
+    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+      const bindings: Record<string, ModelRef> = {...step.config.modelSlotBindings};
+      let changed = false;
+      for (const slotName of Object.keys(bindings)) {
+        const remap = remaps[`${step.id}::${slotName}`];
+        if (remap) {
+          bindings[slotName] = {kind: 'fixed', endpointId: remap.endpointId, modelName: remap.modelName};
+          changed = true;
+        }
+      }
+      if (changed) {
+        return {...step, config: {...step.config, modelSlotBindings: bindings}};
+      }
+    }
+    return step;
+  });
+}
+
 export function prepareImportedPipeline(
   pipeline: PipelineDefinition,
   newId: string,
@@ -197,7 +237,7 @@ export function prepareImportedPipeline(
   return {
     ...pipeline,
     id: newId,
-    nodes: applyModelRemapsToNodes(pipeline.nodes, remaps),
+    steps: applyModelRemapsToSteps(pipeline.steps, remaps),
     updatedAt: now,
     createdAt: now,
   };
@@ -221,14 +261,47 @@ export function prepareImportedCapsule(
 export function collectPipelineCapsuleRefs(
   pipeline: PipelineDefinition,
 ): Array<{nodeId: string; capsuleDefinitionId: string; capsuleVersion: string}> {
-  return pipeline.nodes
-    .filter((n): n is Extract<PipelineNode, {type: 'capsule-instance'}> => n.type === 'capsule-instance')
-    .filter((n) => n.config.capsuleDefinitionId && n.config.capsuleVersion)
-    .map((n) => ({
-      nodeId: n.id,
-      capsuleDefinitionId: n.config.capsuleDefinitionId,
-      capsuleVersion: n.config.capsuleVersion,
-    }));
+  const result: Array<{nodeId: string; capsuleDefinitionId: string; capsuleVersion: string}> = [];
+  for (const step of pipeline.steps) {
+    if (step.config.type === 'capsule-instance') {
+      const {capsuleId, capsuleVersion} = step.config;
+      if (capsuleId && capsuleVersion) {
+        result.push({nodeId: step.id, capsuleDefinitionId: capsuleId, capsuleVersion});
+      }
+    }
+  }
+  return result;
+}
+
+function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference[] {
+  const refs: MissingModelReference[] = [];
+  for (const step of steps) {
+    if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
+      const {endpointId, modelName} = step.config.modelRef;
+      if (!endpointId && !modelName) continue;
+      refs.push({
+        key: step.id,
+        nodeId: step.id,
+        endpointId,
+        modelName,
+        label: `Model call ${step.label || step.id}`,
+      });
+    }
+    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+      for (const [slotName, ref] of Object.entries(step.config.modelSlotBindings)) {
+        if (ref.kind !== 'fixed') continue;
+        if (!ref.endpointId && !ref.modelName) continue;
+        refs.push({
+          key: `${step.id}::${slotName}`,
+          nodeId: step.id,
+          endpointId: ref.endpointId,
+          modelName: ref.modelName,
+          label: `Capsule slot ${slotName} (${step.label || step.id})`,
+        });
+      }
+    }
+  }
+  return refs;
 }
 
 function collectModelRefs(nodes: PipelineNode[]): MissingModelReference[] {
@@ -272,8 +345,8 @@ function findMissingModels(
   });
 }
 
-function findMissingCapsules(
-  nodes: PipelineNode[],
+function findMissingCapsulesFromSteps(
+  steps: PipelineStep[],
   includedCapsules: CapsuleDefinition[],
   ctx: ImportContext,
 ): MissingCapsuleReference[] {
@@ -281,13 +354,13 @@ function findMissingCapsules(
     includedCapsules.map((c) => capsuleLookupKey(c.id, c.version)),
   );
   const missing: MissingCapsuleReference[] = [];
-  for (const node of nodes) {
-    if (node.type !== 'capsule-instance') continue;
-    const {capsuleDefinitionId, capsuleVersion} = node.config;
-    if (!capsuleDefinitionId || !capsuleVersion) continue;
-    const key = capsuleLookupKey(capsuleDefinitionId, capsuleVersion);
+  for (const step of steps) {
+    if (step.config.type !== 'capsule-instance') continue;
+    const {capsuleId, capsuleVersion} = step.config;
+    if (!capsuleId || !capsuleVersion) continue;
+    const key = capsuleLookupKey(capsuleId, capsuleVersion);
     if (includedKeys.has(key) || ctx.knownCapsuleKeys.has(key)) continue;
-    missing.push({nodeId: node.id, capsuleDefinitionId, capsuleVersion});
+    missing.push({nodeId: step.id, capsuleDefinitionId: capsuleId, capsuleVersion});
   }
   return missing;
 }
@@ -307,9 +380,9 @@ function envelopeErrors(data: unknown, expectedKind: 'pipeline' | 'capsule'): st
   return errors;
 }
 
-function schemaVersionError(version: unknown, label: string): string | null {
-  if (version !== CURRENT_SCHEMA_VERSION) {
-    return `Unsupported ${label} schemaVersion: ${String(version)} (expected ${CURRENT_SCHEMA_VERSION})`;
+function schemaVersionError(version: unknown, label: string, expected: number): string | null {
+  if (version !== expected) {
+    return `Unsupported ${label} schemaVersion: ${String(version)} (expected ${expected})`;
   }
   return null;
 }

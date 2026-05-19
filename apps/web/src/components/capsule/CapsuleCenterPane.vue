@@ -17,25 +17,21 @@
       <button class="btn btn-secondary" type="button" title="Import Capsule JSON" @click="handleImport">Import</button>
     </div>
 
-    <StepMainPrompt
-      :node="selectedNode"
-      :user-prompt="testPrompt"
-      input-prompt-label="User prompt"
-      @update:user-prompt="testPrompt = $event"
-      @update:node="onStepPromptNodeUpdate"
-    />
-
-    <ChainEditor
-      :nodes="def.nodes"
-      :selected-node-id="uiStore.selectedNodeId"
-      :trace="capsuleRunStore.trace"
-      :final-artifact-key="finalArtifactKey"
-      @select="uiStore.selectNode"
-      @add="handleAddNode"
-      @remove="editor.removeNode"
-      @move-up="(id) => editor.moveNode(id, 'up')"
-      @move-down="(id) => editor.moveNode(id, 'down')"
-    />
+    <!-- Capsule node list (full chain editor deferred to Phase 9) -->
+    <div class="capsule-node-list">
+      <div
+        v-for="node in def.nodes.filter(n => n.type !== 'input')"
+        :key="node.id"
+        class="capsule-node-row"
+        :class="{active: uiStore.selectedNodeId === node.id}"
+        :title="`${node.type}: ${node.title || node.id}`"
+        @click="uiStore.selectNodeAndInspect(node.id)"
+      >
+        <span class="node-type-badge">{{ node.type }}</span>
+        <span class="node-row-title">{{ node.title || node.id }}</span>
+      </div>
+      <p v-if="def.nodes.filter(n => n.type !== 'input').length === 0" class="empty-hint">No steps yet.</p>
+    </div>
 
     <!-- Test run panel -->
     <div class="test-panel">
@@ -90,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch} from 'vue';
+import {ref, watch} from 'vue';
 import type {CapsuleDefinition, PipelineNode} from '@lorca/core';
 import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
@@ -99,10 +95,7 @@ import {useUiStore} from '../../stores/ui.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
-import {resolveOutputRef} from '@lorca/pipeline';
 import FieldLabel from '../common/FieldLabel.vue';
-import ChainEditor from '../pipeline/ChainEditor.vue';
-import StepMainPrompt from '../pipeline/StepMainPrompt.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -124,17 +117,7 @@ watch(() => props.capsule, (c) => { if (c.id !== def.value.id) Object.assign(def
 const localName = ref(props.capsule.name);
 watch(() => def.value.name, (n) => { localName.value = n; });
 
-const finalArtifactKey = computed(() => resolveOutputRef(def.value.outputRef, def.value.nodes));
-
-const selectedNode = computed(() =>
-  uiStore.selectedNodeId ? def.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
-);
-
 const testPrompt = ref('');
-
-function onStepPromptNodeUpdate(patch: Record<string, unknown>) {
-  if (uiStore.selectedNodeId) updateNode(uiStore.selectedNodeId, patch);
-}
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
@@ -221,6 +204,18 @@ function handleImport() {
 .capsule-status { font-size: 0.68rem; padding: 1px 6px; border-radius: 3px; }
 .status-draft { background: #2d2a1e; color: #c8a85a; }
 .status-locked { background: #1e2d1e; color: #5ddb9e; }
+
+.capsule-node-list { flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.capsule-node-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #222;
+  cursor: pointer; background: #161616;
+}
+.capsule-node-row:hover { border-color: #333; background: #1e1e1e; }
+.capsule-node-row.active { border-color: #2a5070; background: #1e2d3d; }
+.node-type-badge { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; color: #555; background: #1a1a1a; border: 1px solid #222; padding: 0 4px; border-radius: 2px; flex-shrink: 0; }
+.node-row-title { font-size: 0.78rem; color: #bbb; }
+.empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
 
 .test-panel {
   border-top: 1px solid #1e1e1e; flex-shrink: 0;
