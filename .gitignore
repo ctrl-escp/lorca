@@ -1,10 +1,14 @@
 .idea
 .vs-code
 *.iml
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+.DS_Store
+*tmp*
+
 .cursor
 .claude
-
 CLAUDE.md
-*tmp*
-.DS_Store
 AGENTS.md

@@ -1,0 +1,92 @@
+import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+
+export default [
+  {
+    ignores: ['**/*tmp*/', '**/*tmp*.*', 'node_modules/'],
+  },
+  {
+    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+    },
+
+    rules: {
+      /*
+       * ───────── Formatting ─────────
+       */
+      indent: ['error', 2, {SwitchCase: 1}],
+      semi: ['error', 'always'],
+      quotes: ['error', 'single', {avoidEscape: true}],
+      'comma-dangle': ['error', 'always-multiline'],
+      'object-curly-spacing': ['error', 'never'],
+      'array-bracket-spacing': ['error', 'never'],
+      'no-trailing-spaces': 'error',
+      'no-multiple-empty-lines': ['error', {max: 1, maxEOF: 0}],
+
+      /*
+       * ───────── Strictness ─────────
+       */
+      eqeqeq: ['error', 'always'],
+      'no-var': 'error',
+      'prefer-const': 'error',
+      'no-redeclare': 'error',
+      'no-shadow': 'error',
+      'no-return-await': 'error',
+      'no-useless-catch': 'error',
+
+      /*
+       * ───────── Predictability ─────────
+       */
+      'consistent-return': 'error',
+      'dot-notation': 'error',
+      'no-fallthrough': 'error',
+      'no-unreachable': 'error',
+      'no-throw-literal': 'error',
+
+      /*
+       * ───────── Clean Refactors ─────────
+       */
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+      'no-debugger': 'error',
+
+      /*
+       * ───────── Modern JS Discipline ─────────
+       */
+      'prefer-arrow-callback': 'error',
+      'prefer-spread': 'error',
+      'prefer-rest-params': 'error',
+      'object-shorthand': ['error', 'always'],
+    },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: {'@typescript-eslint': tsPlugin},
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {projectService: true},
+    },
+    rules: {
+      ...tsPlugin.configs.recommended.rules,
+      'consistent-return': 'off',
+      '@typescript-eslint/consistent-return': 'error',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+];
