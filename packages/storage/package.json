@@ -11,7 +11,9 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@lorca/capsules": "*",
     "@lorca/core": "*",
+    "@lorca/pipeline": "*",
     "dexie": "*"
   },
   "devDependencies": {

@@ -12,6 +12,11 @@
         {{ runStatus }}
       </span>
     </header>
+    <ImportErrorBanner
+      v-if="importStore.importErrors.length > 0"
+      :errors="importStore.importErrors"
+      @dismiss="importStore.cancelImport()"
+    />
     <main class="app-body">
       <div class="pane pane-left">
         <LeftPane />
@@ -25,6 +30,7 @@
         />
         <CenterPane
           v-else-if="pipelinesStore.loaded && pipelinesStore.activePipeline"
+          :key="pipelinesStore.activePipelineId ?? 'default-pipeline'"
           ref="centerPaneRef"
           :def="pipelinesStore.activePipeline"
           @update="onUpdateDef"
@@ -38,6 +44,17 @@
         />
       </div>
     </main>
+
+    <ImportRemapDialog
+      v-if="importStore.pendingImport"
+      :open="true"
+      :kind="importStore.pendingImport.kind"
+      :missing-models="pendingMissingModels"
+      :models="modelsStore.models"
+      :endpoints="endpointsStore.endpoints"
+      @cancel="importStore.cancelImport()"
+      @confirm="onConfirmImport"
+    />
   </div>
 </template>
 
@@ -50,17 +67,24 @@ import {useEndpointsStore} from './stores/endpoints.js';
 import {useModelsStore} from './stores/models.js';
 import {usePipelinesStore} from './stores/pipelines.js';
 import {useCapsulesStore} from './stores/capsules.js';
+import {useImportExportStore} from './stores/importExport.js';
 import {useUiStore} from './stores/ui.js';
 import LeftPane from './components/LeftPane.vue';
 import CenterPane from './components/pipeline/CenterPane.vue';
 import CapsuleCenterPane from './components/capsule/CapsuleCenterPane.vue';
 import RightPane from './components/RightPane.vue';
+import ImportRemapDialog from './components/import/ImportRemapDialog.vue';
+import ImportErrorBanner from './components/import/ImportErrorBanner.vue';
+import type {ModelRemap} from './stores/importExport.js';
 
 const runStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
 const uiStore = useUiStore();
 const pipelinesStore = usePipelinesStore();
 const capsulesStore = useCapsulesStore();
+const importStore = useImportExportStore();
+const endpointsStore = useEndpointsStore();
+const modelsStore = useModelsStore();
 
 const runStatus = computed(() =>
   uiStore.editorContext === 'capsule' ? capsuleRunStore.status : runStore.status,
@@ -114,6 +138,23 @@ function onUpdateCapsuleInterface(iface: CapsuleInterface) {
       interface: iface,
       updatedAt: new Date().toISOString(),
     });
+  }
+}
+
+const pendingMissingModels = computed(() =>
+  importStore.pendingImport?.kind === 'pipeline'
+    ? importStore.pendingImport.preview.missingModels
+    : importStore.pendingImport?.kind === 'capsule'
+      ? importStore.pendingImport.preview.missingModels
+      : [],
+);
+
+async function onConfirmImport(remaps: Record<string, ModelRemap>) {
+  const result = await importStore.confirmImport(remaps);
+  if (result?.kind === 'capsule') {
+    uiStore.openCapsuleEditor(result.id);
+  } else if (result?.kind === 'pipeline') {
+    uiStore.closeCapsuleEditor();
   }
 }
 

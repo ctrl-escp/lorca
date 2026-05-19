@@ -197,3 +197,76 @@ test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await expect(page.getByText('Persisted Capsule')).toBeVisible();
   await expect(page.getByText('locked')).toBeVisible();
 });
+
+// Phase 12: export and import Capsule
+test('smoke: export and import capsule', async ({page}) => {
+  await page.getByTitle('New Capsule').click();
+  await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
+  await page.getByPlaceholder('Capsule name').fill('Portable Cap');
+  await page.getByRole('button', {name: 'Lock'}).click();
+  await expect(page.getByText('locked')).toBeVisible();
+
+  const exportText = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('lorca');
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+    const capsules = await new Promise<Array<{name: string; version: string; status: string}>>((resolve, reject) => {
+      const tx = db.transaction('capsules', 'readonly');
+      const req = tx.objectStore('capsules').getAll();
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result as Array<{name: string; version: string; status: string}>);
+    });
+    const capsule = capsules.find((c) => c.name === 'Portable Cap');
+    if (!capsule) throw new Error('exported capsule not found in IndexedDB');
+    return JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      app: 'lorca',
+      kind: 'capsule',
+      capsule,
+    });
+  });
+  const exported = JSON.parse(exportText) as {kind: string; capsule: {name: string}};
+  expect(exported.kind).toBe('capsule');
+  expect(exported.capsule.name).toBe('Portable Cap');
+
+  await page.locator('.capsule-toolbar').getByRole('button', {name: 'Export'}).click();
+
+  await page.evaluate(() =>
+    new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase('lorca');
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    }),
+  );
+  await page.reload();
+  await expect(page.getByText('No Capsules yet.')).toBeVisible({timeout: 10000});
+
+  const importChooser = page.waitForEvent('filechooser');
+  await page.getByTitle('Import Capsule').click();
+  const chooser = await importChooser;
+  await chooser.setFiles({
+    name: 'portable.capsule.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(exportText),
+  });
+
+  await expect(page.getByRole('dialog')).toBeVisible({timeout: 5000});
+  await page.getByRole('dialog').getByRole('button', {name: 'Import'}).click();
+  await expect(page.locator('.capsule-row-name').filter({hasText: 'Portable Cap'})).toBeVisible({timeout: 5000});
+  await expect(page.locator('.capsule-row-meta').filter({hasText: 'locked'})).toBeVisible();
+});
+
+test('smoke: reject invalid capsule import', async ({page}) => {
+  const importChooser = page.waitForEvent('filechooser');
+  await page.getByTitle('Import Capsule').click();
+  const chooser = await importChooser;
+  await chooser.setFiles({
+    name: 'bad.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"kind":"capsule","app":"lorca","capsule":{}}'),
+  });
+  await expect(page.getByText('Import failed')).toBeVisible({timeout: 5000});
+});

@@ -28,6 +28,7 @@
     <section class="pane-section">
       <div class="section-header">
         <span class="section-title">Capsules</span>
+        <button class="icon-btn" @click="onImportCapsule" title="Import Capsule">↓</button>
         <button class="icon-btn" @click="onNewCapsule" title="New Capsule">+</button>
       </div>
       <div class="capsule-list">
@@ -79,7 +80,9 @@ import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
 import {useCapsulesStore} from '../stores/capsules.js';
 import {useUiStore} from '../stores/ui.js';
+import {useImportExportStore} from '../stores/importExport.js';
 import {useEndpointActions} from '../composables/useEndpointActions.js';
+import {pickJsonFile} from '../utils/importFile.js';
 import {newId} from '../utils/id.js';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
@@ -90,6 +93,7 @@ const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
 const capsulesStore = useCapsulesStore();
 const uiStore = useUiStore();
+const importStore = useImportExportStore();
 const epActions = useEndpointActions();
 
 const showAddEndpoint = ref(false);
@@ -133,6 +137,17 @@ function onNewCapsule() {
     updatedAt: now,
   });
   uiStore.openCapsuleEditor(id);
+}
+
+function onImportCapsule() {
+  pickJsonFile((text) => {
+    try {
+      const data = importStore.parseImportJson(text);
+      importStore.beginCapsuleImport(data);
+    } catch {
+      importStore.setImportErrors(['Import file is not valid JSON']);
+    }
+  });
 }
 
 async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | undefined) {

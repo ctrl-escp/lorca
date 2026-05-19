@@ -6,6 +6,8 @@
       <span class="capsule-status" :class="`status-${def.status}`">{{ def.status }}</span>
       <button v-if="def.status === 'draft'" class="btn btn-lock" @click="handleLock">Lock</button>
       <button v-else class="btn btn-edit" @click="handleEditLocked">Edit (new draft)</button>
+      <button class="btn btn-secondary" type="button" title="Export Capsule JSON" @click="handleExport">Export</button>
+      <button class="btn btn-secondary" type="button" title="Import Capsule JSON" @click="handleImport">Import</button>
     </div>
 
     <ChainEditor
@@ -76,9 +78,11 @@ import {ref, computed, watch} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
 import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
+import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
+import {pickJsonFile} from '../../utils/importFile.js';
 import {resolveOutputRef} from '@lorca/pipeline';
 import ChainEditor from '../pipeline/ChainEditor.vue';
 
@@ -86,6 +90,7 @@ const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
 
 const capsuleRunStore = useCapsuleRunStore();
+const importStore = useImportExportStore();
 const uiStore = useUiStore();
 const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
@@ -152,6 +157,21 @@ async function handleTestRun() {
   uiStore.setRightPaneTab('output');
   await capsuleRunStore.run(def.value, testPrompt.value, inputValues, paramValues, slotAssignments);
 }
+
+function handleExport() {
+  importStore.exportCurrentCapsule(def.value);
+}
+
+function handleImport() {
+  pickJsonFile((text) => {
+    try {
+      const data = importStore.parseImportJson(text);
+      importStore.beginCapsuleImport(data);
+    } catch {
+      importStore.setImportErrors(['Import file is not valid JSON']);
+    }
+  });
+}
 </script>
 
 <style scoped>
@@ -203,4 +223,6 @@ async function handleTestRun() {
 .btn-lock:hover { background: #253d25; }
 .btn-edit { background: #2d2a1e; border-color: #4d3d1a; color: #c8a85a; padding: 2px 8px; font-size: 0.72rem; }
 .btn-edit:hover { background: #3d3822; }
+.btn-secondary { background: #1a1a1a; color: #aaa; padding: 2px 8px; font-size: 0.72rem; }
+.btn-secondary:hover { background: #222; color: #ccc; }
 </style>

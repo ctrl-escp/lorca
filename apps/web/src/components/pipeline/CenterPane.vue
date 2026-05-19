@@ -8,6 +8,8 @@
         @change="commitPipelineName"
       />
       <div class="run-controls">
+        <button class="btn btn-secondary" type="button" title="Export pipeline JSON" @click="handleExport">Export</button>
+        <button class="btn btn-secondary" type="button" title="Import pipeline JSON" @click="handleImport">Import</button>
         <button class="btn btn-run" :disabled="runStore.isRunning || !canRun" @click="handleRun">
           {{ runStore.isRunning ? 'Running…' : 'Execute' }}
         </button>
@@ -40,13 +42,16 @@ import {ref, computed, watch} from 'vue';
 import type {PipelineDefinition} from '@lorca/core';
 import {usePipelineEditor} from '../../composables/usePipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
+import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
+import {pickJsonFile} from '../../utils/importFile.js';
 import ChainEditor from './ChainEditor.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]}>();
 
 const runStore = useActiveRunStore();
+const importStore = useImportExportStore();
 const uiStore = useUiStore();
 const userPrompt = ref('');
 const localPipelineName = ref(props.def.name);
@@ -73,6 +78,21 @@ watch(def, (newDef) => emit('update', newDef), {deep: true});
 async function handleRun() {
   await runStore.run(def.value, userPrompt.value.trim());
 }
+
+function handleExport() {
+  importStore.exportCurrentPipeline(def.value);
+}
+
+function handleImport() {
+  pickJsonFile((text) => {
+    try {
+      const data = importStore.parseImportJson(text);
+      importStore.beginPipelineImport(data);
+    } catch {
+      importStore.setImportErrors(['Import file is not valid JSON']);
+    }
+  });
+}
 </script>
 
 <style scoped>
@@ -85,6 +105,8 @@ async function handleRun() {
 .btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 .btn-run:hover:not(:disabled) { background: #254a62; }
 .btn-run:disabled { opacity: 0.4; cursor: default; }
+.btn-secondary { background: #1a1a1a; color: #aaa; }
+.btn-secondary:hover { background: #222; color: #ccc; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
 .prompt-input { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.2rem; }
