@@ -31,10 +31,11 @@
         />
         <CenterPane
           v-else-if="pipelinesStore.loaded && pipelinesStore.activePipeline"
-          :key="pipelinesStore.activePipelineId ?? 'default-pipeline'"
+          :key="`${pipelinesStore.activePipelineId ?? 'default-pipeline'}-${pipelineEditorKey}`"
           ref="centerPaneRef"
           :def="pipelinesStore.activePipeline"
           @update="onUpdateDef"
+          @new="onNewPipeline"
         />
       </div>
       <PaneResizeHandle side="right" @resize="resizeRightPane" />
@@ -102,6 +103,7 @@ const capsuleCenterPaneRef = ref<NodeEditorPane | null>(null);
 // Starts null; gets set on first CenterPane update emit so the right pane
 // node list stays in sync with CenterPane's internal editor state.
 const currentDef = ref<PipelineDefinition | null>(null);
+const pipelineEditorKey = ref(0);
 
 const activeCapsule = computed(() =>
   uiStore.activeCapsuleEditId
@@ -119,6 +121,11 @@ const activeNodes = computed(() => {
 async function onUpdateDef(def: PipelineDefinition) {
   currentDef.value = def;
   await pipelinesStore.save(def);
+}
+
+function onNewPipeline() {
+  currentDef.value = null;
+  pipelineEditorKey.value++;
 }
 
 function onUpdateNode(nodeId: string, patch: Record<string, unknown>) {

@@ -48,7 +48,7 @@ const FIELDS: Partial<Record<PipelineNode['type'], PromptField>> = {
   input: {
     label: 'Target prompt',
     required: true,
-    title: 'Your main input text — wrapped and passed through the pipeline on Execute',
+    title: 'Your main input text — wrapped and passed through the pipeline on Execute Pipeline',
     placeholder: 'Enter your target prompt…',
     rows: 5,
     kind: 'user-prompt',
@@ -135,6 +135,12 @@ function syncLocalFromSource() {
 }
 
 watch([() => props.node, () => props.userPrompt, field], syncLocalFromSource, {immediate: true});
+
+watch(localValue, (value) => {
+  if (field.value?.kind === 'user-prompt' && value !== props.userPrompt) {
+    emit('update:userPrompt', value);
+  }
+});
 
 function commit() {
   const f = field.value;

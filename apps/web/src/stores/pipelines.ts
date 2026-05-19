@@ -5,12 +5,12 @@ import {getDb} from '@lorca/storage';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
-function makeDefaultPipeline(): PipelineDefinition {
+export function createDefaultPipeline(preserveId?: string): PipelineDefinition {
   const inputId = newId('input');
   const now = new Date().toISOString();
   return {
     schemaVersion: 1,
-    id: newId('pipeline'),
+    id: preserveId ?? newId('pipeline'),
     name: 'New Pipeline',
     inputArtifactName: 'user_prompt',
     nodes: [{id: inputId, type: 'input'}],
@@ -39,7 +39,7 @@ export const usePipelinesStore = defineStore('pipelines', () => {
       pipelines.value = stored;
       activePipelineId.value = stored[0]!.id;
     } else {
-      const def = makeDefaultPipeline();
+      const def = createDefaultPipeline();
       await getDb().pipelines.put(def);
       pipelines.value = [def];
       activePipelineId.value = def.id;
@@ -84,5 +84,13 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     activePipelineId.value = id;
   }
 
-  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive};
+  async function resetActivePipeline(): Promise<PipelineDefinition | null> {
+    const id = activePipelineId.value;
+    if (!id) return null;
+    const def = createDefaultPipeline(id);
+    await save(def);
+    return def;
+  }
+
+  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive, resetActivePipeline};
 });

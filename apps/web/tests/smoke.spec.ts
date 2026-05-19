@@ -173,10 +173,10 @@ test('smoke: execute pipeline and inspect trace', async ({page}) => {
 
   // Enter prompt and execute
   await page.getByPlaceholder('Enter your target prompt…').fill('Say hello');
-  await page.getByRole('button', {name: 'Execute'}).click();
+  await page.getByRole('button', {name: 'Execute Pipeline'}).click();
 
-  // Wait for run to finish (Execute button re-enables)
-  await expect(page.getByRole('button', {name: 'Execute'})).toBeEnabled({timeout: 15000});
+  // Wait for run to finish (Execute Pipeline button re-enables)
+  await expect(page.getByRole('button', {name: 'Execute Pipeline'})).toBeEnabled({timeout: 15000});
 
   // 11. Inspect trace
   await page.getByRole('button', {name: 'Trace'}).click();

@@ -1,6 +1,14 @@
 <template>
   <div class="center-pane">
     <div class="center-toolbar">
+      <button
+        class="btn btn-secondary btn-new"
+        type="button"
+        title="Start a new empty pipeline"
+        @click="handleNew"
+      >
+        New
+      </button>
       <input
         class="pipeline-name"
         v-model="localPipelineName"
@@ -14,10 +22,10 @@
         <button
           class="btn btn-run"
           :disabled="runStore.isRunning || !canRun"
-          :title="canRun ? 'Run the pipeline with the target prompt' : 'Enter a target prompt to enable Execute'"
+          :title="runButtonTitle"
           @click="handleRun"
         >
-          {{ runStore.isRunning ? 'Running…' : 'Execute' }}
+          {{ runStore.isRunning ? 'Running…' : 'Execute Pipeline' }}
         </button>
         <button class="btn btn-cancel" v-if="runStore.isRunning" title="Stop the current pipeline run" @click="runStore.cancel">Cancel</button>
       </div>
@@ -51,15 +59,20 @@ import type {PipelineDefinition, PipelineNode} from '@lorca/core';
 import {usePipelineEditor} from '../../composables/usePipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
+import {usePipelinesStore} from '../../stores/pipelines.js';
+import {useCapsulesStore} from '../../stores/capsules.js';
 import {useUiStore} from '../../stores/ui.js';
 import {pickJsonFile} from '../../utils/importFile.js';
+import {pipelineHasConfiguredModel, pipelineRunReady} from '../../utils/pipelineRunReady.js';
 import ChainEditor from './ChainEditor.vue';
 import StepMainPrompt from './StepMainPrompt.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
-const emit = defineEmits<{update: [def: PipelineDefinition]}>();
+const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
 
 const runStore = useActiveRunStore();
+const pipelinesStore = usePipelinesStore();
+const capsulesStore = useCapsulesStore();
 const importStore = useImportExportStore();
 const uiStore = useUiStore();
 const userPrompt = ref('');
@@ -83,7 +96,20 @@ watch(localPipelineName, () => commitPipelineName());
 const selectedNode = computed(() =>
   uiStore.selectedNodeId ? pipeline.value.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
 );
-const canRun = computed(() => userPrompt.value.trim().length > 0);
+const hasInput = computed(() => userPrompt.value.trim().length > 0);
+const hasModel = computed(() =>
+  pipelineHasConfiguredModel(pipeline.value, (id, version) => capsulesStore.getCapsule(id, version)),
+);
+const canRun = computed(() =>
+  pipelineRunReady(pipeline.value, userPrompt.value, (id, version) => capsulesStore.getCapsule(id, version)),
+);
+const runButtonTitle = computed(() => {
+  if (canRun.value) return 'Run the entire current pipeline with the target prompt';
+  const needs: string[] = [];
+  if (!hasInput.value) needs.push('enter a target prompt');
+  if (!hasModel.value) needs.push('add a model call step and select a model');
+  return `To enable Execute Pipeline, ${needs.join(' and ')}`;
+});
 
 function onStepPromptNodeUpdate(patch: Record<string, unknown>) {
   if (uiStore.selectedNodeId) updateNode(uiStore.selectedNodeId, patch);
@@ -113,6 +139,20 @@ function handleImport() {
       importStore.setImportErrors(['Import file is not valid JSON']);
     }
   });
+}
+
+async function handleNew() {
+  const confirmed = window.confirm(
+    'Start a new pipeline?\n\nYour current pipeline, target prompt, and any run results will be discarded. This cannot be undone.',
+  );
+  if (!confirmed) return;
+  if (runStore.isRunning) runStore.cancel();
+  runStore.reset();
+  await pipelinesStore.resetActivePipeline();
+  userPrompt.value = '';
+  localPipelineName.value = 'New Pipeline';
+  uiStore.selectNode(null);
+  emit('new');
 }
 </script>
 

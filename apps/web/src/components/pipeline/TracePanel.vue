@@ -1,6 +1,6 @@
 <template>
   <div class="trace-panel">
-    <div v-if="trace.length === 0" class="trace-empty">No trace yet. Execute the pipeline to see step details.</div>
+    <div v-if="trace.length === 0" class="trace-empty">No trace yet. Execute Pipeline to see step details.</div>
     <div v-for="event in trace" :key="`${event.nodeId}-${event.status}-${event.timestamp}`" class="trace-event" :class="`ev-${event.status}`">
       <div class="ev-header">
         <span v-if="event.capsuleInstanceId" class="ev-capsule-id">{{ event.capsuleInstanceId }}<template v-if="event.capsuleIteration !== undefined"> #{{ event.capsuleIteration }}</template></span>
