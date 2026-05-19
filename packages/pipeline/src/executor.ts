@@ -11,7 +11,7 @@ import type {
   AiEndpointConfig,
   Result,
 } from '@lorca/core';
-import { MODEL_CALL_TIMEOUT_MS } from '@lorca/core';
+import { MODEL_CALL_TIMEOUT_MS, CAPSULE_LOOP_MAX_COUNT } from '@lorca/core';
 import { buildUserPromptArtifacts } from '@lorca/prompt';
 import { renderPromptWrapper } from '@lorca/prompt';
 import { renderTemplate } from '@lorca/prompt';
@@ -304,6 +304,10 @@ async function executeCapsuleInstance(
 
   const resolvedNodes = resolveCapsuleSlots(capsule.nodes, modelSlotAssignments);
 
+  if (node.config.loop?.enabled) {
+    return executeCapsuleInstanceLooped(node, capsule, resolvedNodes, ctx, resolveEndpoint, callbacks, resolveCapsule);
+  }
+
   // Pre-seed internal artifacts from parent via inputBindings
   const internalArtifacts: Record<string, PipelineArtifact> = {};
   for (const port of capsule.interface.inputs) {
@@ -411,6 +415,153 @@ async function executeCapsuleInstance(
   }
 
   return {ok: true, value: publicOutputs};
+}
+
+async function executeCapsuleInstanceLooped(
+  node: CapsuleInstanceNode,
+  capsule: CapsuleDefinition,
+  resolvedNodes: PipelineNode[],
+  ctx: PipelineRunContext,
+  resolveEndpoint: EndpointResolver,
+  callbacks: ExecutorCallbacks,
+  resolveCapsule: CapsuleResolver | undefined,
+): Promise<Result<PipelineArtifact[], PipelineError>> {
+  const {inputBindings, outputBindings, parameterValues} = node.config;
+  const loop = node.config.loop!;
+  const instancePrefix = node.artifactPrefix ?? node.id;
+  const count = loop.count;
+
+  if (count < 1 || count > CAPSULE_LOOP_MAX_COUNT) {
+    return {ok: false, error: {code: 'capsule_loop_limit_exceeded', message: `Loop count ${count} must be between 1 and ${CAPSULE_LOOP_MAX_COUNT}`, nodeId: node.id}};
+  }
+
+  const syntheticDef = {
+    schemaVersion: 1 as const,
+    id: capsule.id, name: capsule.name, inputArtifactName: 'user_prompt',
+    nodes: resolvedNodes, edges: capsule.edges, outputRef: capsule.outputRef,
+    createdAt: capsule.createdAt, updatedAt: capsule.updatedAt,
+  };
+  const order = topologicalOrder(syntheticDef);
+  const nodeMap = new Map(resolvedNodes.map((n) => [n.id, n]));
+
+  let previousCarriedArtifact: PipelineArtifact | null = null;
+  const lastIterationPublicOutputs: PipelineArtifact[] = [];
+
+  for (let iteration = 1; iteration <= count; iteration++) {
+    // Seed artifacts for this iteration
+    const internalArtifacts: Record<string, PipelineArtifact> = {};
+    for (const port of capsule.interface.inputs) {
+      if (port.name === loop.carriedInputName && iteration > 1 && previousCarriedArtifact) {
+        internalArtifacts[port.name] = {...previousCarriedArtifact, name: port.name};
+      } else {
+        const parentKey = inputBindings[port.name] ?? `${instancePrefix}.${port.name}`;
+        const parentArtifact = ctx.artifacts[parentKey];
+        if (parentArtifact) internalArtifacts[port.name] = {...parentArtifact, name: port.name};
+      }
+    }
+
+    const internalCtx: PipelineRunContext = {
+      runId: ctx.runId, pipelineId: capsule.id, startedAt: new Date().toISOString(),
+      ...(ctx.abortSignal !== undefined && {abortSignal: ctx.abortSignal}),
+      input: ctx.input, artifacts: internalArtifacts, trace: [],
+      ...(Object.keys(parameterValues).length > 0 && {params: parameterValues}),
+    };
+
+    let failed = false;
+    let failError: PipelineError | null = null;
+
+    for (const nodeId of order) {
+      const n = nodeMap.get(nodeId)!;
+
+      if (failed) {
+        callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'skipped', timestamp: new Date().toISOString()});
+        continue;
+      }
+      if (ctx.abortSignal?.aborted) {
+        const cancelErr: PipelineError = {code: 'run_cancelled', message: 'Run was cancelled', nodeId, capsuleInstanceId: node.id};
+        callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'cancelled', timestamp: new Date().toISOString(), error: cancelErr});
+        failed = true; failError = cancelErr; continue;
+      }
+
+      const startMs = Date.now();
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'started', timestamp: new Date().toISOString()});
+
+      const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule);
+      if (!result.ok) {
+        const nodeErr: PipelineError = {...result.error, capsuleInstanceId: node.id};
+        callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'failed', timestamp: new Date().toISOString(), durationMs: Date.now() - startMs, error: nodeErr});
+        failed = true; failError = nodeErr; continue;
+      }
+
+      const produced: string[] = [];
+      for (const artifact of result.value) {
+        internalCtx.artifacts[artifact.name] = artifact;
+        const iterInternalKey = `${instancePrefix}.iteration_${iteration}.internal.${artifact.name}`;
+        const iterInternal = {...artifact, name: iterInternalKey};
+        ctx.artifacts[iterInternalKey] = iterInternal;
+        callbacks.onArtifact(iterInternal);
+        produced.push(iterInternalKey);
+      }
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'completed', timestamp: new Date().toISOString(), durationMs: Date.now() - startMs, outputArtifactNames: produced});
+    }
+
+    if (failed && failError) {
+      return {ok: false, error: {...failError, nodeId: node.id, iteration}};
+    }
+
+    // Determine carried output for next iteration and public iteration outputs
+    const primaryKey = resolveOutputRef(capsule.outputRef, resolvedNodes);
+    lastIterationPublicOutputs.length = 0;
+
+    for (const port of capsule.interface.outputs) {
+      const sourceKey = port.sourceArtifactKey ?? primaryKey ?? port.name;
+      const artifact = internalCtx.artifacts[sourceKey];
+      if (!artifact) continue;
+      const iterKey = `${instancePrefix}.iteration_${iteration}.${port.name}`;
+      const iterArtifact = {...artifact, name: iterKey};
+      ctx.artifacts[iterKey] = iterArtifact;
+      callbacks.onArtifact(iterArtifact);
+      lastIterationPublicOutputs.push(iterArtifact);
+      if (port.name === loop.carriedOutputName) previousCarriedArtifact = artifact;
+    }
+
+    // No declared outputs — use capsule's primary outputRef
+    if (capsule.interface.outputs.length === 0 && primaryKey) {
+      const artifact = internalCtx.artifacts[primaryKey];
+      if (artifact) {
+        const portName = capsule.outputRef.outputName;
+        const iterKey = `${instancePrefix}.iteration_${iteration}.${portName}`;
+        const iterArtifact = {...artifact, name: iterKey};
+        ctx.artifacts[iterKey] = iterArtifact;
+        callbacks.onArtifact(iterArtifact);
+        lastIterationPublicOutputs.push(iterArtifact);
+        if (portName === loop.carriedOutputName || !previousCarriedArtifact) {
+          previousCarriedArtifact = artifact;
+        }
+      }
+    }
+  }
+
+  // Create .final.* artifacts from last iteration
+  const finalOutputs: PipelineArtifact[] = [];
+  for (const iterArtifact of lastIterationPublicOutputs) {
+    const portName = iterArtifact.name.replace(`${instancePrefix}.iteration_${count}.`, '');
+    const finalKey = `${instancePrefix}.final.${portName}`;
+    const finalArtifact = {...iterArtifact, name: finalKey};
+    ctx.artifacts[finalKey] = finalArtifact;
+    callbacks.onArtifact(finalArtifact);
+    finalOutputs.push(finalArtifact);
+
+    const binding = outputBindings[portName];
+    if (binding) {
+      const boundArtifact = {...finalArtifact, name: binding};
+      ctx.artifacts[binding] = boundArtifact;
+      callbacks.onArtifact(boundArtifact);
+      finalOutputs.push(boundArtifact);
+    }
+  }
+
+  return {ok: true, value: finalOutputs};
 }
 
 function resolveCapsuleSlots(

@@ -16,11 +16,18 @@ export function outputKey(node: PipelineNode, outputName: string): string {
 }
 
 // Resolves an outputRef to an artifact key given the node list.
+// For looped capsule instances, returns the .final. artifact key per spec §15.
 export function resolveOutputRef(
   ref: PipelineOutputRef,
   nodes: PipelineNode[],
 ): string | null {
   const node = nodes.find((n) => n.id === ref.nodeId);
   if (!node) return null;
+  if (node.type === 'capsule-instance' && node.config.loop?.enabled) {
+    const prefix = nodePrefix(node);
+    const binding = node.config.outputBindings[ref.outputName];
+    if (binding) return binding;
+    return `${prefix}.final.${ref.outputName}`;
+  }
   return outputKey(node, ref.outputName);
 }

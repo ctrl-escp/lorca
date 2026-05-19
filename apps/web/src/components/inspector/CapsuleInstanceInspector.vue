@@ -11,6 +11,29 @@
     </div>
 
     <template v-if="selectedCapsule">
+      <!-- Loop config -->
+      <div class="ci-section-label">Loop</div>
+      <div class="ci-field-row">
+        <label><input type="checkbox" v-model="localLoopEnabled" @change="emitConfig" /> Enable loop</label>
+      </div>
+      <template v-if="localLoopEnabled">
+        <div class="ci-field">
+          <label>Iterations (1–10)</label>
+          <input type="number" v-model.number="localLoopCount" min="1" max="10" @change="emitConfig" />
+        </div>
+        <div class="ci-field">
+          <label>Carried input port</label>
+          <select v-model="localCarriedInputName" @change="emitConfig">
+            <option value="">— select input port —</option>
+            <option v-for="p in selectedCapsule.interface.inputs" :key="p.name" :value="p.name">{{ p.name }}</option>
+          </select>
+        </div>
+        <div class="ci-field">
+          <label>Carried output name</label>
+          <input v-model="localCarriedOutputName" @blur="emitConfig" placeholder="output port or outputRef name" />
+        </div>
+      </template>
+
       <template v-if="selectedCapsule.interface.inputs.length > 0">
         <div class="ci-section-label">Input bindings</div>
         <div v-for="port in selectedCapsule.interface.inputs" :key="port.name" class="ci-field">
@@ -82,6 +105,10 @@ const localInputBindings = ref<Record<string, string>>({});
 const localOutputBindings = ref<Record<string, string>>({});
 const localParamValues = ref<Record<string, unknown>>({});
 const localSlotAssignments = ref<Record<string, {endpointId: string; modelName: string}>>({});
+const localLoopEnabled = ref(false);
+const localLoopCount = ref(1);
+const localCarriedInputName = ref('');
+const localCarriedOutputName = ref('');
 
 const instancePrefix = computed(() => props.node.artifactPrefix ?? props.node.id);
 
@@ -92,12 +119,16 @@ const selectedCapsule = computed(() => {
 });
 
 watch(() => props.node, (n) => {
-  const {capsuleDefinitionId, capsuleVersion, inputBindings, outputBindings, parameterValues, modelSlotAssignments} = n.config;
+  const {capsuleDefinitionId, capsuleVersion, inputBindings, outputBindings, parameterValues, modelSlotAssignments, loop} = n.config;
   localCapsuleId.value = capsuleDefinitionId ? `${capsuleDefinitionId}::${capsuleVersion}` : '';
   localInputBindings.value = {...inputBindings};
   localOutputBindings.value = {...outputBindings};
   localParamValues.value = {...parameterValues};
   localSlotAssignments.value = {...modelSlotAssignments};
+  localLoopEnabled.value = loop?.enabled ?? false;
+  localLoopCount.value = loop?.count ?? 1;
+  localCarriedInputName.value = loop?.carriedInputName ?? '';
+  localCarriedOutputName.value = loop?.carriedOutputName ?? '';
 }, {immediate: true});
 
 function onCapsuleSelect() {
@@ -111,6 +142,15 @@ function onCapsuleSelect() {
 
 function emitConfig() {
   const [id = '', version = 'v1'] = localCapsuleId.value.split('::');
+  const loopConfig = localLoopEnabled.value ? {
+    loop: {
+      enabled: true,
+      count: localLoopCount.value,
+      inputCarryMode: 'first-input-then-previous-output' as const,
+      carriedInputName: localCarriedInputName.value,
+      carriedOutputName: localCarriedOutputName.value,
+    },
+  } : {};
   emit('update', {
     config: {
       capsuleDefinitionId: id,
@@ -119,6 +159,7 @@ function emitConfig() {
       outputBindings: {...localOutputBindings.value},
       parameterValues: {...localParamValues.value},
       modelSlotAssignments: {...localSlotAssignments.value},
+      ...loopConfig,
     },
   });
 }
@@ -136,6 +177,8 @@ function stringToSlot(value: string): {endpointId: string; modelName: string} {
 
 <style scoped>
 .ci-inspector { display: flex; flex-direction: column; gap: 0.5rem; }
+.ci-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #888; }
+.ci-field-row label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
 .ci-section-label { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
 .ci-field { display: flex; flex-direction: column; gap: 0.15rem; }
 .ci-field label { font-size: 0.72rem; color: #888; }
