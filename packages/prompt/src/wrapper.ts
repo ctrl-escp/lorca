@@ -1,11 +1,10 @@
-import type { PromptWrapperConfig } from '@lorca/core';
-import { escapePromptText } from './escape.js';
+import type {PromptWrapperConfig} from '@lorca/core';
 
 export function renderPromptWrapper(
   config: PromptWrapperConfig,
   inputArtifactValue: string,
 ): string {
-  const { tagName, instructionText, includeInputArtifact, inputPlacement, template } = config;
+  const {tagName, instructionText, includeInputArtifact, inputPlacement, template} = config;
 
   if (!includeInputArtifact) {
     return `<${tagName}>\n${instructionText}\n</${tagName}>`;

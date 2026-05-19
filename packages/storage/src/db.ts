@@ -1,5 +1,5 @@
-import Dexie, { type Table } from 'dexie';
-import type { AiEndpointConfig, DiscoveredModel, PipelineDefinition, CapsuleDefinition } from '@lorca/core';
+import Dexie, {type Table} from 'dexie';
+import type {AiEndpointConfig, DiscoveredModel, PipelineDefinition, CapsuleDefinition} from '@lorca/core';
 
 export class LorcaDb extends Dexie {
   endpoints!: Table<AiEndpointConfig, string>;

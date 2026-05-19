@@ -1,4 +1,4 @@
-import type { AiEndpointConfig, DiscoveredModel, Result, PipelineError } from '@lorca/core';
+import type {AiEndpointConfig, DiscoveredModel, Result, PipelineError} from '@lorca/core';
 
 export interface ModelCallRequest {
   mode: 'generate' | 'chat';

@@ -32,7 +32,7 @@ function buildCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefini
     nodes: [
       {id: 'in', type: 'input'},
       {id: nodeId, type: 'model-call', artifactPrefix: 'answer',
-       config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
+        config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
     ],
     edges: [
       {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: nodeId, toInput: 'input'},
@@ -78,7 +78,7 @@ describe('executeCapsuleTestRun', () => {
       nodes: [
         {id: 'in', type: 'input'},
         {id: 'mc-slot', type: 'model-call', artifactPrefix: 'answer',
-         config: {modelRef: {kind: 'slot', slotName: 'main_model'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
+          config: {modelRef: {kind: 'slot', slotName: 'main_model'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
       ],
       edges: [{id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc-slot', toInput: 'input'}],
       outputRef: {nodeId: 'mc-slot', outputName: 'text'},
@@ -147,9 +147,9 @@ describe('executeCapsuleTestRun', () => {
       nodes: [
         {id: 'in', type: 'input'},
         {id: templateId, type: 'template', artifactPrefix: 'rendered',
-         template: 'Goal: {{param.goal}}\nPrompt: {{artifact.user_prompt.raw}}'},
+          template: 'Goal: {{param.goal}}\nPrompt: {{artifact.user_prompt.raw}}'},
         {id: mcId, type: 'model-call', artifactPrefix: 'answer',
-         config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'rendered.text'}},
+          config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'rendered.text'}},
       ],
       edges: [
         {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: templateId, toInput: 'input'},

@@ -74,7 +74,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
           ctx.artifacts[artifact.name] = artifact;
         },
       },
-      (id, version) => capsulesStore.getCapsule(id, version),
+      (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
     );
 
     abortController.value = null;

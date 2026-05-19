@@ -54,11 +54,11 @@ export const useImportExportStore = defineStore('importExport', () => {
     const refs = collectPipelineCapsuleRefs(pipeline);
     const seen = new Set<string>();
     const result: CapsuleDefinition[] = [];
-    for (const ref of refs) {
-      const key = `${ref.capsuleDefinitionId}::${ref.capsuleVersion}`;
+    for (const capsuleRef of refs) {
+      const key = `${capsuleRef.capsuleDefinitionId}::${capsuleRef.capsuleVersion}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const cap = capsulesStore.getCapsule(ref.capsuleDefinitionId, ref.capsuleVersion);
+      const cap = capsulesStore.getCapsule(capsuleRef.capsuleDefinitionId, capsuleRef.capsuleVersion);
       if (cap) result.push(cap);
     }
     return result;

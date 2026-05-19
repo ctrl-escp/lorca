@@ -1,4 +1,4 @@
-import type { PipelineDefinition } from '@lorca/core';
+import type {PipelineDefinition} from '@lorca/core';
 
 // Topological sort (Kahn's algorithm) — returns node IDs in execution order.
 // Assumes the graph has already been validated (no cycles).

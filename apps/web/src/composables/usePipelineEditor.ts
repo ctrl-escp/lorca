@@ -38,6 +38,10 @@ function defaultNode(type: PipelineNode['type']): PipelineNode {
     case 'model-call': return {id, type: 'model-call', artifactPrefix: id, config: {modelRef: {kind: 'fixed', endpointId: '', modelName: ''}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}};
     case 'json-extract': return {id, type: 'json-extract', artifactPrefix: id, inputArtifactRef: ''};
     case 'capsule-instance': return {id, type: 'capsule-instance', artifactPrefix: id, config: {capsuleDefinitionId: '', capsuleVersion: 'v1', inputBindings: {}, outputBindings: {}, parameterValues: {}, modelSlotAssignments: {}}};
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
+    }
   }
 }
 

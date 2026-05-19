@@ -1,74 +1,71 @@
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
+const lintTargets = [
+  'eslint.config.mjs',
+  'vitest.config.ts',
+  'apps/web/playwright.config.ts',
+  'apps/web/vite.config.ts',
+  'apps/web/src/**/*.ts',
+  'apps/web/tests/**/*.ts',
+  'packages/*/src/**/*.ts',
+  'packages/*/tests/**/*.ts',
+];
+
+const baseRules = {
+  indent: ['error', 2, {SwitchCase: 1}],
+  semi: ['error', 'always'],
+  quotes: ['error', 'single', {avoidEscape: true}],
+  'comma-dangle': ['error', 'always-multiline'],
+  'object-curly-spacing': ['error', 'never'],
+  'array-bracket-spacing': ['error', 'never'],
+  'no-trailing-spaces': 'error',
+  'no-multiple-empty-lines': ['error', {max: 1, maxEOF: 0}],
+  eqeqeq: ['error', 'always'],
+  'no-var': 'error',
+  'prefer-const': 'error',
+  'no-redeclare': 'error',
+  'no-shadow': 'error',
+  'no-return-await': 'error',
+  'no-useless-catch': 'error',
+  'consistent-return': 'error',
+  'dot-notation': 'error',
+  'no-fallthrough': 'error',
+  'no-unreachable': 'error',
+  'no-throw-literal': 'error',
+  'no-unused-vars': [
+    'warn',
+    {argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_'},
+  ],
+  'no-debugger': 'error',
+  'prefer-arrow-callback': 'error',
+  'prefer-spread': 'error',
+  'prefer-rest-params': 'error',
+  'object-shorthand': ['error', 'always'],
+};
+
 export default [
   {
-    ignores: ['**/*tmp*/', '**/*tmp*.*', 'node_modules/'],
+    ignores: [
+      'apps/web/dist/',
+      '**/dist/',
+      '**/coverage/',
+      '**/test-results/',
+      '**/.vite/',
+      '**/*tmp*/',
+      '**/*tmp*.*',
+    ],
   },
   {
-    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    files: lintTargets,
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
     },
-
-    rules: {
-      /*
-       * ───────── Formatting ─────────
-       */
-      indent: ['error', 2, {SwitchCase: 1}],
-      semi: ['error', 'always'],
-      quotes: ['error', 'single', {avoidEscape: true}],
-      'comma-dangle': ['error', 'always-multiline'],
-      'object-curly-spacing': ['error', 'never'],
-      'array-bracket-spacing': ['error', 'never'],
-      'no-trailing-spaces': 'error',
-      'no-multiple-empty-lines': ['error', {max: 1, maxEOF: 0}],
-
-      /*
-       * ───────── Strictness ─────────
-       */
-      eqeqeq: ['error', 'always'],
-      'no-var': 'error',
-      'prefer-const': 'error',
-      'no-redeclare': 'error',
-      'no-shadow': 'error',
-      'no-return-await': 'error',
-      'no-useless-catch': 'error',
-
-      /*
-       * ───────── Predictability ─────────
-       */
-      'consistent-return': 'error',
-      'dot-notation': 'error',
-      'no-fallthrough': 'error',
-      'no-unreachable': 'error',
-      'no-throw-literal': 'error',
-
-      /*
-       * ───────── Clean Refactors ─────────
-       */
-      'no-unused-vars': [
-        'warn',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
-        },
-      ],
-      'no-debugger': 'error',
-
-      /*
-       * ───────── Modern JS Discipline ─────────
-       */
-      'prefer-arrow-callback': 'error',
-      'prefer-spread': 'error',
-      'prefer-rest-params': 'error',
-      'object-shorthand': ['error', 'always'],
-    },
+    rules: baseRules,
   },
   {
-    files: ['**/*.{ts,tsx}'],
+    files: lintTargets.filter((target) => target.endsWith('.ts')),
     plugins: {'@typescript-eslint': tsPlugin},
     languageOptions: {
       parser: tsParser,
@@ -81,11 +78,7 @@ export default [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
-        },
+        {argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_'},
       ],
     },
   },

@@ -11,15 +11,13 @@ import type {
   AiEndpointConfig,
   Result,
 } from '@lorca/core';
-import { MODEL_CALL_TIMEOUT_MS, CAPSULE_LOOP_MAX_COUNT } from '@lorca/core';
-import { buildUserPromptArtifacts } from '@lorca/prompt';
-import { renderPromptWrapper } from '@lorca/prompt';
-import { renderTemplate } from '@lorca/prompt';
-import type { ModelCallRequest } from '@lorca/endpoints';
-import { executeModelCall } from '@lorca/endpoints';
-import { validatePipeline } from './validate.js';
-import { topologicalOrder } from './order.js';
-import { outputKey, resolveOutputRef } from './artifacts.js';
+import {MODEL_CALL_TIMEOUT_MS, CAPSULE_LOOP_MAX_COUNT} from '@lorca/core';
+import {renderPromptWrapper, renderTemplate} from '@lorca/prompt';
+import type {ModelCallRequest} from '@lorca/endpoints';
+import {executeModelCall} from '@lorca/endpoints';
+import {validatePipeline} from './validate.js';
+import {topologicalOrder} from './order.js';
+import {outputKey, resolveOutputRef} from './artifacts.js';
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
 export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
@@ -35,11 +33,11 @@ function makeArtifact(
   kind: PipelineArtifact['kind'],
   value: unknown,
 ): PipelineArtifact {
-  return { name, nodeId, kind, value, createdAt: new Date().toISOString() };
+  return {name, nodeId, kind, value, createdAt: new Date().toISOString()};
 }
 
 function traceStarted(runId: string, nodeId: string): PipelineTraceEvent {
-  return { runId, nodeId, status: 'started', timestamp: new Date().toISOString() };
+  return {runId, nodeId, status: 'started', timestamp: new Date().toISOString()};
 }
 
 function traceCompleted(
@@ -75,7 +73,7 @@ function traceFailed(
 }
 
 function traceSkipped(runId: string, nodeId: string): PipelineTraceEvent {
-  return { runId, nodeId, status: 'skipped', timestamp: new Date().toISOString() };
+  return {runId, nodeId, status: 'skipped', timestamp: new Date().toISOString()};
 }
 
 export async function executePipeline(
@@ -103,8 +101,8 @@ export async function executePipeline(
     }
 
     if (ctx.abortSignal?.aborted) {
-      const cancelErr: PipelineError = { code: 'run_cancelled', message: 'Run was cancelled', nodeId };
-      callbacks.onTraceEvent({ runId: ctx.runId, nodeId, status: 'cancelled', timestamp: new Date().toISOString(), error: cancelErr });
+      const cancelErr: PipelineError = {code: 'run_cancelled', message: 'Run was cancelled', nodeId};
+      callbacks.onTraceEvent({runId: ctx.runId, nodeId, status: 'cancelled', timestamp: new Date().toISOString(), error: cancelErr});
       failed = true;
       failError = cancelErr;
       continue;
@@ -132,18 +130,18 @@ export async function executePipeline(
   }
 
   if (failed && failError) {
-    return { ok: false, error: failError };
+    return {ok: false, error: failError};
   }
 
   const finalKey = resolveOutputRef(def.outputRef, def.nodes);
   if (!finalKey || !(finalKey in ctx.artifacts)) {
     return {
       ok: false,
-      error: { code: 'final_output_missing', message: `Final output artifact not found: ${finalKey ?? '(unresolved)'}` },
+      error: {code: 'final_output_missing', message: `Final output artifact not found: ${finalKey ?? '(unresolved)'}`},
     };
   }
 
-  return { ok: true, value: finalKey };
+  return {ok: true, value: finalKey};
 }
 
 async function executeNode(
@@ -155,14 +153,14 @@ async function executeNode(
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   switch (node.type) {
     case 'input':
-      return { ok: true, value: [
+      return {ok: true, value: [
         makeArtifact('user_prompt.raw', node.id, 'text', ctx.input.userPromptRaw),
         makeArtifact('user_prompt.xml', node.id, 'text', ctx.input.userPromptXml),
       ]};
 
     case 'manual-text': {
       const key = outputKey(node, 'text');
-      return { ok: true, value: [makeArtifact(key, node.id, 'text', node.text)] };
+      return {ok: true, value: [makeArtifact(key, node.id, 'text', node.text)]};
     }
 
     case 'prompt-wrapper': {
@@ -175,12 +173,12 @@ async function executeNode(
           allowParams: true,
           params: ctx.params,
         });
-        if (!instrResult.ok) return { ok: false, error: { ...instrResult.error, nodeId: node.id } };
-        config = { ...node.config, instructionText: instrResult.value };
+        if (!instrResult.ok) return {ok: false, error: {...instrResult.error, nodeId: node.id}};
+        config = {...node.config, instructionText: instrResult.value};
       }
       const rendered = renderPromptWrapper(config, inputText);
       const key = outputKey(node, 'text');
-      return { ok: true, value: [makeArtifact(key, node.id, 'text', rendered)] };
+      return {ok: true, value: [makeArtifact(key, node.id, 'text', rendered)]};
     }
 
     case 'template': {
@@ -193,23 +191,23 @@ async function executeNode(
         allowParams: ctx.params !== undefined,
         ...(ctx.params !== undefined && {params: ctx.params}),
       });
-      if (!renderResult.ok) return { ok: false, error: { ...renderResult.error, nodeId: node.id } };
+      if (!renderResult.ok) return {ok: false, error: {...renderResult.error, nodeId: node.id}};
       const key = outputKey(node, 'text');
-      return { ok: true, value: [makeArtifact(key, node.id, 'text', renderResult.value)] };
+      return {ok: true, value: [makeArtifact(key, node.id, 'text', renderResult.value)]};
     }
 
     case 'json-extract': {
       const source = ctx.artifacts[node.inputArtifactRef];
       if (!source) {
-        return { ok: false, error: { code: 'missing_artifact', message: `Artifact not found: ${node.inputArtifactRef}`, nodeId: node.id } };
+        return {ok: false, error: {code: 'missing_artifact', message: `Artifact not found: ${node.inputArtifactRef}`, nodeId: node.id}};
       }
       const text = typeof source.value === 'string' ? source.value : JSON.stringify(source.value);
       const parsed = tryParseJson(text);
       if (parsed === null) {
-        return { ok: false, error: { code: 'json_parse_failed', message: `Could not extract JSON from artifact: ${node.inputArtifactRef}`, nodeId: node.id } };
+        return {ok: false, error: {code: 'json_parse_failed', message: `Could not extract JSON from artifact: ${node.inputArtifactRef}`, nodeId: node.id}};
       }
       const key = outputKey(node, 'json');
-      return { ok: true, value: [makeArtifact(key, node.id, 'json', parsed)] };
+      return {ok: true, value: [makeArtifact(key, node.id, 'json', parsed)]};
     }
 
     case 'model-call':
@@ -217,6 +215,10 @@ async function executeNode(
 
     case 'capsule-instance':
       return executeCapsuleInstance(node, ctx, resolveEndpoint, callbacks, resolveCapsule);
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
+    }
   }
 }
 
@@ -225,20 +227,20 @@ async function executeModelCallNode(
   ctx: PipelineRunContext,
   resolveEndpoint: EndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
-  const { modelRef, mode, systemPrompt, inputArtifactRef, temperature, topP, maxTokens, expectedOutput } = node.config;
+  const {modelRef, mode, systemPrompt, inputArtifactRef, temperature, topP, maxTokens, expectedOutput} = node.config;
 
   if (modelRef.kind === 'slot') {
-    return { ok: false, error: { code: 'invalid_capsule_interface', message: `ModelRef kind 'slot' is only valid inside a Capsule`, nodeId: node.id } };
+    return {ok: false, error: {code: 'invalid_capsule_interface', message: 'ModelRef kind \'slot\' is only valid inside a Capsule', nodeId: node.id}};
   }
 
   const endpointConfig = resolveEndpoint(modelRef.endpointId);
   if (!endpointConfig) {
-    return { ok: false, error: { code: 'missing_endpoint', message: `Endpoint not found: ${modelRef.endpointId}`, nodeId: node.id } };
+    return {ok: false, error: {code: 'missing_endpoint', message: `Endpoint not found: ${modelRef.endpointId}`, nodeId: node.id}};
   }
 
   const inputArtifact = ctx.artifacts[inputArtifactRef];
   if (!inputArtifact) {
-    return { ok: false, error: { code: 'missing_artifact', message: `Input artifact not found: ${inputArtifactRef}`, nodeId: node.id } };
+    return {ok: false, error: {code: 'missing_artifact', message: `Input artifact not found: ${inputArtifactRef}`, nodeId: node.id}};
   }
 
   const userContent = typeof inputArtifact.value === 'string'
@@ -257,15 +259,15 @@ async function executeModelCallNode(
     modelName: modelRef.modelName,
     userContent,
     abortSignal: signal,
-    ...(systemPrompt !== undefined && { systemPrompt }),
-    ...(temperature !== undefined && { temperature }),
-    ...(topP !== undefined && { topP }),
-    ...(maxTokens !== undefined && { maxTokens }),
+    ...(systemPrompt !== undefined && {systemPrompt}),
+    ...(temperature !== undefined && {temperature}),
+    ...(topP !== undefined && {topP}),
+    ...(maxTokens !== undefined && {maxTokens}),
   };
 
   const callResult = await executeModelCall(endpointConfig, request);
   if (!callResult.ok) {
-    return { ok: false, error: { ...callResult.error, nodeId: node.id } };
+    return {ok: false, error: {...callResult.error, nodeId: node.id}};
   }
 
   const artifacts: PipelineArtifact[] = [
@@ -280,7 +282,7 @@ async function executeModelCallNode(
     }
   }
 
-  return { ok: true, value: artifacts };
+  return {ok: true, value: artifacts};
 }
 
 async function executeCapsuleInstance(

@@ -1,5 +1,5 @@
-import type { Result, PipelineError } from '@lorca/core';
-import { ok, err } from '@lorca/core';
+import type {Result, PipelineError} from '@lorca/core';
+import {ok, err} from '@lorca/core';
 
 // Template syntax: {{artifact.<key>}} and {{param.<name>}}
 // Literal {{ is escaped as \{{

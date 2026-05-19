@@ -1,6 +1,6 @@
-import type { PipelineDefinition, PipelineError, Result } from '@lorca/core';
-import { ok, err } from '@lorca/core';
-import { outputKey } from './artifacts.js';
+import type {PipelineDefinition, PipelineError, Result} from '@lorca/core';
+import {ok, err} from '@lorca/core';
+import {outputKey} from './artifacts.js';
 
 export function validatePipeline(
   def: PipelineDefinition,
@@ -8,16 +8,16 @@ export function validatePipeline(
   // Unique node IDs
   const nodeIds = new Set(def.nodes.map((n) => n.id));
   if (nodeIds.size !== def.nodes.length) {
-    return err({ code: 'invalid_pipeline_graph', message: 'Duplicate node IDs detected' });
+    return err({code: 'invalid_pipeline_graph', message: 'Duplicate node IDs detected'});
   }
 
   // At least one input node
   const inputNodes = def.nodes.filter((n) => n.type === 'input');
   if (inputNodes.length === 0) {
-    return err({ code: 'invalid_pipeline_graph', message: 'Pipeline must have an InputNode' });
+    return err({code: 'invalid_pipeline_graph', message: 'Pipeline must have an InputNode'});
   }
   if (inputNodes.length > 1) {
-    return err({ code: 'invalid_pipeline_graph', message: 'Pipeline must have exactly one InputNode' });
+    return err({code: 'invalid_pipeline_graph', message: 'Pipeline must have exactly one InputNode'});
   }
 
   // outputRef resolves to a known node
@@ -79,7 +79,7 @@ function detectCycle(def: PipelineDefinition): Result<never, PipelineError> | nu
 
   for (const node of def.nodes) {
     if (color.get(node.id) === WHITE && dfs(node.id)) {
-      return err({ code: 'cycle_detected', message: 'Pipeline graph contains a cycle' });
+      return err({code: 'cycle_detected', message: 'Pipeline graph contains a cycle'});
     }
   }
   return null;
@@ -123,5 +123,9 @@ function nodeOutputKeys(node: PipelineDefinition['nodes'][number]): string[] {
     case 'capsule-instance':
       // Capsule outputs are validated during capsule expansion (Phase 8)
       return [];
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
+    }
   }
 }

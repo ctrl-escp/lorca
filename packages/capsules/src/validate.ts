@@ -131,5 +131,9 @@ function nodeOutputKeys(node: CapsuleDefinition['nodes'][number]): string[] {
     }
     case 'json-extract': return [outputKey(node, 'json')];
     case 'capsule-instance': return [];
+    default: {
+      const _exhaustive: never = node;
+      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
+    }
   }
 }

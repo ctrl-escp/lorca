@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
-import { ollamaAdapter } from '../src/ollama.js';
-import type { AiEndpointConfig } from '@lorca/core';
+import {describe, it, expect, beforeAll, afterAll, afterEach} from 'vitest';
+import {http, HttpResponse} from 'msw';
+import {setupServer} from 'msw/node';
+import {ollamaAdapter} from '../src/ollama.js';
+import type {AiEndpointConfig} from '@lorca/core';
 
 const BASE = 'http://localhost:11434';
 
@@ -25,13 +25,13 @@ const FAKE_MODELS = {
       name: 'llama3.2:3b',
       modified_at: '2026-01-01T00:00:00Z',
       size: 2_000_000_000,
-      details: { parameter_size: '3b', quantization_level: 'Q4_K_M', family: 'llama' },
+      details: {parameter_size: '3b', quantization_level: 'Q4_K_M', family: 'llama'},
     },
     {
       name: 'mistral:7b',
       modified_at: '2026-01-01T00:00:00Z',
       size: 4_000_000_000,
-      details: { parameter_size: '7b', quantization_level: 'Q4_K_M', family: 'mistral' },
+      details: {parameter_size: '7b', quantization_level: 'Q4_K_M', family: 'mistral'},
     },
   ],
 };
@@ -39,18 +39,18 @@ const FAKE_MODELS = {
 const server = setupServer(
   http.get(`${BASE}/api/tags`, () => HttpResponse.json(FAKE_MODELS)),
   http.post(`${BASE}/api/generate`, () =>
-    HttpResponse.json({ response: 'Hello from fake Ollama', done: true, model: 'llama3.2:3b' }),
+    HttpResponse.json({response: 'Hello from fake Ollama', done: true, model: 'llama3.2:3b'}),
   ),
   http.post(`${BASE}/api/chat`, () =>
     HttpResponse.json({
-      message: { role: 'assistant', content: 'Hello from chat' },
+      message: {role: 'assistant', content: 'Hello from chat'},
       done: true,
       model: 'llama3.2:3b',
     }),
   ),
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({onUnhandledRequest: 'error'}));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -73,7 +73,7 @@ describe('ollamaAdapter.testBrowserAccess', () => {
 
   it('returns endpoint_unreachable on non-200 status', async () => {
     server.use(
-      http.get(`${BASE}/api/tags`, () => new HttpResponse(null, { status: 503 })),
+      http.get(`${BASE}/api/tags`, () => new HttpResponse(null, {status: 503})),
     );
     const result = await ollamaAdapter.testBrowserAccess(endpoint);
     expect(result.ok).toBe(false);

@@ -1,5 +1,5 @@
-export type { PipelineExportFile, CapsuleExportFile } from '@lorca/core';
-export { getDb, LorcaDb } from './db.js';
+export type {PipelineExportFile, CapsuleExportFile} from '@lorca/core';
+export {getDb, LorcaDb} from './db.js';
 export {
   exportPipeline,
   exportCapsule,

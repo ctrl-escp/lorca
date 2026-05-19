@@ -40,11 +40,11 @@ export const useModelsStore = defineStore('models', () => {
   }
 
   async function setUserBuckets(modelId: string, buckets: ModelUsageBucket[]) {
-    const m = models.value.find((m) => m.id === modelId);
-    if (!m) return;
-    const updated = {...m, userBuckets: buckets};
+    const model = models.value.find((entry) => entry.id === modelId);
+    if (!model) return;
+    const updated = {...model, userBuckets: buckets};
     await getDb().models.put(updated);
-    const idx = models.value.findIndex((m) => m.id === modelId);
+    const idx = models.value.findIndex((entry) => entry.id === modelId);
     if (idx !== -1) models.value[idx] = updated;
   }
 

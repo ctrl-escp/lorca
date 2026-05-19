@@ -27,7 +27,7 @@ export const usePipelinesStore = defineStore('pipelines', () => {
   const loaded = ref(false);
 
   const activePipeline = computed(() =>
-    activePipelineId.value != null
+    activePipelineId.value !== null
       ? pipelines.value.find((p) => p.id === activePipelineId.value)
       : undefined,
   );

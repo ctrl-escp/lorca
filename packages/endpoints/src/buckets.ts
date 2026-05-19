@@ -1,4 +1,4 @@
-import type { ModelUsageBucket } from '@lorca/core';
+import type {ModelUsageBucket} from '@lorca/core';
 
 interface BucketInput {
   providerModelName: string;

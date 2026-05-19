@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { escapePromptText, unescapePromptText } from '../src/escape.js';
-import { buildUserPromptArtifacts } from '../src/envelope.js';
-import { renderTemplate } from '../src/template.js';
-import { isValidTag, isReservedTag } from '../src/tags.js';
+import {describe, it, expect} from 'vitest';
+import {escapePromptText, unescapePromptText} from '../src/escape.js';
+import {buildUserPromptArtifacts} from '../src/envelope.js';
+import {renderTemplate} from '../src/template.js';
+import {isValidTag, isReservedTag} from '../src/tags.js';
 
 describe('escapePromptText', () => {
   it('escapes &', () => expect(escapePromptText('a & b')).toBe('a &amp; b'));
@@ -25,17 +25,17 @@ describe('unescapePromptText', () => {
 
 describe('buildUserPromptArtifacts', () => {
   it('preserves raw text unchanged', () => {
-    const { raw } = buildUserPromptArtifacts('Hello <world>');
+    const {raw} = buildUserPromptArtifacts('Hello <world>');
     expect(raw).toBe('Hello <world>');
   });
 
   it('wraps xml in user_prompt tag', () => {
-    const { xml } = buildUserPromptArtifacts('Hello');
+    const {xml} = buildUserPromptArtifacts('Hello');
     expect(xml).toBe('<user_prompt>\nHello\n</user_prompt>');
   });
 
   it('escapes special chars in xml artifact', () => {
-    const { xml } = buildUserPromptArtifacts('a < b & c > d');
+    const {xml} = buildUserPromptArtifacts('a < b & c > d');
     expect(xml).toContain('&lt;');
     expect(xml).toContain('&amp;');
     expect(xml).toContain('&gt;');
@@ -43,7 +43,7 @@ describe('buildUserPromptArtifacts', () => {
   });
 
   it('xml starts and ends with user_prompt tag', () => {
-    const { xml } = buildUserPromptArtifacts('test');
+    const {xml} = buildUserPromptArtifacts('test');
     expect(xml.startsWith('<user_prompt>')).toBe(true);
     expect(xml.endsWith('</user_prompt>')).toBe(true);
   });
@@ -52,7 +52,7 @@ describe('buildUserPromptArtifacts', () => {
 describe('renderTemplate', () => {
   it('substitutes artifact references', () => {
     const result = renderTemplate('Use: {{artifact.criteria.json}}', {
-      artifacts: { 'criteria.json': 'some json' },
+      artifacts: {'criteria.json': 'some json'},
       allowParams: false,
     });
     expect(result.ok).toBe(true);
@@ -61,7 +61,7 @@ describe('renderTemplate', () => {
 
   it('serializes object artifacts as pretty JSON', () => {
     const result = renderTemplate('{{artifact.data}}', {
-      artifacts: { data: { key: 'val' } },
+      artifacts: {data: {key: 'val'}},
       allowParams: false,
     });
     expect(result.ok).toBe(true);
@@ -83,7 +83,7 @@ describe('renderTemplate', () => {
   it('substitutes param references inside Capsule context', () => {
     const result = renderTemplate('Goal: {{param.extraction_goal}}', {
       artifacts: {},
-      params: { extraction_goal: 'Extract the intent' },
+      params: {extraction_goal: 'Extract the intent'},
       allowParams: true,
     });
     expect(result.ok).toBe(true);

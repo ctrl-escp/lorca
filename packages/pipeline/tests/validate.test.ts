@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import type { PipelineDefinition } from '@lorca/core';
-import { validatePipeline, topologicalOrder, resolveOutputRef } from '../src/index.js';
+import {describe, it, expect} from 'vitest';
+import type {PipelineDefinition} from '@lorca/core';
+import {validatePipeline, topologicalOrder, resolveOutputRef} from '../src/index.js';
 
 function base(): PipelineDefinition {
   return {
@@ -9,11 +9,11 @@ function base(): PipelineDefinition {
     name: 'Test',
     inputArtifactName: 'user_prompt',
     nodes: [
-      { id: 'in', type: 'input' },
-      { id: 'mc', type: 'model-call', artifactPrefix: 'answer', config: { modelRef: { kind: 'fixed', endpointId: 'ep', modelName: 'm' }, mode: 'generate', inputArtifactRef: 'user_prompt.xml' } },
+      {id: 'in', type: 'input'},
+      {id: 'mc', type: 'model-call', artifactPrefix: 'answer', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
     ],
-    edges: [{ id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc', toInput: 'input' }],
-    outputRef: { nodeId: 'mc', outputName: 'text' },
+    edges: [{id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc', toInput: 'input'}],
+    outputRef: {nodeId: 'mc', outputName: 'text'},
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
@@ -34,7 +34,7 @@ describe('validatePipeline', () => {
   });
 
   it('rejects outputRef pointing to unknown node', () => {
-    const def = { ...base(), outputRef: { nodeId: 'ghost', outputName: 'text' } };
+    const def = {...base(), outputRef: {nodeId: 'ghost', outputName: 'text'}};
     const result = validatePipeline(def);
     expect(result.ok).toBe(false);
   });
@@ -42,7 +42,7 @@ describe('validatePipeline', () => {
   it('detects a cycle', () => {
     const def = base();
     // Add a back-edge mc → in
-    def.edges.push({ id: 'e2', fromNodeId: 'mc', fromOutput: 'text', toNodeId: 'in', toInput: 'x' });
+    def.edges.push({id: 'e2', fromNodeId: 'mc', fromOutput: 'text', toNodeId: 'in', toInput: 'x'});
     const result = validatePipeline(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('cycle_detected');
@@ -50,7 +50,7 @@ describe('validatePipeline', () => {
 
   it('detects duplicate artifact keys from two nodes with same prefix', () => {
     const def = base();
-    def.nodes.push({ id: 'mc2', type: 'model-call', artifactPrefix: 'answer', config: { modelRef: { kind: 'fixed', endpointId: 'ep', modelName: 'm' }, mode: 'generate', inputArtifactRef: 'user_prompt.xml' } });
+    def.nodes.push({id: 'mc2', type: 'model-call', artifactPrefix: 'answer', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}});
     const result = validatePipeline(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
@@ -67,13 +67,13 @@ describe('topologicalOrder', () => {
     const def: PipelineDefinition = {
       ...base(),
       nodes: [
-        { id: 'n1', type: 'input' },
-        { id: 'n2', type: 'manual-text', artifactPrefix: 't', text: 'hi' },
-        { id: 'n3', type: 'model-call', artifactPrefix: 'r', config: { modelRef: { kind: 'fixed', endpointId: 'ep', modelName: 'm' }, mode: 'generate', inputArtifactRef: 't.text' } },
+        {id: 'n1', type: 'input'},
+        {id: 'n2', type: 'manual-text', artifactPrefix: 't', text: 'hi'},
+        {id: 'n3', type: 'model-call', artifactPrefix: 'r', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 't.text'}},
       ],
       edges: [
-        { id: 'e1', fromNodeId: 'n1', fromOutput: 'xml', toNodeId: 'n2', toInput: 'input' },
-        { id: 'e2', fromNodeId: 'n2', fromOutput: 'text', toNodeId: 'n3', toInput: 'input' },
+        {id: 'e1', fromNodeId: 'n1', fromOutput: 'xml', toNodeId: 'n2', toInput: 'input'},
+        {id: 'e2', fromNodeId: 'n2', fromOutput: 'text', toNodeId: 'n3', toInput: 'input'},
       ],
     };
     const order = topologicalOrder(def);
@@ -86,16 +86,16 @@ describe('topologicalOrder', () => {
 describe('resolveOutputRef', () => {
   it('resolves InputNode raw output to global key', () => {
     const nodes = base().nodes;
-    expect(resolveOutputRef({ nodeId: 'in', outputName: 'raw' }, nodes)).toBe('user_prompt.raw');
-    expect(resolveOutputRef({ nodeId: 'in', outputName: 'xml' }, nodes)).toBe('user_prompt.xml');
+    expect(resolveOutputRef({nodeId: 'in', outputName: 'raw'}, nodes)).toBe('user_prompt.raw');
+    expect(resolveOutputRef({nodeId: 'in', outputName: 'xml'}, nodes)).toBe('user_prompt.xml');
   });
 
   it('resolves model-call output using artifactPrefix', () => {
     const nodes = base().nodes;
-    expect(resolveOutputRef({ nodeId: 'mc', outputName: 'text' }, nodes)).toBe('answer.text');
+    expect(resolveOutputRef({nodeId: 'mc', outputName: 'text'}, nodes)).toBe('answer.text');
   });
 
   it('returns null for unknown nodeId', () => {
-    expect(resolveOutputRef({ nodeId: 'ghost', outputName: 'text' }, base().nodes)).toBeNull();
+    expect(resolveOutputRef({nodeId: 'ghost', outputName: 'text'}, base().nodes)).toBeNull();
   });
 });

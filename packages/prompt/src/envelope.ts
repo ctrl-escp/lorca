@@ -1,4 +1,4 @@
-import { escapePromptText } from './escape.js';
+import {escapePromptText} from './escape.js';
 
 export interface UserPromptArtifacts {
   raw: string;

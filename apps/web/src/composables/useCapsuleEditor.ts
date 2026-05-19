@@ -46,6 +46,10 @@ function defaultNode(type: PipelineNode['type']): PipelineNode {
       id, type: 'capsule-instance', artifactPrefix: id,
       config: {capsuleDefinitionId: '', capsuleVersion: 'v1', inputBindings: {}, outputBindings: {}, parameterValues: {}, modelSlotAssignments: {}},
     };
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
+    }
   }
 }
 

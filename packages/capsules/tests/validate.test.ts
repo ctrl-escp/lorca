@@ -14,7 +14,7 @@ function minimalCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefi
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
     nodes: [
       {id: nodeId, type: 'model-call', artifactPrefix: 'result',
-       config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'llm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
+        config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'llm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
     ],
     edges: [],
     outputRef: {nodeId, outputName: 'text'},
@@ -70,7 +70,7 @@ describe('validateCapsule', () => {
     const def = minimalCapsule({
       nodes: [
         {id: 'cap', type: 'capsule-instance', artifactPrefix: 'cap',
-         config: {capsuleDefinitionId: 'x', capsuleVersion: 'v1', inputBindings: {}, outputBindings: {}, parameterValues: {}, modelSlotAssignments: {}}},
+          config: {capsuleDefinitionId: 'x', capsuleVersion: 'v1', inputBindings: {}, outputBindings: {}, parameterValues: {}, modelSlotAssignments: {}}},
       ],
       outputRef: {nodeId: 'cap', outputName: 'result'},
     });
@@ -83,7 +83,7 @@ describe('validateCapsule', () => {
     const def = minimalCapsule({
       nodes: [
         {id: 'mc', type: 'model-call', artifactPrefix: 'out',
-         config: {modelRef: {kind: 'slot', slotName: 'undeclared_slot'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
+          config: {modelRef: {kind: 'slot', slotName: 'undeclared_slot'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
       ],
       outputRef: {nodeId: 'mc', outputName: 'text'},
     });
@@ -102,7 +102,7 @@ describe('validateCapsule', () => {
       },
       nodes: [
         {id: 'mc', type: 'model-call', artifactPrefix: 'out',
-         config: {modelRef: {kind: 'slot', slotName: 'main_model'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
+          config: {modelRef: {kind: 'slot', slotName: 'main_model'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
       ],
       outputRef: {nodeId: 'mc', outputName: 'text'},
     });

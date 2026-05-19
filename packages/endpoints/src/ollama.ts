@@ -1,7 +1,7 @@
-import type { AiEndpointConfig, DiscoveredModel, Result, PipelineError } from '@lorca/core';
-import { ok, err } from '@lorca/core';
-import type { EndpointAdapter, ModelCallRequest, ModelCallResponse } from './adapter.js';
-import { assignBuckets } from './buckets.js';
+import type {AiEndpointConfig, DiscoveredModel, Result, PipelineError} from '@lorca/core';
+import {ok, err} from '@lorca/core';
+import type {EndpointAdapter, ModelCallRequest, ModelCallResponse} from './adapter.js';
+import {assignBuckets} from './buckets.js';
 
 // Shapes returned by the Ollama REST API
 interface OllamaTagsResponse {
@@ -35,7 +35,7 @@ function endpointError(
   code: PipelineError['code'],
   message: string,
 ): Result<never, PipelineError> {
-  return err({ code, message });
+  return err({code, message});
 }
 
 async function safeFetch(
@@ -120,14 +120,14 @@ export const ollamaAdapter: EndpointAdapter = {
         modifiedAt: m.modified_at,
         buckets: assignBuckets({
           providerModelName: m.name,
-          ...(parameterSize !== undefined && { parameterSize }),
-          ...(quantization !== undefined && { quantization }),
-          ...(family !== undefined && { family }),
+          ...(parameterSize !== undefined && {parameterSize}),
+          ...(quantization !== undefined && {quantization}),
+          ...(family !== undefined && {family}),
         }),
         source: 'discovered',
-        ...(parameterSize !== undefined && { parameterSize }),
-        ...(quantization !== undefined && { quantization }),
-        ...(family !== undefined && { family }),
+        ...(parameterSize !== undefined && {parameterSize}),
+        ...(quantization !== undefined && {quantization}),
+        ...(family !== undefined && {family}),
       };
       return model;
     });
@@ -144,25 +144,25 @@ export const ollamaAdapter: EndpointAdapter = {
 
     const body = isChat
       ? {
-          model: request.modelName,
-          stream: false,
-          messages: [
-            ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
-            { role: 'user', content: request.userContent },
-          ],
-          ...(request.temperature !== undefined && { options: { temperature: request.temperature } }),
-        }
+        model: request.modelName,
+        stream: false,
+        messages: [
+          ...(request.systemPrompt ? [{role: 'system', content: request.systemPrompt}] : []),
+          {role: 'user', content: request.userContent},
+        ],
+        ...(request.temperature !== undefined && {options: {temperature: request.temperature}}),
+      }
       : {
-          model: request.modelName,
-          prompt: request.userContent,
-          stream: false,
-          ...(request.systemPrompt && { system: request.systemPrompt }),
-          ...(request.temperature !== undefined && { options: { temperature: request.temperature } }),
-        };
+        model: request.modelName,
+        prompt: request.userContent,
+        stream: false,
+        ...(request.systemPrompt && {system: request.systemPrompt}),
+        ...(request.temperature !== undefined && {options: {temperature: request.temperature}}),
+      };
 
     const fetchResult = await safeFetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),
       signal: request.abortSignal ?? null,
     });
@@ -189,6 +189,6 @@ export const ollamaAdapter: EndpointAdapter = {
       ? ((rawResponse as OllamaChatResponse).message?.content ?? '')
       : ((rawResponse as OllamaGenerateResponse).response ?? '');
 
-    return ok({ text, rawResponse });
+    return ok({text, rawResponse});
   },
 };

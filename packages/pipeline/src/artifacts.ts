@@ -1,4 +1,4 @@
-import type { PipelineNode, PipelineOutputRef } from '@lorca/core';
+import type {PipelineNode, PipelineOutputRef} from '@lorca/core';
 
 // Derives the artifact key prefix for a node.
 export function nodePrefix(node: PipelineNode): string {
