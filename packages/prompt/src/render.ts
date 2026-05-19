@@ -12,8 +12,33 @@ export interface RenderedPromptPayload {
   xmlText: string;
 }
 
+export interface ResolvedHistoryRead {
+  sourceArtifactRef: string;
+  value?: string;
+  omitted?: boolean;
+}
+
 function blockToXml(tagName: string, body: string): string {
   return `<${tagName}>\n${body}\n</${tagName}>`;
+}
+
+function historyReadBlocks(
+  config: PromptCompositionConfig,
+  resolvedHistory?: ResolvedHistoryRead[],
+): RenderedPromptBlock[] {
+  const byRef = new Map(resolvedHistory?.map((r) => [r.sourceArtifactRef, r]) ?? []);
+  const blocks: RenderedPromptBlock[] = [];
+
+  for (const read of config.historyReads) {
+    if (!isValidTag(read.tagName)) continue;
+    const resolved = byRef.get(read.sourceArtifactRef);
+    if (resolved?.omitted) continue;
+    if (resolved?.value !== undefined) {
+      blocks.push({tagName: read.tagName, body: resolved.value, source: 'history-read'});
+    }
+  }
+
+  return blocks;
 }
 
 /**
@@ -21,10 +46,12 @@ function blockToXml(tagName: string, body: string): string {
  *
  * Pass resolvedPrevOutput when the previous step's output is known (execution).
  * Pass undefined for preview — previous-output block is omitted from output.
+ * Pass resolvedHistory during execution to inject prior step outputs.
  */
 export function renderPromptComposition(
   config: PromptCompositionConfig,
   resolvedPrevOutput?: string,
+  resolvedHistory?: ResolvedHistoryRead[],
 ): RenderedPromptPayload {
   const blocks: RenderedPromptBlock[] = [];
 
@@ -39,6 +66,8 @@ export function renderPromptComposition(
   if (prevBlock && config.previousOutput.placement === 'beforeOwnPrompt') {
     blocks.push(prevBlock);
   }
+
+  blocks.push(...historyReadBlocks(config, resolvedHistory));
 
   for (const block of config.blocks) {
     if (!block.enabled) continue;
@@ -55,7 +84,12 @@ export function renderPromptComposition(
   return {blocks, xmlText};
 }
 
-/** Preview XML — previous output shown as a placeholder tag when enabled. */
+function previewHistoryReadBody(read: {sourceArtifactRef: string; required: boolean}): string {
+  const suffix = read.required ? '' : ' (optional — omitted if unavailable)';
+  return `…${read.sourceArtifactRef}${suffix}…`;
+}
+
+/** Preview XML — previous output and history reads shown as placeholders when unresolved. */
 export function previewPromptXml(config: PromptCompositionConfig): string {
   const blocks: string[] = [];
   const prevTagName = config.previousOutput.tagName || 'previous_output';
@@ -65,6 +99,11 @@ export function previewPromptXml(config: PromptCompositionConfig): string {
     : null;
 
   if (prevXml && config.previousOutput.placement === 'beforeOwnPrompt') blocks.push(prevXml);
+
+  for (const read of config.historyReads) {
+    if (!isValidTag(read.tagName)) continue;
+    blocks.push(blockToXml(read.tagName, previewHistoryReadBody(read)));
+  }
 
   for (const block of config.blocks) {
     if (!block.enabled) continue;

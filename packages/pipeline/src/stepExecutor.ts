@@ -11,6 +11,7 @@ import type {
 } from '@lorca/core';
 import {MODEL_CALL_TIMEOUT_MS} from '@lorca/core';
 import {renderPromptComposition, renderTemplate} from '@lorca/prompt';
+import type {ResolvedHistoryRead} from '@lorca/prompt';
 import type {ModelCallRequest} from '@lorca/endpoints';
 import {executeModelCall} from '@lorca/endpoints';
 import {compileStepChainToExecutionPlan} from './chainCompiler.js';
@@ -219,9 +220,31 @@ async function executePromptStep(
     ? (typeof prevArtifact.value === 'string' ? prevArtifact.value : JSON.stringify(prevArtifact.value))
     : undefined;
 
+  // Resolve history read artifacts
+  const resolvedHistory: ResolvedHistoryRead[] = [];
+  for (const read of compiledStep.historyReads ?? []) {
+    const artifact = artifacts[read.sourceArtifactRef];
+    if (!artifact) {
+      if (read.required) {
+        return {
+          ok: false,
+          error: {
+            code: 'missing_artifact',
+            message: `Required history read artifact not found: ${read.sourceArtifactRef}`,
+            nodeId: step.id,
+          },
+        };
+      }
+      resolvedHistory.push({sourceArtifactRef: read.sourceArtifactRef, omitted: true});
+      continue;
+    }
+    const value = typeof artifact.value === 'string' ? artifact.value : JSON.stringify(artifact.value);
+    resolvedHistory.push({sourceArtifactRef: read.sourceArtifactRef, value});
+  }
+
   // Render prompt composition
   const renderedPrompt = step.prompt
-    ? renderPromptComposition(step.prompt, prevValue)
+    ? renderPromptComposition(step.prompt, prevValue, resolvedHistory)
     : {blocks: [], xmlText: prevValue ?? ''};
 
   const key = `${step.outputNamespace}.text`;

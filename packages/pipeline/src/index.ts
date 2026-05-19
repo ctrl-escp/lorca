@@ -12,3 +12,20 @@ export {
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
 export {executeStepChain} from './stepExecutor.js';
+export {
+  getStepHistoryReads,
+  listPipelineInputArtifacts,
+  listStepOutputArtifacts,
+  artifactsForSourceStep,
+  getPriorSourceSteps,
+  defaultArtifactRefForSource,
+  suggestHistoryReadTagName,
+  validateHistoryRead,
+  historyReadIssueLabel,
+} from './historyReads.js';
+export type {
+  SourceStepOption,
+  ArtifactOption,
+  HistoryReadIssue,
+  HistoryReadValidation,
+} from './historyReads.js';

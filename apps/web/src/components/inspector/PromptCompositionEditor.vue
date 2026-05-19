@@ -31,6 +31,127 @@
       </template>
     </div>
 
+    <!-- History inputs -->
+    <div class="pce-section">
+      <div class="pce-section-header">
+        <span class="pce-section-title">History Inputs</span>
+        <button
+          class="pce-add-btn"
+          type="button"
+          title="Read output from a prior step"
+          :disabled="priorSources.length <= 1"
+          @click="addHistoryRead"
+        >+ Read</button>
+      </div>
+
+      <div v-if="localHistoryReads.length === 0" class="pce-empty">
+        No history reads. Add one to include a prior step output in this prompt.
+      </div>
+
+      <div
+        v-for="(read, idx) in localHistoryReads"
+        :key="`${read.sourceStepId}-${idx}`"
+        class="pce-history-read"
+        :class="historyReadStatusClass(read)"
+      >
+        <div class="pce-history-header">
+          <span class="pce-history-status" :title="historyReadStatusTitle(read)">
+            {{ historyReadStatusIcon(read) }}
+          </span>
+          <button
+            class="pce-delete-btn"
+            type="button"
+            title="Remove this history read"
+            @click="deleteHistoryRead(idx)"
+          >×</button>
+        </div>
+
+        <div class="pce-field-row">
+          <label class="pce-field-label" title="Step whose output to include">Source</label>
+          <select
+            class="pce-select pce-input-sm"
+            :value="read.sourceStepId"
+            title="Prior step to read from"
+            @change="onSourceStepChange(idx, ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="src in priorSources"
+              :key="src.stepId"
+              :value="src.stepId"
+              :disabled="!src.enabled && src.stepId !== read.sourceStepId"
+            >
+              {{ src.label }}{{ !src.enabled ? ' (disabled)' : '' }}
+            </option>
+            <option
+              v-if="!priorSources.some((s) => s.stepId === read.sourceStepId)"
+              :value="read.sourceStepId"
+            >
+              {{ read.sourceStepId }} (missing)
+            </option>
+          </select>
+        </div>
+
+        <div class="pce-field-row">
+          <label class="pce-field-label" title="Which output artifact to read">Artifact</label>
+          <select
+            class="pce-select pce-input-sm"
+            :value="read.sourceArtifactRef"
+            title="Artifact output to include"
+            @change="onArtifactChange(idx, ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="art in artifactsForRead(read)"
+              :key="art.ref"
+              :value="art.ref"
+            >
+              {{ art.ref }}{{ art.isPrimary ? ' (primary)' : '' }}
+            </option>
+            <option
+              v-if="read.sourceArtifactRef && !artifactsForRead(read).some((a) => a.ref === read.sourceArtifactRef)"
+              :value="read.sourceArtifactRef"
+            >
+              {{ read.sourceArtifactRef }} (custom)
+            </option>
+          </select>
+        </div>
+
+        <div class="pce-field-row">
+          <label class="pce-field-label" title="XML tag wrapping this history value">Tag</label>
+          <input
+            class="pce-input pce-input-sm pce-tag-input-inline"
+            :value="read.tagName"
+            :class="{invalid: read.tagName && !isValidTag(read.tagName)}"
+            placeholder="intent"
+            title="XML tag name"
+            @input="onTagNameInput(idx, ($event.target as HTMLInputElement).value)"
+            @blur="commitHistoryReads('Edit history read tag')"
+          />
+        </div>
+
+        <div class="pce-field-row">
+          <label class="pce-toggle-label pce-required-toggle" title="Required reads block execution when the source is unavailable">
+            <input
+              type="checkbox"
+              :checked="read.required"
+              @change="toggleRequired(idx)"
+            />
+            Required
+          </label>
+        </div>
+
+        <div v-if="previewForRead(read)" class="pce-history-preview" :title="previewForRead(read)!">
+          <span class="pce-preview-label">Last run:</span>
+          <code>{{ truncatePreview(previewForRead(read)!) }}</code>
+        </div>
+        <div v-else-if="readStatus(read).ok" class="pce-history-preview pce-history-preview-empty">
+          No value from last run yet
+        </div>
+        <div v-if="!readStatus(read).ok" class="pce-history-issue">
+          {{ readStatus(read).issues.map(historyReadIssueLabel).join(' · ') }}
+        </div>
+      </div>
+    </div>
+
     <!-- Prompt blocks -->
     <div class="pce-section">
       <div class="pce-section-header">
@@ -97,9 +218,18 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {PromptCompositionConfig, PromptBlock} from '@lorca/core';
+import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig} from '@lorca/core';
 import {isValidTag, previewPromptXml} from '@lorca/prompt';
+import {
+  getPriorSourceSteps,
+  artifactsForSourceStep,
+  defaultArtifactRefForSource,
+  suggestHistoryReadTagName,
+  validateHistoryRead,
+  historyReadIssueLabel,
+} from '@lorca/pipeline';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {useActiveRunStore} from '../../stores/activeRun.js';
 
 const props = defineProps<{
   stepId: string;
@@ -107,6 +237,7 @@ const props = defineProps<{
 }>();
 
 const editorStore = usePipelineEditorStore();
+const runStore = useActiveRunStore();
 
 const EMPTY_CONFIG: PromptCompositionConfig = {
   previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
@@ -117,14 +248,18 @@ const EMPTY_CONFIG: PromptCompositionConfig = {
 const localPrevEnabled = ref(false);
 const localPrevTagName = ref('previous_output');
 const localPrevPlacement = ref<'beforeOwnPrompt' | 'afterOwnPrompt'>('afterOwnPrompt');
+const localHistoryReads = ref<StepHistoryReadConfig[]>([]);
 const localBlocks = ref<PromptBlock[]>([]);
 const showPreview = ref(false);
+
+const priorSources = computed(() => getPriorSourceSteps(editorStore.steps, props.stepId));
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
   const c = cfg ?? EMPTY_CONFIG;
   localPrevEnabled.value = c.previousOutput.enabled;
   localPrevTagName.value = c.previousOutput.tagName || 'previous_output';
   localPrevPlacement.value = c.previousOutput.placement;
+  localHistoryReads.value = c.historyReads.map((r) => ({...r}));
   localBlocks.value = c.blocks.map((b) => ({...b}));
 }
 
@@ -137,7 +272,7 @@ function buildConfig(): PromptCompositionConfig {
       placement: localPrevPlacement.value,
       tagName: localPrevTagName.value || 'previous_output',
     },
-    historyReads: props.config?.historyReads ?? [],
+    historyReads: localHistoryReads.value.map((r) => ({...r})),
     blocks: localBlocks.value.map((b) => ({...b})),
   };
 }
@@ -151,6 +286,10 @@ function commitPrev() {
 }
 
 function commitBlocks(label: string) {
+  editorStore.commitStepConfigEdit(props.stepId, {prompt: buildConfig()}, label);
+}
+
+function commitHistoryReads(label: string) {
   editorStore.commitStepConfigEdit(props.stepId, {prompt: buildConfig()}, label);
 }
 
@@ -177,6 +316,91 @@ function addBlock() {
   commitBlocks('Add block');
 }
 
+function defaultNewHistoryRead(): StepHistoryReadConfig {
+  const sources = priorSources.value;
+  const lastPrior = sources.length > 1 ? sources[sources.length - 1]! : sources[0]!;
+  const sourceStepId = lastPrior.stepId;
+  return {
+    sourceStepId,
+    sourceArtifactRef: defaultArtifactRefForSource(editorStore.steps, sourceStepId),
+    tagName: suggestHistoryReadTagName(sourceStepId, editorStore.steps),
+    required: true,
+  };
+}
+
+function addHistoryRead() {
+  localHistoryReads.value.push(defaultNewHistoryRead());
+  commitHistoryReads('Add history read');
+}
+
+function deleteHistoryRead(idx: number) {
+  localHistoryReads.value.splice(idx, 1);
+  commitHistoryReads('Remove history read');
+}
+
+function onSourceStepChange(idx: number, sourceStepId: string) {
+  const read = localHistoryReads.value[idx]!;
+  read.sourceStepId = sourceStepId;
+  read.sourceArtifactRef = defaultArtifactRefForSource(editorStore.steps, sourceStepId);
+  read.tagName = suggestHistoryReadTagName(sourceStepId, editorStore.steps);
+  commitHistoryReads('Change history read source');
+}
+
+function onArtifactChange(idx: number, sourceArtifactRef: string) {
+  localHistoryReads.value[idx]!.sourceArtifactRef = sourceArtifactRef;
+  commitHistoryReads('Change history read artifact');
+}
+
+function onTagNameInput(idx: number, tagName: string) {
+  localHistoryReads.value[idx]!.tagName = tagName;
+  liveUpdate();
+}
+
+function toggleRequired(idx: number) {
+  const read = localHistoryReads.value[idx]!;
+  read.required = !read.required;
+  commitHistoryReads(read.required ? 'Mark history read required' : 'Mark history read optional');
+}
+
+function artifactsForRead(read: StepHistoryReadConfig) {
+  return artifactsForSourceStep(editorStore.steps, read.sourceStepId);
+}
+
+function readStatus(read: StepHistoryReadConfig) {
+  return validateHistoryRead(read, props.stepId, editorStore.steps);
+}
+
+function historyReadStatusClass(read: StepHistoryReadConfig) {
+  const status = readStatus(read);
+  if (!status.ok) return 'invalid';
+  return previewForRead(read) ? 'resolved' : 'pending';
+}
+
+function historyReadStatusIcon(read: StepHistoryReadConfig) {
+  const status = readStatus(read);
+  if (!status.ok) return '⚠';
+  return previewForRead(read) ? '●' : '○';
+}
+
+function historyReadStatusTitle(read: StepHistoryReadConfig) {
+  const status = readStatus(read);
+  if (!status.ok) return status.issues.map(historyReadIssueLabel).join('; ');
+  if (previewForRead(read)) return 'Value available from last run';
+  return 'Valid — run pipeline to populate';
+}
+
+function previewForRead(read: StepHistoryReadConfig): string | null {
+  const artifact = runStore.artifacts[read.sourceArtifactRef];
+  if (!artifact) return null;
+  if (typeof artifact.value === 'string') return artifact.value;
+  return JSON.stringify(artifact.value, null, 2);
+}
+
+function truncatePreview(text: string, max = 120): string {
+  const oneLine = text.replace(/\s+/g, ' ').trim();
+  return oneLine.length <= max ? oneLine : `${oneLine.slice(0, max)}…`;
+}
+
 const previewXml = computed(() => previewPromptXml(buildConfig()));
 </script>
 
@@ -193,6 +417,7 @@ const previewXml = computed(() => previewPromptXml(buildConfig()));
 
 .pce-toggle-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: #888; cursor: pointer; }
 .pce-toggle-label input[type="checkbox"] { width: auto; }
+.pce-required-toggle { margin-left: 4rem; }
 
 .pce-field-row { display: flex; align-items: center; gap: 0.4rem; }
 .pce-field-label { font-size: 0.68rem; color: #666; flex-shrink: 0; width: 4rem; }
@@ -201,6 +426,7 @@ const previewXml = computed(() => previewPromptXml(buildConfig()));
 .pce-input:focus { outline: none; border-color: #3a6080; }
 .pce-input.invalid { border-color: #c0392b; }
 .pce-input-sm { flex: 1; }
+.pce-tag-input-inline { font-family: monospace; color: #7ec8e3; }
 .pce-select { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; flex: 1; }
 .pce-select:focus { outline: none; border-color: #3a6080; }
 
@@ -209,9 +435,36 @@ const previewXml = computed(() => previewPromptXml(buildConfig()));
   background: #1a2a1a; border: 1px solid #2a4a2a; color: #6db86d;
   border-radius: 3px; cursor: pointer;
 }
-.pce-add-btn:hover { background: #1e381e; }
+.pce-add-btn:hover:not(:disabled) { background: #1e381e; }
+.pce-add-btn:disabled { opacity: 0.35; cursor: default; }
 
 .pce-empty { font-size: 0.68rem; color: #444; }
+
+.pce-history-read {
+  border: 1px solid #222; border-radius: 4px; padding: 0.4rem;
+  display: flex; flex-direction: column; gap: 0.25rem; background: #111;
+}
+.pce-history-read.invalid { border-color: #5a3030; background: #1a1010; }
+.pce-history-read.resolved { border-left: 2px solid #3a7a5a; }
+.pce-history-read.pending { border-left: 2px solid #444; }
+
+.pce-history-header { display: flex; align-items: center; justify-content: space-between; }
+.pce-history-status { font-size: 0.65rem; color: #666; }
+
+.pce-history-preview {
+  font-size: 0.65rem; color: #666; margin-left: 4rem;
+  display: flex; gap: 0.3rem; align-items: baseline; min-width: 0;
+}
+.pce-history-preview code {
+  color: #5a8a5a; font-family: monospace; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+}
+.pce-history-preview-empty { color: #444; font-style: italic; }
+.pce-preview-label { color: #555; flex-shrink: 0; }
+
+.pce-history-issue {
+  font-size: 0.65rem; color: #c07070; margin-left: 4rem;
+}
 
 .pce-block {
   border: 1px solid #222; border-radius: 4px; padding: 0.4rem;

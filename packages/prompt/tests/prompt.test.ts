@@ -196,6 +196,53 @@ describe('renderPromptComposition', () => {
     expect(xml).toContain('<system>');
     expect(xml.indexOf('previous_output')).toBeLessThan(xml.indexOf('<system>'));
   });
+
+  it('previewPromptXml shows history read placeholders', () => {
+    const config = baseConfig();
+    config.historyReads = [{
+      sourceStepId: 'intent',
+      sourceArtifactRef: 'intent_extraction.text',
+      tagName: 'intent',
+      required: true,
+    }];
+    const xml = previewPromptXml(config);
+    expect(xml).toContain('<intent>');
+    expect(xml).toContain('…intent_extraction.text…');
+    expect(xml.indexOf('<intent>')).toBeLessThan(xml.indexOf('<system>'));
+  });
+
+  it('renderPromptComposition injects resolved history reads before own blocks', () => {
+    const config = baseConfig();
+    config.historyReads = [{
+      sourceStepId: 'intent',
+      sourceArtifactRef: 'intent_extraction.text',
+      tagName: 'intent',
+      required: true,
+    }];
+    const {blocks, xmlText} = renderPromptComposition(config, undefined, [{
+      sourceArtifactRef: 'intent_extraction.text',
+      value: '{"intent":"test"}',
+    }]);
+    expect(blocks[0]?.tagName).toBe('intent');
+    expect(blocks[0]?.body).toBe('{"intent":"test"}');
+    expect(xmlText).toContain('{"intent":"test"}');
+  });
+
+  it('renderPromptComposition omits optional missing history reads', () => {
+    const config = baseConfig();
+    config.historyReads = [{
+      sourceStepId: 'loop.prev',
+      sourceArtifactRef: 'loop.prev.text',
+      tagName: 'prev_iter',
+      required: false,
+    }];
+    const {blocks} = renderPromptComposition(config, undefined, [{
+      sourceArtifactRef: 'loop.prev.text',
+      omitted: true,
+    }]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.tagName).toBe('system');
+  });
 });
 
 describe('tag validation', () => {

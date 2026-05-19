@@ -9,6 +9,7 @@ import type {
   PromptWrapperConfig,
 } from '@lorca/core';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
+import {getStepHistoryReads} from './historyReads.js';
 import {newStepId} from './stepId.js';
 
 // ── Active chain ──────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ export function compileStepChainToExecutionPlan(
     const step = slicedSteps[i]!;
     const prevActiveStep = i > 0 ? slicedSteps[i - 1] : undefined;
 
-    const historyReads = step.historyReads ?? [];
+    const historyReads = getStepHistoryReads(step);
     for (const read of historyReads) {
       requiredHistorySources.add(read.sourceStepId);
     }

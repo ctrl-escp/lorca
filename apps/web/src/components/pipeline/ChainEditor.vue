@@ -39,6 +39,9 @@
                   {{ step.config.modelRef.modelName || '— no model —' }}
                 </span>
                 <span class="step-namespace">→ {{ step.outputNamespace }}.*</span>
+                <span v-if="historyReadCount(step) > 0" class="step-history-badge" :title="`${historyReadCount(step)} history read(s)`">
+                  ↩ {{ historyReadCount(step) }}
+                </span>
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
               </div>
 
@@ -101,6 +104,7 @@
 <script setup lang="ts">
 import {ref, watch, nextTick, onMounted} from 'vue';
 import type {PipelineStep, PipelineTraceEvent, StepType} from '@lorca/core';
+import {getStepHistoryReads} from '@lorca/pipeline';
 
 const props = defineProps<{
   steps: PipelineStep[];
@@ -180,6 +184,10 @@ const TYPE_LABELS: Record<StepType, string> = {
 
 function stepTypeLabel(type: StepType): string {
   return TYPE_LABELS[type] ?? type;
+}
+
+function historyReadCount(step: PipelineStep): number {
+  return getStepHistoryReads(step).length;
 }
 </script>
 
@@ -292,6 +300,7 @@ function stepTypeLabel(type: StepType): string {
 .step-model { color: #5a9fd4; }
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
+.step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
 
 .step-trace { display: flex; gap: 0.4rem; font-size: 0.68rem; margin-top: 0.15rem; }
 .status-completed { color: #3a9d6e; }
