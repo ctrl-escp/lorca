@@ -1,8 +1,8 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError} from '@lorca/core';
-import {buildUserPromptArtifacts} from '@lorca/prompt';
-import {executePipeline, compilePipelineToLegacyGraph} from '@lorca/pipeline';
+// PipelineArtifact and PipelineTraceEvent used in store state types
+import {executeStepChain} from '@lorca/pipeline';
 import {useEndpointsStore} from './endpoints.js';
 import {useCapsulesStore} from './capsules.js';
 
@@ -49,34 +49,14 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     const controller = new AbortController();
     abortController.value = controller;
 
-    const {raw, xml} = buildUserPromptArtifacts(userPromptRaw);
-    const ctx = {
-      runId: id,
-      pipelineId: def.id,
-      startedAt: new Date().toISOString(),
-      abortSignal: controller.signal,
-      ...(stopAtStepId ? {partial: true} : {}),
-      input: {userPromptRaw: raw, userPromptXml: xml},
-      artifacts: {} as Record<string, PipelineArtifact>,
-      trace: [] as PipelineTraceEvent[],
-    };
-
-    // Compile V2 step-chain to V1 legacy graph for execution
-    const legacyDef = compilePipelineToLegacyGraph(def, stopAtStepId ? {stopAtStepId} : {});
-
-    const result = await executePipeline(
-      legacyDef,
-      ctx,
+    const result = await executeStepChain(
+      def,
+      userPromptRaw,
+      {abortSignal: controller.signal, ...(stopAtStepId ? {stopAtStepId} : {})},
       (endpointId) => endpointsStore.getEndpoint(endpointId),
       {
-        onTraceEvent(event) {
-          trace.value = [...trace.value, event];
-          ctx.trace.push(event);
-        },
-        onArtifact(artifact) {
-          artifacts.value = {...artifacts.value, [artifact.name]: artifact};
-          ctx.artifacts[artifact.name] = artifact;
-        },
+        onTraceEvent(event) { trace.value = [...trace.value, event]; },
+        onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
       (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
     );

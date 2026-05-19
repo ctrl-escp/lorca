@@ -41,6 +41,7 @@ export interface ExecutePipelineOptions {
   stopAtStepId?: string;
   includeDisabled?: boolean;
   reuseValidArtifacts?: boolean;
+  abortSignal?: AbortSignal;
 }
 
 export function compileStepChainToExecutionPlan(

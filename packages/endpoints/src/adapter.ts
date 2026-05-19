@@ -1,11 +1,16 @@
 import type {AiEndpointConfig, DiscoveredModel, Result, PipelineError} from '@lorca/core';
+import type {RenderedPromptPayload} from '@lorca/prompt';
 
 export interface ModelCallRequest {
   mode: 'generate' | 'chat';
   endpointId: string;
   modelName: string;
+  /** Structured prompt from renderPromptComposition — preferred over legacy fields. */
+  prompt?: RenderedPromptPayload;
+  /** @deprecated Use prompt instead. Kept for legacy executor path. */
   systemPrompt?: string;
-  userContent: string;
+  /** @deprecated Use prompt instead. Kept for legacy executor path. */
+  userContent?: string;
   temperature?: number;
   topP?: number;
   maxTokens?: number;

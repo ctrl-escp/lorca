@@ -11,3 +11,4 @@ export {
   makeEmptyPipeline,
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
+export {executeStepChain} from './stepExecutor.js';
