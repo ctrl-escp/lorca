@@ -275,11 +275,9 @@ Built-in suggestion recipes are backed by `@lorca/capsules` (`getBuiltinExamples
 
 ## Import and export
 
-- **Export:** download pipeline or Capsule JSON (`PipelineExportFile` / `CapsuleExportFile`, `schemaVersion: 1`, `app: "lorca"`).
-- **Import:** parse file, preview missing model/Capsule references, remap to local ids, then apply.
+- **Export:** clicking Export (pipeline: ⋯ More menu; Capsule: toolbar button) opens a modal showing the JSON. From there you can copy to clipboard or download as `{name}.json`. The file format is `PipelineExportFile` / `CapsuleExportFile` (`schemaVersion: 2` / `1`, `app: "lorca"`).
+- **Import:** clicking Import opens a modal where you can paste JSON directly or load it from a file. After submitting, missing model/Capsule references are resolved via `ImportRemapDialog`.
 - Pipelines may embed referenced Capsules in `includedCapsules`.
-
-Import UI: left-pane import buttons and `ImportRemapDialog` when references need resolution.
 
 ---
 
