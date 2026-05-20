@@ -41,7 +41,7 @@ The project grew out of work on Smartazz and related pipeline experiments: rathe
 | --- | --- |
 | **Endpoints** | Add AI endpoints (Ollama is fully supported today), test browser access, discover models, or add models manually |
 | **Model buckets** | Auto-suggest usage buckets (`tiny`, `thinking`, `summarize`, `rewrite`, `extract-json`, `verify`, `general`) and override per model |
-| **Pipelines** | Linear chain editor backed by a graph-shaped definition: nodes, edges, artifact refs |
+| **Pipelines** | Ordered step-chain editor with XML prompt blocks, history reads, partial runs, and stale indicators |
 | **Prompts** | Wrap the target prompt in `<user_prompt>…</user_prompt>`, add tagged instruction wrappers and templates |
 | **Model calls** | Insert generate/chat steps anywhere; later steps consume artifacts from earlier steps |
 | **Capsules** | Reusable mini-pipelines with a public interface; lock, version, test, and insert multiple instances |
@@ -49,7 +49,7 @@ The project grew out of work on Smartazz and related pipeline experiments: rathe
 | **Execution** | Run the pipeline in dependency order; trace panel shows per-step status, inputs, and outputs |
 | **Persistence** | Save pipelines, Capsules, endpoints, and models in IndexedDB (`lorca` database) |
 | **Import / export** | JSON files for pipelines and Capsules, with model/Capsule remap on import |
-| **Examples** | Eight built-in Capsule templates you can duplicate and customize |
+| **Step Suggestions** | Eight built-in insertable step recipes (Intent Extraction, Acceptance Criteria, and more) |
 
 **Not in scope for the current MVP:** mandatory server, MCP/tools, cloud sync, multi-user mode, autonomous agent loops, or a sharing marketplace.
 
@@ -97,20 +97,21 @@ Lorca uses a three-pane shell:
 ├──────────────┬──────────────────────────────┬───────────────────┤
 │  Left pane   │  Center pane                 │  Right pane       │
 │              │                              │                   │
-│  Examples    │  Target prompt               │  Node / Capsule   │
-│  Capsules    │  Pipeline chain editor       │  inspector        │
+│  Step        │  User prompt + step chain    │  Step inspector   │
+│  Suggestions │  editor (or Capsule editor)  │  Trace / Output   │
+│  Capsules    │                              │                   │
 │  Models      │  (or Capsule editor)         │  Trace            │
 │  Endpoints   │                              │  Final output     │
 └──────────────┴──────────────────────────────┴───────────────────┘
 ```
 
-- **Left:** library (example Capsules, your Capsules), model inventory and buckets, endpoints.
-- **Center:** main prompt, ordered pipeline steps, execute/cancel.
-- **Right:** configuration for the selected step, execution trace, resolved output.
+- **Left:** Step Suggestions, your Capsules, models and buckets, endpoints.
+- **Center:** user prompt, ordered step chain, execute / run-up-to / undo-redo.
+- **Right:** step inspector, execution trace, resolved output.
 
 ### Capsule editing
 
-Open a Capsule from the left pane to switch the center pane into **Capsule editor** mode. The header shows a breadcrumb (`← Pipeline › Capsule name`). Capsules share the same node/edge model as top-level pipelines but expose a **public interface** (inputs, outputs, parameters, model slots) for use inside larger flows.
+Open a Capsule from the left pane to switch the center pane into **Capsule editor** mode. The header shows a breadcrumb (`← Pipeline › Capsule name`). Capsules use the same step-chain editor as pipelines and expose a **public interface** (inputs, outputs, parameters, model slots) for use inside larger flows. Test runs support run-up-to and the same trace/output panels as pipelines.
 
 ### Typical workflow
 
@@ -263,7 +264,7 @@ Duplicate any example from the left pane to create an editable draft. The eight 
 | `example-constraint-extraction` | Constraint Extraction |
 | `example-drift-check` | Drift Check |
 
-Programmatic access: `getBuiltinExamples()`, `duplicateExampleCapsule()` from `@lorca/capsules`.
+Built-in suggestion recipes are backed by `@lorca/capsules` (`getBuiltinExamples()`, `duplicateExampleCapsule()` for cloning into user-owned drafts).
 
 ---
 

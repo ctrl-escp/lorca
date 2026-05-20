@@ -64,7 +64,7 @@ describe('executeCapsuleTestRun', () => {
     expect(result.ok).toBe(true);
     expect(artifacts).toContain('user_prompt.xml');
     expect(artifacts).toContain('answer.text');
-    if (result.ok) expect(result.value).toBe('answer.text');
+    if (result.ok) expect(result.value.finalOutputKey).toBe('answer.text');
   });
 
   it('resolves model slot assignments before running', async () => {

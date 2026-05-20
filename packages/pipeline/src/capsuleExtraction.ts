@@ -5,12 +5,14 @@ import type {
   CapsuleOutputPort,
   CapsuleModelSlot,
   CapsuleValueKind,
+  LegacyPipelineDefinition,
   PipelineDefinition,
+  PipelineInputConfig,
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
-import {compilePipelineToLegacyGraph} from './chainCompiler.js';
+import {compilePipelineToLegacyGraph, migrateLegacyPipeline} from './chainCompiler.js';
 import {buildActiveStepChain, compileActiveStepsToExecutionPlan} from './chainCompiler.js';
 import {getStepHistoryReads} from './historyReads.js';
 import {stepArtifactKey} from './artifacts.js';
@@ -289,11 +291,18 @@ function buildCapsuleInterface(
   return {inputs, outputs, parameters: [], modelSlots: collectModelSlots(innerSteps)};
 }
 
-function syncLegacyGraphFromSteps(
+const DEFAULT_CAPSULE_INPUT: PipelineInputConfig = {
+  raw: '',
+  tagName: 'user',
+  outputNamespace: 'user_prompt',
+};
+
+/** Keep legacy nodes/edges in sync when the canonical body is steps[]. */
+export function syncCapsuleLegacyGraphFromSteps(
   capsuleId: string,
   capsuleName: string,
   steps: PipelineStep[],
-  input: PipelineDefinition['input'],
+  input: PipelineInputConfig,
 ): Pick<CapsuleDefinition, 'nodes' | 'edges' | 'outputRef'> {
   const miniPipeline: PipelineDefinition = {
     schemaVersion: 2,
@@ -355,7 +364,7 @@ export function extractStepsToCapsule(
 
   const innerSteps = selectedSteps.map((s) => remapStepForCapsule(s, inputPortByParentRef));
   const now = new Date().toISOString();
-  const graph = syncLegacyGraphFromSteps(capsuleId, capsuleName, innerSteps, pipeline.input);
+  const graph = syncCapsuleLegacyGraphFromSteps(capsuleId, capsuleName, innerSteps, pipeline.input);
 
   const capsuleInterface = buildCapsuleInterface(externalInputs, externalOutputs, innerSteps);
 
@@ -458,6 +467,42 @@ export function extractFullPipelineToCapsule(
     capsuleId,
     capsuleName,
   });
+}
+
+/** Ensure capsules use steps[] as canonical body; migrate graph-only capsules on load. */
+export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefinition {
+  const input = capsule.input ?? DEFAULT_CAPSULE_INPUT;
+
+  if (capsule.steps && capsule.steps.length > 0) {
+    const graph = syncCapsuleLegacyGraphFromSteps(capsule.id, capsule.name, capsule.steps, input);
+    return {...capsule, input, ...graph};
+  }
+
+  if (!capsule.nodes.length) {
+    return {...capsule, input, steps: []};
+  }
+
+  const legacy: LegacyPipelineDefinition = {
+    schemaVersion: 1,
+    id: capsule.id,
+    name: capsule.name,
+    inputArtifactName: 'user_prompt',
+    nodes: capsule.nodes,
+    edges: capsule.edges,
+    outputRef: capsule.outputRef,
+    createdAt: capsule.createdAt,
+    updatedAt: capsule.updatedAt,
+  };
+  if (capsule.description !== undefined) legacy.description = capsule.description;
+
+  const migrated = migrateLegacyPipeline(legacy);
+  const graph = syncCapsuleLegacyGraphFromSteps(capsule.id, capsule.name, migrated.steps, migrated.input);
+  return {
+    ...capsule,
+    input: migrated.input,
+    steps: migrated.steps,
+    ...graph,
+  };
 }
 
 /** Stable hash of capsule body for instance staleness when definition changes. */

@@ -9,7 +9,7 @@ import type {
 } from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
 import {executePipeline, executeStepChain} from '@lorca/pipeline';
-import type {ExecutorCallbacks, EndpointResolver} from '@lorca/pipeline';
+import type {ExecutorCallbacks, EndpointResolver, StepChainRunResult} from '@lorca/pipeline';
 import type {PipelineDefinition} from '@lorca/core';
 import {validateCapsule} from './validate.js';
 
@@ -19,14 +19,17 @@ export interface CapsuleTestInput {
   paramValues: Record<string, unknown>;
   slotAssignments: Record<string, {endpointId: string; modelName: string}>;
   abortSignal?: AbortSignal;
+  stopAtStepId?: string;
 }
+
+export type CapsuleTestRunResult = StepChainRunResult;
 
 export async function executeCapsuleTestRun(
   def: CapsuleDefinition,
   testInput: CapsuleTestInput,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
-): Promise<Result<string, PipelineError>> {
+): Promise<Result<CapsuleTestRunResult, PipelineError>> {
   const validation = validateCapsule(def);
   if (!validation.ok) return validation;
 
@@ -77,7 +80,18 @@ export async function executeCapsuleTestRun(
     }
   }
 
-  return executePipeline(syntheticDef, ctx, resolveEndpoint, callbacks);
+  const graphResult = await executePipeline(syntheticDef, ctx, resolveEndpoint, callbacks);
+  if (!graphResult.ok) return graphResult;
+  return {
+    ok: true,
+    value: {
+      finalOutputKey: graphResult.value,
+      snapshots: {},
+      userPromptSignature: '',
+      partial: false,
+      executedStepIds: [],
+    },
+  };
 }
 
 async function executeCapsuleStepChainTestRun(
@@ -85,7 +99,7 @@ async function executeCapsuleStepChainTestRun(
   testInput: CapsuleTestInput,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
-): Promise<Result<string, PipelineError>> {
+): Promise<Result<CapsuleTestRunResult, PipelineError>> {
   const {raw, xml} = buildUserPromptArtifacts(testInput.userPromptRaw);
   const seedArtifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
   const now = new Date().toISOString();
@@ -111,19 +125,17 @@ async function executeCapsuleStepChainTestRun(
     updatedAt: def.updatedAt,
   };
 
-  const result = await executeStepChain(
+  return executeStepChain(
     innerPipeline,
     raw,
     {
       seedArtifacts,
       ...(testInput.abortSignal !== undefined ? {abortSignal: testInput.abortSignal} : {}),
+      ...(testInput.stopAtStepId ? {stopAtStepId: testInput.stopAtStepId} : {}),
     },
     resolveEndpoint,
     callbacks,
   );
-
-  if (!result.ok) return result;
-  return {ok: true, value: result.value.finalOutputKey};
 }
 
 function resolveSlots(

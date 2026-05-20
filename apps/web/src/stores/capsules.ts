@@ -9,6 +9,7 @@ import {
   getBuiltinExample,
   duplicateExampleCapsule,
 } from '@lorca/capsules';
+import {ensureCapsuleStepChain} from '@lorca/pipeline';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -31,7 +32,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
 
   async function load() {
     if (loaded.value) return;
-    capsules.value = await getDb().capsules.toArray();
+    capsules.value = (await getDb().capsules.toArray()).map((c) => ensureCapsuleStepChain(c));
     loaded.value = true;
   }
 

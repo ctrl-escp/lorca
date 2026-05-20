@@ -228,7 +228,7 @@ import {
   validateHistoryRead,
   historyReadIssueLabel,
 } from '@lorca/pipeline';
-import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 
 const props = defineProps<{
@@ -239,7 +239,7 @@ const props = defineProps<{
   loopGroupStepId?: string;
 }>();
 
-const editorStore = usePipelineEditorStore();
+const editorStore = useActiveStepEditor();
 const runStore = useActiveRunStore();
 
 const EMPTY_CONFIG: PromptCompositionConfig = {

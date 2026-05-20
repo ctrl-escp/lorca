@@ -274,8 +274,10 @@
 import {ref, watch, computed} from 'vue';
 import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig} from '@lorca/core';
 import {computeStepStaleStates, stepRunUiStateLabel} from '@lorca/pipeline';
-import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
+import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
+import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
@@ -286,8 +288,11 @@ import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 
 type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
 
-const editorStore = usePipelineEditorStore();
-const runStore = useActiveRunStore();
+const uiStore = useUiStore();
+const editorStore = useActiveStepEditor();
+const pipelineRunStore = useActiveRunStore();
+const capsuleRunStore = useCapsuleRunStore();
+const runStore = computed(() => uiStore.editorContext === 'capsule' ? capsuleRunStore : pipelineRunStore);
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
 const capsulesStore = useCapsulesStore();
@@ -300,7 +305,7 @@ const stepStatus = computed(() => {
   if (!s) return null;
   const states = computeStepStaleStates(
     editorStore.pipeline,
-    runStore.runSnapshotContext,
+    runStore.value.runSnapshotContext,
     editorStore.pipeline.input.raw,
     (id, version) => capsulesStore.getCapsule(id, version),
   );
@@ -310,7 +315,7 @@ const stepStatus = computed(() => {
 const lastSnapshot = computed(() => {
   const s = step.value;
   if (!s) return null;
-  return runStore.snapshots[s.id] ?? null;
+  return runStore.value.snapshots[s.id] ?? null;
 });
 
 const hasPromptBlocks = computed(() =>

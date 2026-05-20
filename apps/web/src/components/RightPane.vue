@@ -12,18 +12,7 @@
     </div>
 
     <div class="right-content">
-      <StepInspector
-        v-if="uiStore.rightPaneTab === 'inspector' && !isCapsuleMode"
-      />
-      <NodeInspector
-        v-else-if="uiStore.rightPaneTab === 'inspector' && isCapsuleMode"
-        :node="selectedNode"
-        :models="modelsStore.models"
-        :endpoints="endpointsStore.endpoints"
-        v-bind="capsule ? {capsule} : {}"
-        :locked-capsules="capsulesStore.lockedCapsules"
-        @update="onUpdateNode"
-      />
+      <StepInspector v-if="uiStore.rightPaneTab === 'inspector'" />
       <CapsuleInterfacePanel
         v-else-if="uiStore.rightPaneTab === 'interface' && capsule"
         :iface="capsule.interface"
@@ -33,8 +22,8 @@
         v-else-if="uiStore.rightPaneTab === 'trace'"
         :trace="activeTrace"
         :artifacts="isCapsuleMode ? capsuleRunStore.artifacts : runStore.artifacts"
-        :partial-run="!isCapsuleMode && runStore.partial"
-        :selected-step-id="isCapsuleMode ? null : editorStore.selectedStepId"
+        :partial-run="isCapsuleMode ? capsuleRunStore.partial : runStore.partial"
+        :selected-step-id="activeSelectedStepId"
       />
       <OutputPanel
         v-else-if="uiStore.rightPaneTab === 'output'"
@@ -43,7 +32,7 @@
         :output-key="activeOutputKey"
         :error="activeError"
         :output-stale="pipelineOutputStale"
-        :partial-run="!isCapsuleMode && runStore.partial"
+        :partial-run="isCapsuleMode ? capsuleRunStore.partial : runStore.partial"
       />
     </div>
   </aside>
@@ -51,24 +40,20 @@
 
 <script setup lang="ts">
 import {computed} from 'vue';
-import type {PipelineNode, CapsuleDefinition, CapsuleInterface} from '@lorca/core';
+import type {CapsuleDefinition, CapsuleInterface} from '@lorca/core';
 import {computeStepStaleStates} from '@lorca/pipeline';
 import {useUiStore} from '../stores/ui.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useCapsuleRunStore} from '../stores/capsuleRun.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
-import {useModelsStore} from '../stores/models.js';
-import {useEndpointsStore} from '../stores/endpoints.js';
 import {useCapsulesStore} from '../stores/capsules.js';
-import NodeInspector from './inspector/NodeInspector.vue';
 import StepInspector from './inspector/StepInspector.vue';
+import {useCapsuleStepEditorStore} from '../stores/capsuleStepEditor.js';
 import CapsuleInterfacePanel from './capsule/CapsuleInterfacePanel.vue';
 import TracePanel from './pipeline/TracePanel.vue';
 import OutputPanel from './pipeline/OutputPanel.vue';
 
 const props = defineProps<{
-  nodes: PipelineNode[];
-  onUpdate: (nodeId: string, patch: Record<string, unknown>) => void;
   capsule?: CapsuleDefinition;
   onUpdateCapsuleInterface?: (iface: CapsuleInterface) => void;
 }>();
@@ -76,9 +61,8 @@ const props = defineProps<{
 const uiStore = useUiStore();
 const runStore = useActiveRunStore();
 const editorStore = usePipelineEditorStore();
+const capsuleEditorStore = useCapsuleStepEditorStore();
 const capsuleRunStore = useCapsuleRunStore();
-const modelsStore = useModelsStore();
-const endpointsStore = useEndpointsStore();
 const capsulesStore = useCapsulesStore();
 
 const isCapsuleMode = computed(() => uiStore.editorContext === 'capsule');
@@ -98,8 +82,8 @@ const CAPSULE_TABS = [
 
 const activeTabs = computed(() => isCapsuleMode.value ? CAPSULE_TABS : PIPELINE_TABS);
 
-const selectedNode = computed(() =>
-  uiStore.selectedNodeId ? props.nodes.find((n) => n.id === uiStore.selectedNodeId) ?? null : null,
+const activeSelectedStepId = computed(() =>
+  isCapsuleMode.value ? capsuleEditorStore.selectedStepId : editorStore.selectedStepId,
 );
 
 const activeTrace = computed(() => isCapsuleMode.value ? capsuleRunStore.trace : runStore.trace);
@@ -123,10 +107,6 @@ const pipelineOutputStale = computed(() => {
   const st = states.find((s) => s.stepId === step.id)?.state;
   return st === 'stale' || st === 'failed-stale';
 });
-
-function onUpdateNode(patch: Record<string, unknown>) {
-  if (uiStore.selectedNodeId) props.onUpdate(uiStore.selectedNodeId, patch);
-}
 
 function onUpdateInterface(iface: CapsuleInterface) {
   props.onUpdateCapsuleInterface?.(iface);

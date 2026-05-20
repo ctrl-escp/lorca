@@ -41,8 +41,6 @@
       <PaneResizeHandle side="right" @resize="resizeRightPane" />
       <div class="pane pane-right" :style="{width: `${uiStore.rightPaneWidth}px`}">
         <RightPane
-          :nodes="activeNodes"
-          :on-update="onUpdateNode"
           v-bind="uiStore.editorContext === 'capsule' && activeCapsule ? {capsule: activeCapsule, onUpdateCapsuleInterface} : {}"
         />
       </div>
@@ -112,14 +110,6 @@ const activeCapsule = computed(() =>
     : undefined,
 );
 
-const activeNodes = computed(() => {
-  if (uiStore.editorContext === 'capsule' && activeCapsule.value) {
-    return activeCapsule.value.nodes;
-  }
-  // Pipeline inspector uses usePipelineEditorStore directly (Phase 10)
-  return [];
-});
-
 async function onUpdateDef(def: PipelineDefinition) {
   currentDef.value = def;
   await pipelinesStore.save(def);
@@ -128,14 +118,6 @@ async function onUpdateDef(def: PipelineDefinition) {
 function onNewPipeline() {
   currentDef.value = null;
   pipelineEditorKey.value++;
-}
-
-function onUpdateNode(nodeId: string, patch: Record<string, unknown>) {
-  if (uiStore.editorContext === 'capsule') {
-    capsuleCenterPaneRef.value?.updateNode(nodeId, patch);
-  } else {
-    centerPaneRef.value?.updateNode(nodeId, patch);
-  }
 }
 
 function onUpdateCapsule(capsule: typeof activeCapsule.value) {

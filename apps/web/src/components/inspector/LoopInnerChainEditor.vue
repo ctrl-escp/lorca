@@ -93,7 +93,7 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {PipelineStep, StepType} from '@lorca/core';
-import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
 import FieldLabel from '../common/FieldLabel.vue';
@@ -104,7 +104,7 @@ const props = defineProps<{
   innerSteps: PipelineStep[];
 }>();
 
-const editorStore = usePipelineEditorStore();
+const editorStore = useActiveStepEditor();
 const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
 

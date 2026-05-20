@@ -4,9 +4,9 @@
       <input
         class="capsule-name"
         v-model="localName"
-        @blur="editor.updateMeta({name: localName})"
+        @blur="commitName"
         placeholder="Capsule name"
-        :readonly="def.status === 'locked'"
+        :readonly="editor.isReadOnly"
         title="Display name for this Capsule"
       />
       <span class="capsule-version" title="Capsule version identifier">{{ def.version }}</span>
@@ -17,21 +17,45 @@
       <button class="btn btn-secondary" type="button" title="Import Capsule JSON" @click="handleImport">Import</button>
     </div>
 
-    <!-- Capsule node list (full chain editor deferred to Phase 9) -->
-    <div class="capsule-node-list">
-      <div
-        v-for="node in def.nodes.filter(n => n.type !== 'input')"
-        :key="node.id"
-        class="capsule-node-row"
-        :class="{active: uiStore.selectedNodeId === node.id}"
-        :title="`${node.type}: ${node.title || node.id}`"
-        @click="uiStore.selectNodeAndInspect(node.id)"
-      >
-        <span class="node-type-badge">{{ node.type }}</span>
-        <span class="node-row-title">{{ node.title || node.id }}</span>
-      </div>
-      <p v-if="def.nodes.filter(n => n.type !== 'input').length === 0" class="empty-hint">No steps yet.</p>
+    <div class="user-prompt-bar" v-if="!editor.isReadOnly">
+      <label class="prompt-label">Test prompt</label>
+      <textarea
+        class="user-prompt-input"
+        v-model="testPrompt"
+        placeholder="Enter your prompt…"
+        rows="2"
+        @blur="editor.updateUserPrompt(testPrompt)"
+      />
     </div>
+
+    <ChainEditor
+      class="capsule-chain"
+      :steps="editor.steps"
+      :selected-step-id="editor.selectedStepId"
+      :trace="capsuleRunStore.trace"
+      :step-states="stepStates"
+      :run-partial="capsuleRunStore.partial"
+      :final-artifact-key="finalArtifactKey"
+      :show-capsule-add="false"
+      :show-undo-redo="!editor.isReadOnly"
+      :can-undo="editor.canUndo"
+      :can-redo="editor.canRedo"
+      :last-undo-label="editor.lastUndoLabel"
+      :last-redo-label="editor.lastRedoLabel"
+      :run-snapshots="capsuleRunStore.snapshots"
+      @select="editor.selectStep"
+      @append="handleAppend"
+      @insert-after="handleInsertAfter"
+      @insert-at="handleInsertAt"
+      @move-up="handleMoveUp"
+      @move-down="handleMoveDown"
+      @duplicate="handleDuplicate"
+      @toggle-enabled="handleToggleEnabled"
+      @delete="editor.deleteStep"
+      @run-up-to="handleRunUpTo"
+      @undo="editor.undo"
+      @redo="editor.redo"
+    />
 
     <!-- Test run panel -->
     <div class="test-panel">
@@ -46,7 +70,6 @@
       </div>
 
       <div class="test-fields">
-        <!-- Input port values -->
         <template v-if="def.interface.inputs.length > 0">
           <div v-for="port in def.interface.inputs" :key="port.name" class="test-field">
             <FieldLabel :label="port.name" :required="port.required" :title="`Test value for input port '${port.name}' (${port.kind})`" />
@@ -60,7 +83,6 @@
           </div>
         </template>
 
-        <!-- Parameter values -->
         <template v-if="def.interface.parameters.length > 0">
           <div v-for="param in def.interface.parameters" :key="param.name" class="test-field">
             <label :title="`Test value for parameter '${param.name}' (${param.kind})`">param: {{ param.name }} <span class="kind-badge">{{ param.kind }}</span></label>
@@ -68,7 +90,6 @@
           </div>
         </template>
 
-        <!-- Slot assignments -->
         <template v-if="def.interface.modelSlots.length > 0">
           <div v-for="slot in def.interface.modelSlots" :key="slot.name" class="test-field">
             <FieldLabel :label="`slot: ${slot.name}`" :required="slot.required" :title="`Model to use for slot '${slot.name}' during test run`" />
@@ -86,15 +107,19 @@
 </template>
 
 <script setup lang="ts">
-import {ref, watch} from 'vue';
-import type {CapsuleDefinition} from '@lorca/core';
-import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
+import {ref, computed, watch, onMounted} from 'vue';
+import type {CapsuleDefinition, StepType} from '@lorca/core';
+import {computeStepStaleStates} from '@lorca/pipeline';
+import type {StepStaleState} from '@lorca/pipeline';
+import {autoAssignModelToStep} from '@lorca/endpoints';
+import {useCapsuleStepEditorStore} from '../../stores/capsuleStepEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
+import ChainEditor from '../pipeline/ChainEditor.vue';
 import FieldLabel from '../common/FieldLabel.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
@@ -105,22 +130,154 @@ const importStore = useImportExportStore();
 const uiStore = useUiStore();
 const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
+const editor = useCapsuleStepEditorStore();
 
-const editor = useCapsuleEditor(props.capsule);
-const {def, updateNode} = editor;
+const def = computed(() => editor.capsule ?? props.capsule);
 
-defineExpose({updateNode});
+onMounted(() => {
+  editor.loadCapsule(props.capsule);
+});
 
-watch(def, (updated) => emit('update', updated));
-watch(() => props.capsule, (c) => { if (c.id !== def.value.id) Object.assign(def.value, structuredClone(c)); });
+watch(() => props.capsule, (c) => {
+  if (c.id !== editor.capsule?.id) editor.loadCapsule(c);
+});
+
+watch(() => editor.capsule, (c) => {
+  if (c) emit('update', c);
+}, {deep: true});
 
 const localName = ref(props.capsule.name);
 watch(() => def.value.name, (n) => { localName.value = n; });
 
-const testPrompt = ref('');
+function commitName() {
+  const name = localName.value.trim() || 'Capsule';
+  if (name !== def.value.name) editor.updateCapsuleName(name);
+}
+
+const testPrompt = ref(def.value.input?.raw ?? '');
+watch(() => def.value.input?.raw, (raw) => { if (raw !== undefined) testPrompt.value = raw; });
+
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
+
+const finalArtifactKey = computed(() => {
+  const enabled = editor.steps.filter((s) => s.enabled);
+  const last = enabled.at(-1);
+  if (!last) return null;
+  return `${last.outputNamespace}.${last.primaryOutputName}`;
+});
+
+const stepStates = computed(() => {
+  const ctx = capsuleRunStore.runSnapshotContext;
+  if (!ctx) return {} as Record<string, StepStaleState>;
+  const states = computeStepStaleStates(
+    editor.pipeline,
+    ctx,
+    testPrompt.value,
+    (id, version) => capsulesStore.getCapsule(id, version),
+  );
+  return Object.fromEntries(states.map((s) => [s.stepId, s])) as Record<string, StepStaleState>;
+});
+
+function withDefaultModel(step: import('@lorca/core').PipelineStep) {
+  return autoAssignModelToStep(step, modelsStore.models, step.type === 'model-call' ? 'general' : undefined);
+}
+
+function handleAppend(type: StepType) {
+  if (editor.isReadOnly) return;
+  const step = withDefaultModel(editor.buildDefaultStep(type));
+  const id = editor.appendStep(step);
+  editor.selectStep(id);
+}
+
+function handleInsertAfter(anchorStepId: string) {
+  if (editor.isReadOnly) return;
+  const anchor = editor.steps.find((s) => s.id === anchorStepId);
+  const type: StepType = anchor?.type ?? 'model-call';
+  const step = withDefaultModel(editor.buildDefaultStep(type));
+  const id = editor.insertStepAfter(anchorStepId, step);
+  editor.selectStep(id);
+}
+
+function handleInsertAt(index: number) {
+  if (editor.isReadOnly) return;
+  const step = withDefaultModel(editor.buildDefaultStep('model-call'));
+  if (index === 0 && editor.steps.length > 0) {
+    editor.insertStepBefore(editor.steps[0]!.id, step);
+  } else {
+    editor.appendStep(step);
+  }
+  editor.selectStep(step.id);
+}
+
+function handleMoveUp(stepId: string) {
+  const idx = editor.steps.findIndex((s) => s.id === stepId);
+  if (idx > 0) editor.moveStep(stepId, idx - 1);
+}
+
+function handleMoveDown(stepId: string) {
+  const idx = editor.steps.findIndex((s) => s.id === stepId);
+  if (idx < editor.steps.length - 1) editor.moveStep(stepId, idx + 1);
+}
+
+function handleDuplicate(stepId: string) {
+  const newId = editor.duplicateStep(stepId);
+  if (newId) editor.selectStep(newId);
+}
+
+function handleToggleEnabled(stepId: string) {
+  const step = editor.steps.find((s) => s.id === stepId);
+  if (step) editor.setStepEnabled(stepId, !step.enabled);
+}
+
+async function handleTestRun() {
+  await runCapsule();
+}
+
+async function handleRunUpTo(stepId: string) {
+  editor.updateUserPrompt(testPrompt.value.trim());
+  await runCapsule(stepId);
+}
+
+async function runCapsule(stopAtStepId?: string) {
+  const c = editor.getCapsule();
+  if (!c) return;
+
+  const inputValues: Record<string, unknown> = {};
+  for (const port of c.interface.inputs) {
+    const raw = testInputValues.value[port.name] ?? '';
+    if (port.kind === 'json') {
+      try { inputValues[port.name] = JSON.parse(raw); } catch { inputValues[port.name] = raw; }
+    } else {
+      inputValues[port.name] = raw;
+    }
+  }
+
+  const paramValues: Record<string, unknown> = {};
+  for (const param of c.interface.parameters) {
+    const raw = testParamValues.value[param.name] ?? '';
+    if (param.kind === 'number') paramValues[param.name] = Number(raw);
+    else if (param.kind === 'boolean') paramValues[param.name] = raw === 'true';
+    else if (param.kind === 'json') {
+      try { paramValues[param.name] = JSON.parse(raw); } catch { paramValues[param.name] = raw; }
+    } else {
+      paramValues[param.name] = raw;
+    }
+  }
+
+  const slotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
+  for (const slot of c.interface.modelSlots) {
+    const val = testSlotAssignments.value[slot.name] ?? '';
+    if (val) {
+      const parts = val.split('::');
+      slotAssignments[slot.name] = {endpointId: parts[0] ?? '', modelName: parts.slice(1).join('::')};
+    }
+  }
+
+  uiStore.setRightPaneTab('trace');
+  await capsuleRunStore.run(c, testPrompt.value, inputValues, paramValues, slotAssignments, stopAtStepId);
+}
 
 function handleLock() {
   if (!uiStore.activeCapsuleEditId) return;
@@ -134,41 +291,9 @@ function handleEditLocked() {
   if (newId) uiStore.openCapsuleEditor(newId);
 }
 
-async function handleTestRun() {
-  const inputValues: Record<string, unknown> = {};
-  for (const port of def.value.interface.inputs) {
-    const raw = testInputValues.value[port.name] ?? '';
-    if (port.kind === 'json') {
-      try { inputValues[port.name] = JSON.parse(raw); } catch { inputValues[port.name] = raw; }
-    } else {
-      inputValues[port.name] = raw;
-    }
-  }
-
-  const paramValues: Record<string, unknown> = {};
-  for (const param of def.value.interface.parameters) {
-    const raw = testParamValues.value[param.name] ?? '';
-    if (param.kind === 'number') paramValues[param.name] = Number(raw);
-    else if (param.kind === 'boolean') paramValues[param.name] = raw === 'true';
-    else if (param.kind === 'json') { try { paramValues[param.name] = JSON.parse(raw); } catch { paramValues[param.name] = raw; } }
-    else paramValues[param.name] = raw;
-  }
-
-  const slotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
-  for (const slot of def.value.interface.modelSlots) {
-    const val = testSlotAssignments.value[slot.name] ?? '';
-    if (val) {
-      const parts = val.split('::');
-      slotAssignments[slot.name] = {endpointId: parts[0] ?? '', modelName: parts.slice(1).join('::')};
-    }
-  }
-
-  uiStore.setRightPaneTab('output');
-  await capsuleRunStore.run(def.value, testPrompt.value, inputValues, paramValues, slotAssignments);
-}
-
 function handleExport() {
-  importStore.exportCurrentCapsule(def.value);
+  const c = editor.getCapsule();
+  if (c) importStore.exportCurrentCapsule(c);
 }
 
 function handleImport() {
@@ -200,21 +325,22 @@ function handleImport() {
 .status-draft { background: #2d2a1e; color: #c8a85a; }
 .status-locked { background: #1e2d1e; color: #5ddb9e; }
 
-.capsule-node-list { flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
-.capsule-node-row {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #222;
-  cursor: pointer; background: #161616;
+.user-prompt-bar {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
 }
-.capsule-node-row:hover { border-color: #333; background: #1e1e1e; }
-.capsule-node-row.active { border-color: #2a5070; background: #1e2d3d; }
-.node-type-badge { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; color: #555; background: #1a1a1a; border: 1px solid #222; padding: 0 4px; border-radius: 2px; flex-shrink: 0; }
-.node-row-title { font-size: 0.78rem; color: #bbb; }
-.empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
+.prompt-label { font-size: 0.68rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; }
+.user-prompt-input {
+  flex: 1; background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
+  border-radius: 3px; padding: 4px 6px; font-size: 0.82rem; resize: vertical; font-family: inherit;
+}
+.user-prompt-input:focus { outline: none; border-color: #3a6080; }
+
+.capsule-chain { flex: 1; min-height: 0; }
 
 .test-panel {
   border-top: 1px solid #1e1e1e; flex-shrink: 0;
-  max-height: 280px; overflow-y: auto;
+  max-height: 220px; overflow-y: auto;
   background: #0d0d0d;
 }
 .test-panel-header {

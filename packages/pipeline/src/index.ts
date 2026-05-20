@@ -28,6 +28,8 @@ export {
   extractStepsToCapsule,
   extractFullPipelineToCapsule,
   computeCapsuleContentSignature,
+  ensureCapsuleStepChain,
+  syncCapsuleLegacyGraphFromSteps,
 } from './capsuleExtraction.js';
 export type {
   CapsuleExtractionRequest,

@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
-import type {CapsuleDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError} from '@lorca/core';
+import type {CapsuleDefinition, PipelineArtifact, PipelineTraceEvent, PipelineError, StepRunSnapshot} from '@lorca/core';
+import type {RunSnapshotContext} from '@lorca/pipeline';
 import {executeCapsuleTestRun} from '@lorca/capsules';
 import {useEndpointsStore} from './endpoints.js';
 
@@ -14,8 +15,21 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
   const finalOutputKey = ref<string | null>(null);
   const error = ref<PipelineError | null>(null);
   const abortController = ref<AbortController | null>(null);
+  const snapshots = ref<Record<string, StepRunSnapshot>>({});
+  const userPromptSignature = ref<string | null>(null);
+  const partial = ref(false);
+  const executedStepIds = ref<string[]>([]);
 
   const isRunning = computed(() => status.value === 'running');
+  const runSnapshotContext = computed((): RunSnapshotContext | null => {
+    if (status.value === 'idle') return null;
+    return {
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value ?? '',
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+    };
+  });
   const finalOutput = computed(() =>
     finalOutputKey.value ? artifacts.value[finalOutputKey.value] : null,
   );
@@ -28,6 +42,10 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     finalOutputKey.value = null;
     error.value = null;
     abortController.value = null;
+    snapshots.value = {};
+    userPromptSignature.value = null;
+    partial.value = false;
+    executedStepIds.value = [];
   }
 
   function cancel() {
@@ -41,6 +59,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     inputValues: Record<string, unknown>,
     paramValues: Record<string, unknown>,
     slotAssignments: Record<string, {endpointId: string; modelName: string}>,
+    stopAtStepId?: string,
   ) {
     const endpointsStore = useEndpointsStore();
     reset();
@@ -53,7 +72,14 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
 
     const result = await executeCapsuleTestRun(
       def,
-      {userPromptRaw, inputValues, paramValues, slotAssignments, abortSignal: controller.signal},
+      {
+        userPromptRaw,
+        inputValues,
+        paramValues,
+        slotAssignments,
+        abortSignal: controller.signal,
+        ...(stopAtStepId ? {stopAtStepId} : {}),
+      },
       (endpointId) => endpointsStore.getEndpoint(endpointId),
       {
         onTraceEvent(event) { trace.value = [...trace.value, event]; },
@@ -66,7 +92,11 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     abortController.value = null;
 
     if (result.ok) {
-      finalOutputKey.value = result.value;
+      finalOutputKey.value = result.value.finalOutputKey;
+      snapshots.value = result.value.snapshots;
+      userPromptSignature.value = result.value.userPromptSignature;
+      partial.value = result.value.partial;
+      executedStepIds.value = result.value.executedStepIds;
       status.value = 'completed';
     } else {
       error.value = result.error;
@@ -74,5 +104,22 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     }
   }
 
-  return {status, runId, artifacts, trace, finalOutputKey, error, isRunning, finalOutput, reset, cancel, run};
+  return {
+    status,
+    runId,
+    artifacts,
+    trace,
+    finalOutputKey,
+    error,
+    isRunning,
+    finalOutput,
+    snapshots,
+    userPromptSignature,
+    partial,
+    executedStepIds,
+    runSnapshotContext,
+    reset,
+    cancel,
+    run,
+  };
 });
