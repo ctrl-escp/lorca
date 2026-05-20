@@ -1,0 +1,7 @@
+exclude:
+  - apps/
+  - packages/
+  - docs/
+  - node_modules/
+  - "*.config.*"
+  - "*.json"

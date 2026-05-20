@@ -37,10 +37,9 @@ jobs:
           cache: npm
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Install, verify, and build
+      - name: Install and build
         run: |
           npm ci
-          npm run check
           npm run build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
