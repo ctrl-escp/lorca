@@ -58,6 +58,14 @@
       @redo="editor.redo"
     />
 
+    <ExportModal
+      :open="exportModal.open"
+      title="Export Capsule"
+      :json="exportModal.json"
+      :filename="exportModal.filename"
+      @close="exportModal.open = false"
+    />
+
     <!-- Test run panel -->
     <div class="test-panel">
       <div class="test-panel-header">
@@ -121,6 +129,7 @@ import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import ChainEditor from '../pipeline/ChainEditor.vue';
 import {FieldLabel} from '@lorca/ui-kit';
+import ExportModal from '../export/ExportModal.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -131,6 +140,8 @@ const uiStore = useUiStore();
 const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
 const editor = useCapsuleStepEditorStore();
+
+const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
 
 const def = computed(() => editor.capsule ?? props.capsule);
 
@@ -283,7 +294,9 @@ function handleEditLocked() {
 
 function handleExport() {
   const c = editor.getCapsule();
-  if (c) importStore.exportCurrentCapsule(c);
+  if (!c) return;
+  const {json, filename} = importStore.buildCapsuleExportJson(c);
+  exportModal.value = {open: true, json, filename};
 }
 
 function handleImport() {

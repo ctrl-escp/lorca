@@ -74,6 +74,22 @@ export const useImportExportStore = defineStore('importExport', () => {
     downloadJson(`${sanitizeFilename(capsule.name)}.${capsule.version}.capsule.json`, file);
   }
 
+  function buildPipelineExportJson(pipeline: PipelineDefinition): {json: string; filename: string} {
+    const file = exportPipeline(pipeline, resolveIncludedCapsules(pipeline));
+    return {
+      json: JSON.stringify(file, null, 2),
+      filename: `${sanitizeFilename(pipeline.name)}.json`,
+    };
+  }
+
+  function buildCapsuleExportJson(capsule: CapsuleDefinition): {json: string; filename: string} {
+    const file = exportCapsule(capsule);
+    return {
+      json: JSON.stringify(file, null, 2),
+      filename: `${sanitizeFilename(capsule.name)}.${capsule.version}.json`,
+    };
+  }
+
   function parseImportJson(text: string): unknown {
     return JSON.parse(text) as unknown;
   }
@@ -171,6 +187,8 @@ export const useImportExportStore = defineStore('importExport', () => {
     importErrors,
     exportCurrentPipeline,
     exportCurrentCapsule,
+    buildPipelineExportJson,
+    buildCapsuleExportJson,
     parseImportJson,
     beginPipelineImport,
     beginCapsuleImport,

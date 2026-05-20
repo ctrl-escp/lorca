@@ -97,6 +97,13 @@
     />
 
     <!-- Dialogs -->
+    <ExportModal
+      :open="exportModal.open"
+      title="Export Pipeline"
+      :json="exportModal.json"
+      :filename="exportModal.filename"
+      @close="exportModal.open = false"
+    />
     <ConfirmDialog
       :open="confirmState.open"
       :title="confirmState.title"
@@ -136,6 +143,7 @@ import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
 import ChainEditor from './ChainEditor.vue';
 import PipelineSelector from './PipelineSelector.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
+import ExportModal from '../export/ExportModal.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
@@ -150,6 +158,8 @@ const modelsStore = useModelsStore();
 const suggestionInsert = useSuggestionInsert();
 const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
+
+const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
@@ -436,7 +446,8 @@ async function handleRunUpTo(stepId: string) {
 function handleExport() {
   moreMenuOpen.value = false;
   editorStore.updateUserPrompt(userPrompt.value.trim());
-  importStore.exportCurrentPipeline(editorStore.pipeline);
+  const {json, filename} = importStore.buildPipelineExportJson(editorStore.pipeline);
+  exportModal.value = {open: true, json, filename};
 }
 
 function handleImport() {

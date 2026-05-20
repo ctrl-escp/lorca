@@ -13,6 +13,10 @@ import {validateCapsule} from '@lorca/capsules';
 const PIPELINE_SCHEMA_VERSION = 2;
 const CAPSULE_SCHEMA_VERSION = 1;
 
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export interface ImportContext {
   knownEndpointIds: ReadonlySet<string>;
   knownModelKeys: ReadonlySet<string>;
@@ -73,8 +77,8 @@ export function exportPipeline(
     exportedAt: new Date().toISOString(),
     app: 'lorca',
     kind: 'pipeline',
-    pipeline: structuredClone(pipeline),
-    ...(capsules.length > 0 ? {includedCapsules: capsules.map((c) => structuredClone(c))} : {}),
+    pipeline: deepClone(pipeline),
+    ...(capsules.length > 0 ? {includedCapsules: capsules.map((c) => deepClone(c))} : {}),
   };
 }
 
@@ -83,7 +87,7 @@ export function exportCapsule(capsule: CapsuleDefinition): CapsuleExportFile {
     exportedAt: new Date().toISOString(),
     app: 'lorca',
     kind: 'capsule',
-    capsule: structuredClone(capsule),
+    capsule: deepClone(capsule),
   };
 }
 
@@ -137,8 +141,8 @@ export function previewPipelineImport(
   return {
     ok: true,
     kind: 'pipeline',
-    pipeline: structuredClone(file.pipeline),
-    includedCapsules: includedCapsules.map((c) => structuredClone(c)),
+    pipeline: deepClone(file.pipeline),
+    includedCapsules: includedCapsules.map((c) => deepClone(c)),
     missingModels,
     missingCapsules,
   };
@@ -155,7 +159,7 @@ export function previewCapsuleImport(
   return {
     ok: true,
     kind: 'capsule',
-    capsule: structuredClone(cap),
+    capsule: deepClone(cap),
     missingModels: findMissingModels(modelRefs, ctx),
   };
 }
