@@ -794,11 +794,11 @@ function runStateTitle(stepId: string): string {
   border-radius: 8px;
   padding: 0;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
-.step-card:active { cursor: grabbing; }
-.chain-step.dragging .step-card { cursor: grabbing; }
+.step-card:active { cursor: default; }
+.chain-step.dragging .step-card { cursor: default; }
 .step-card-content {
   flex: 1;
   min-width: 0;
