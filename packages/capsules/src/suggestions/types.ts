@@ -1,4 +1,4 @@
-import type {PipelineStep} from '@lorca/core';
+import type {ModelUsageBucket, PipelineStep} from '@lorca/core';
 
 export type SuggestionCategory =
   | 'extraction'
@@ -25,6 +25,8 @@ export interface PipelineSuggestion {
   name: string;
   description: string;
   category: SuggestionCategory;
+  /** Preferred model usage bucket when auto-assigning a model on insert. */
+  preferredModelBucket?: ModelUsageBucket;
   insertableSteps: PipelineStep[];
   requiredBindings: SuggestionBinding[];
   outputHints: SuggestionOutputHint[];

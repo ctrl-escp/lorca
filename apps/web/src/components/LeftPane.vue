@@ -73,11 +73,28 @@
               <button
                 class="btn-insert-suggestion"
                 type="button"
+                title="Insert before selected step"
+                :disabled="!editorStore.selectedStepId"
+                @click.stop="onInsertSuggestion(suggestion, 'before')"
+              >↑ Before</button>
+              <button
+                class="btn-insert-suggestion"
+                type="button"
                 title="Insert after selected step (or append)"
-                @click.stop="onInsertSuggestion(suggestion)"
-              >
-                ↓ Insert
-              </button>
+                @click.stop="onInsertSuggestion(suggestion, 'after')"
+              >↓ After</button>
+              <button
+                class="btn-insert-suggestion"
+                type="button"
+                title="Append to end of pipeline"
+                @click.stop="onInsertSuggestion(suggestion, 'append')"
+              >+ Append</button>
+              <button
+                class="btn-insert-suggestion btn-insert-new"
+                type="button"
+                title="Replace current pipeline with this suggestion"
+                @click.stop="onInsertSuggestion(suggestion, 'new')"
+              >New</button>
             </div>
           </div>
           <p v-if="filteredSuggestions.length === 0" class="empty-hint">No suggestions match your filter.</p>
@@ -142,15 +159,27 @@
       </div>
       <div v-if="isExpanded('models')" class="section-body">
         <AddModelForm v-if="showAddModel" :endpoints="endpointsStore.endpoints" @add="onAddModel" @cancel="showAddModel = false" />
+        <select v-model="modelBucketFilter" class="model-bucket-filter" aria-label="Filter models by usage bucket">
+          <option v-for="opt in MODEL_BUCKET_OPTIONS" :key="opt.value || 'all'" :value="opt.value">{{ opt.label }}</option>
+        </select>
+        <p v-if="canAssignModelToStep" class="model-assign-hint">Click a model to assign it to the selected step.</p>
         <div class="model-list">
-          <div v-for="model in modelsStore.models" :key="model.id" class="model-row">
+          <div
+            v-for="model in filteredModels"
+            :key="model.id"
+            class="model-row"
+            :class="{assignable: canAssignModelToStep}"
+            :title="canAssignModelToStep ? `Assign ${model.displayName} to selected step` : model.displayName"
+            @click="onModelClick(model)"
+          >
             <div class="model-row-header">
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-source" :class="`source-${model.source}`">{{ model.source }}</span>
             </div>
-            <ModelBucketEditor :model="model" @update="onUpdateBuckets(model.id, $event)" />
+            <ModelBucketEditor :model="model" @update="onUpdateBuckets(model.id, $event)" @click.stop />
           </div>
           <p v-if="modelsStore.models.length === 0" class="empty-hint">No models. Discover from an endpoint or add manually.</p>
+          <p v-else-if="filteredModels.length === 0" class="empty-hint">No models match this filter.</p>
         </div>
       </div>
     </section>
@@ -197,9 +226,15 @@ import {useCapsulesStore} from '../stores/capsules.js';
 import {useUiStore} from '../stores/ui.js';
 import {useImportExportStore} from '../stores/importExport.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
+import {useActiveRunStore} from '../stores/activeRun.js';
 import {useEndpointActions} from '../composables/useEndpointActions.js';
 import {pickJsonFile} from '../utils/importFile.js';
 import {newId} from '../utils/id.js';
+import {
+  autoAssignModelsToSteps,
+  autoAssignModelToStep,
+  modelMatchesBucket,
+} from '@lorca/endpoints';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
@@ -211,11 +246,13 @@ const capsulesStore = useCapsulesStore();
 const uiStore = useUiStore();
 const importStore = useImportExportStore();
 const editorStore = usePipelineEditorStore();
+const runStore = useActiveRunStore();
 const epActions = useEndpointActions();
 
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
 const paletteQuery = ref('');
+const modelBucketFilter = ref<ModelUsageBucket | ''>('');
 
 const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
   {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
@@ -243,6 +280,27 @@ const filteredSuggestions = computed(() =>
     matchesPaletteQuery(`${s.name} ${s.description} ${s.category} ${s.id}`),
   ),
 );
+
+const MODEL_BUCKET_OPTIONS: {value: ModelUsageBucket | ''; label: string}[] = [
+  {value: '', label: 'All buckets'},
+  {value: 'tiny', label: 'Tiny'},
+  {value: 'thinking', label: 'Thinking'},
+  {value: 'summarize', label: 'Summarize'},
+  {value: 'rewrite', label: 'Rewrite'},
+  {value: 'extract-json', label: 'Extract JSON'},
+  {value: 'verify', label: 'Verify'},
+  {value: 'general', label: 'General'},
+];
+
+const filteredModels = computed(() => {
+  if (!modelBucketFilter.value) return modelsStore.models;
+  return modelsStore.models.filter((m) => modelMatchesBucket(m, modelBucketFilter.value as ModelUsageBucket));
+});
+
+const canAssignModelToStep = computed(() => {
+  const step = editorStore.selectedStep;
+  return step?.type === 'model-call' && step.config.type === 'model-call';
+});
 
 onMounted(async () => {
   await endpointsStore.load();
@@ -297,22 +355,40 @@ function onDuplicateCapsule(capsuleId: string) {
   if (duplicatedId) uiStore.openCapsuleEditor(duplicatedId);
 }
 
-function insertSteps(newSteps: ReturnType<typeof instantiateSuggestion>) {
-  const anchorId = editorStore.selectedStepId;
-  for (const step of newSteps) {
-    if (anchorId) {
-      editorStore.insertStepAfter(anchorId, step);
-    } else {
+function prepareSteps(
+  steps: ReturnType<typeof instantiateSuggestion>,
+  preferredBucket?: ModelUsageBucket,
+): PipelineStep[] {
+  return autoAssignModelsToSteps(steps, modelsStore.models, preferredBucket);
+}
+
+function insertStepsAfterAnchor(anchorId: string | null, newSteps: PipelineStep[]) {
+  if (newSteps.length === 0) return;
+  if (anchorId) {
+    let afterId = anchorId;
+    for (const step of newSteps) {
+      afterId = editorStore.insertStepAfter(afterId, step);
+    }
+    editorStore.selectStep(afterId);
+  } else {
+    for (const step of newSteps) {
       editorStore.appendStep(step);
     }
-  }
-  if (newSteps.length > 0) {
     editorStore.selectStep(newSteps[newSteps.length - 1]!.id);
   }
 }
 
+function insertStepsBeforeAnchor(anchorId: string, newSteps: PipelineStep[]) {
+  if (newSteps.length === 0) return;
+  for (const step of newSteps) {
+    editorStore.insertStepBefore(anchorId, step);
+  }
+  editorStore.selectStep(newSteps[newSteps.length - 1]!.id);
+}
+
 function onInsertStepType(type: StepType) {
-  const step = editorStore.buildDefaultStep(type);
+  let step = editorStore.buildDefaultStep(type);
+  step = autoAssignModelToStep(step, modelsStore.models, type === 'model-call' ? 'general' : undefined);
   const anchorId = editorStore.selectedStepId;
   const id = anchorId
     ? editorStore.insertStepAfter(anchorId, step)
@@ -320,9 +396,46 @@ function onInsertStepType(type: StepType) {
   editorStore.selectStep(id);
 }
 
-function onInsertSuggestion(suggestion: PipelineSuggestion) {
+type SuggestionInsertMode = 'before' | 'after' | 'append' | 'new';
+
+function onInsertSuggestion(suggestion: PipelineSuggestion, mode: SuggestionInsertMode) {
   const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
-  insertSteps(instantiateSuggestion(suggestion, existingNamespaces));
+  const rawSteps = instantiateSuggestion(suggestion, existingNamespaces);
+  const newSteps = prepareSteps(rawSteps, suggestion.preferredModelBucket);
+
+  if (mode === 'new') {
+    const hasContent = editorStore.steps.length > 0 || editorStore.pipeline.input.raw.trim();
+    if (hasContent && !window.confirm(
+      `Replace the current pipeline with "${suggestion.name}"?\n\nExisting steps and prompt will be cleared.`,
+    )) return;
+    if (runStore.isRunning) runStore.cancel();
+    runStore.reset();
+    editorStore.replaceSteps(newSteps, `New pipeline from "${suggestion.name}"`);
+    return;
+  }
+
+  const anchorId = mode === 'append' ? null : editorStore.selectedStepId;
+  if (mode === 'before') {
+    if (!anchorId) return;
+    insertStepsBeforeAnchor(anchorId, newSteps);
+    return;
+  }
+  insertStepsAfterAnchor(anchorId, newSteps);
+}
+
+function onModelClick(model: DiscoveredModel) {
+  const step = editorStore.selectedStep;
+  if (!step || step.type !== 'model-call' || step.config.type !== 'model-call') return;
+  editorStore.commitStepConfigEdit(
+    step.id,
+    {
+      config: {
+        ...step.config,
+        modelRef: {kind: 'fixed', endpointId: model.endpointId, modelName: model.providerModelName},
+      },
+    },
+    `Assign model "${model.displayName}"`,
+  );
 }
 
 function onNewCapsule() {
@@ -474,7 +587,28 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .suggestion-row-name { font-size: 0.78rem; font-weight: 500; }
 .suggestion-row-desc { font-size: 0.62rem; color: #666; line-height: 1.3; }
 .suggestion-row-category { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a8a5a; }
-.suggestion-row-actions { display: flex; flex-direction: column; gap: 0.2rem; flex-shrink: 0; }
+.suggestion-row-actions { display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0; max-width: 5.5rem; }
+.btn-insert-new { background: #2d1a1a; border-color: #4d2a2a; color: #b86d6d; }
+.btn-insert-new:hover { background: #381e1e; color: #da8d8d; }
+.btn-insert-suggestion:disabled { opacity: 0.35; cursor: default; }
+
+.model-bucket-filter {
+  width: 100%;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  color: #ccc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  margin-bottom: 0.35rem;
+}
+.model-assign-hint {
+  font-size: 0.68rem;
+  color: #7ec8e3;
+  margin: 0 0 0.35rem;
+}
+.model-row.assignable { cursor: pointer; border-color: #2a4a6a; }
+.model-row.assignable:hover { background: #1e2d3d; border-color: #3a6a9a; }
 .btn-insert-suggestion {
   font-size: 0.65rem; padding: 2px 6px;
   background: #1a2d1a; border: 1px solid #2a4d2a; color: #6db86d;

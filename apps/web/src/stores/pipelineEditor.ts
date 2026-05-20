@@ -525,6 +525,18 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     persistPipeline();
   }
 
+  function replaceSteps(newSteps: PipelineStep[], label = 'Replace steps') {
+    const before = snapshot();
+    pipeline.value = {
+      ...pipeline.value,
+      steps: newSteps,
+      updatedAt: new Date().toISOString(),
+    };
+    selectedStepId.value = newSteps.at(-1)?.id ?? null;
+    selectionAnchorId.value = selectedStepId.value;
+    recordUndo(label, before);
+  }
+
   // ── Undo/redo ─────────────────────────────────────────────────────────────────
 
   function undo() {
@@ -572,6 +584,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     insertStepAfter,
     insertStepBefore,
     appendStep,
+    replaceSteps,
     moveStep,
     duplicateStep,
     deleteStep,

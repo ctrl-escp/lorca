@@ -13,6 +13,7 @@ export const SUGGESTION_INTENT_EXTRACTION: PipelineSuggestion = {
   name: 'Intent Extraction',
   description: 'Extract structured intent and topics from the user prompt using a fast model call.',
   category: 'extraction',
+  preferredModelBucket: 'extract-json',
   requiredBindings: [],
   outputHints: [{stepId: 'intent-extraction', outputName: 'text', description: 'Extracted intent as JSON text'}],
   insertableSteps: [
@@ -53,6 +54,7 @@ export const SUGGESTION_ACCEPTANCE_CRITERIA: PipelineSuggestion = {
   name: 'Acceptance Criteria',
   description: 'Generate testable acceptance criteria from the user prompt.',
   category: 'planning',
+  preferredModelBucket: 'general',
   requiredBindings: [],
   outputHints: [{stepId: 'acceptance-criteria', outputName: 'text', description: 'Acceptance criteria as JSON text'}],
   insertableSteps: [
@@ -93,6 +95,7 @@ export const SUGGESTION_CONSTRAINT_EXTRACTION: PipelineSuggestion = {
   name: 'Constraint Extraction',
   description: 'Extract explicit constraints and requirements from the user prompt.',
   category: 'extraction',
+  preferredModelBucket: 'extract-json',
   requiredBindings: [],
   outputHints: [{stepId: 'constraint-extraction', outputName: 'text', description: 'Extracted constraints as JSON'}],
   insertableSteps: [
@@ -133,6 +136,7 @@ export const SUGGESTION_PROMPT_REWRITE: PipelineSuggestion = {
   name: 'Prompt Rewrite',
   description: 'Rewrite the previous output or user prompt in a clearer, more structured style.',
   category: 'rewrite',
+  preferredModelBucket: 'rewrite',
   requiredBindings: [],
   outputHints: [{stepId: 'prompt-rewrite', outputName: 'text', description: 'Rewritten prompt text'}],
   insertableSteps: [
@@ -173,6 +177,7 @@ export const SUGGESTION_CANDIDATE_ANSWER: PipelineSuggestion = {
   name: 'Candidate Answer',
   description: 'Generate a candidate answer using the prior pipeline context.',
   category: 'generation',
+  preferredModelBucket: 'general',
   requiredBindings: [],
   outputHints: [{stepId: 'candidate-answer', outputName: 'text', description: 'Generated candidate answer'}],
   insertableSteps: [
@@ -213,6 +218,7 @@ export const SUGGESTION_ANSWER_VERIFICATION: PipelineSuggestion = {
   name: 'Answer Verification',
   description: 'Verify a candidate answer against requirements or criteria.',
   category: 'verification',
+  preferredModelBucket: 'verify',
   requiredBindings: [],
   outputHints: [{stepId: 'answer-verification', outputName: 'text', description: 'Verification result as JSON'}],
   insertableSteps: [
@@ -253,6 +259,7 @@ export const SUGGESTION_DRIFT_CHECK: PipelineSuggestion = {
   name: 'Drift Check',
   description: 'Detect semantic drift between the original prompt and a generated answer.',
   category: 'verification',
+  preferredModelBucket: 'verify',
   requiredBindings: [],
   outputHints: [{stepId: 'drift-check', outputName: 'text', description: 'Drift analysis as JSON'}],
   insertableSteps: [
@@ -293,6 +300,7 @@ export const SUGGESTION_SUMMARY: PipelineSuggestion = {
   name: 'Summary',
   description: 'Summarize the previous step output while preserving key facts.',
   category: 'utility',
+  preferredModelBucket: 'summarize',
   requiredBindings: [],
   outputHints: [{stepId: 'summary', outputName: 'text', description: 'Compressed summary text'}],
   insertableSteps: [

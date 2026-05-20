@@ -57,7 +57,7 @@ async function addEndpoint(page: import('@playwright/test').Page, name = 'Test O
 
 async function expandLeftSection(
   page: import('@playwright/test').Page,
-  section: 'Endpoints' | 'Examples' | 'Capsules' | 'Models',
+  section: 'Endpoints' | 'Step Suggestions' | 'Capsules' | 'Models' | 'Step types',
 ) {
   const toggle = page.locator('.section-toggle').filter({hasText: section});
   if (await toggle.getAttribute('aria-expanded') !== 'true') {
@@ -271,13 +271,12 @@ test('smoke: export and import capsule', async ({page}) => {
   await expect(page.locator('.capsule-row-meta').filter({hasText: 'locked'})).toBeVisible();
 });
 
-test('smoke: duplicate example capsule', async ({page}) => {
-  await expandLeftSection(page, 'Examples');
+test('smoke: insert intent extraction suggestion', async ({page}) => {
+  await expandLeftSection(page, 'Step Suggestions');
   await expect(page.getByText('Intent Extraction')).toBeVisible({timeout: 5000});
-  const row = page.locator('.example-row').filter({hasText: 'Intent Extraction'});
-  await row.getByRole('button', {name: 'Duplicate'}).click();
-  await expect(page.getByPlaceholder('Capsule name')).toHaveValue('Intent Extraction (copy)', {timeout: 5000});
-  await expect(page.locator('.capsule-status.status-draft')).toBeVisible();
+  const row = page.locator('.suggestion-row').filter({hasText: 'Intent Extraction'});
+  await row.getByRole('button', {name: '↓ After'}).click();
+  await expect(page.locator('.step-title').filter({hasText: 'Intent Extraction'})).toBeVisible();
 });
 
 test('smoke: reject invalid capsule import', async ({page}) => {

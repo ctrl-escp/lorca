@@ -80,8 +80,10 @@ import {useImportExportStore} from '../../stores/importExport.js';
 import {usePipelinesStore} from '../../stores/pipelines.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useUiStore} from '../../stores/ui.js';
+import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
+import {autoAssignModelToStep} from '@lorca/endpoints';
 import ChainEditor from './ChainEditor.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
@@ -93,6 +95,7 @@ const capsulesStore = useCapsulesStore();
 const uiStore = useUiStore();
 const importStore = useImportExportStore();
 const editorStore = usePipelineEditorStore();
+const modelsStore = useModelsStore();
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
@@ -221,8 +224,12 @@ function commitPipelineName() {
   }
 }
 
+function withDefaultModel(step: import('@lorca/core').PipelineStep) {
+  return autoAssignModelToStep(step, modelsStore.models, step.type === 'model-call' ? 'general' : undefined);
+}
+
 function handleAppend(type: StepType) {
-  const step = editorStore.buildDefaultStep(type);
+  const step = withDefaultModel(editorStore.buildDefaultStep(type));
   const id = editorStore.appendStep(step);
   editorStore.selectStep(id);
 }
@@ -230,13 +237,13 @@ function handleAppend(type: StepType) {
 function handleInsertAfter(anchorStepId: string) {
   const anchor = editorStore.steps.find((s) => s.id === anchorStepId);
   const type: StepType = anchor?.type ?? 'model-call';
-  const step = editorStore.buildDefaultStep(type);
+  const step = withDefaultModel(editorStore.buildDefaultStep(type));
   const id = editorStore.insertStepAfter(anchorStepId, step);
   editorStore.selectStep(id);
 }
 
 function handleInsertAt(index: number) {
-  const step = editorStore.buildDefaultStep('model-call');
+  const step = withDefaultModel(editorStore.buildDefaultStep('model-call'));
   if (index === 0 && editorStore.steps.length > 0) {
     editorStore.insertStepBefore(editorStore.steps[0]!.id, step);
   } else {
