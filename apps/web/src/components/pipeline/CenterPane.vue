@@ -223,6 +223,7 @@ function resolvePrompt(value: string | null) {
 
 onMounted(() => {
   editorStore.loadPipeline(props.def);
+  runStore.restoreForPipeline(props.def.id);
   window.addEventListener('keydown', onKeyDown);
   document.addEventListener('click', onDocClick, true);
 });
@@ -257,6 +258,7 @@ watch(() => props.def, (def) => {
     editorStore.loadPipeline(def);
     userPrompt.value = def.input.raw;
     localPipelineName.value = def.name;
+    if (def.id !== cur.id) runStore.restoreForPipeline(def.id);
   }
 });
 

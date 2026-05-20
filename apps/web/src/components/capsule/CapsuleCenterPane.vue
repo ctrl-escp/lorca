@@ -155,10 +155,14 @@ const def = computed(() => editor.capsule ?? props.capsule);
 
 onMounted(() => {
   editor.loadCapsule(props.capsule);
+  capsuleRunStore.restoreForCapsule(props.capsule.id);
 });
 
 watch(() => props.capsule, (c) => {
-  if (c.id !== editor.capsule?.id) editor.loadCapsule(c);
+  if (c.id !== editor.capsule?.id) {
+    editor.loadCapsule(c);
+    capsuleRunStore.restoreForCapsule(c.id);
+  }
 });
 
 watch(() => editor.capsule, (c) => {

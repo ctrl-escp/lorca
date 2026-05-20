@@ -4,6 +4,7 @@ import type {CapsuleDefinition, PipelineArtifact, PipelineTraceEvent, PipelineEr
 import type {RunSnapshotContext} from '@lorca/pipeline';
 import {executeCapsuleTestRun} from '@lorca/capsules';
 import {useEndpointsStore} from './endpoints.js';
+import {saveCapsuleRunState, loadCapsuleRunState} from '../utils/runPersistence.js';
 
 export type RunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -106,6 +107,20 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
       error.value = result.error;
       status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
     }
+
+    saveCapsuleRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
   }
 
   async function runOnlyStep(
@@ -168,6 +183,37 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
       error.value = result.error;
       status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
     }
+
+    saveCapsuleRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
+  }
+
+  function restoreForCapsule(capsuleId: string) {
+    const saved = loadCapsuleRunState(capsuleId);
+    if (!saved) return;
+    status.value = saved.status;
+    runId.value = saved.runId;
+    artifacts.value = saved.artifacts;
+    trace.value = saved.trace;
+    finalOutputKey.value = saved.finalOutputKey;
+    error.value = saved.error;
+    snapshots.value = saved.snapshots;
+    userPromptSignature.value = saved.userPromptSignature;
+    partial.value = saved.partial;
+    executedStepIds.value = saved.executedStepIds;
+    rerunSingleStepId.value = saved.rerunSingleStepId;
+    abortController.value = null;
   }
 
   return {
@@ -188,5 +234,6 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     cancel,
     run,
     runOnlyStep,
+    restoreForCapsule,
   };
 });

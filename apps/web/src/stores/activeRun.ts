@@ -5,6 +5,7 @@ import {executeStepChain} from '@lorca/pipeline';
 import type {RunSnapshotContext} from '@lorca/pipeline';
 import {useEndpointsStore} from './endpoints.js';
 import {useCapsulesStore} from './capsules.js';
+import {saveRunState, loadRunState} from '../utils/runPersistence.js';
 
 export type RunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -106,6 +107,20 @@ export const useActiveRunStore = defineStore('activeRun', () => {
       error.value = result.error;
       status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
     }
+
+    saveRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
   }
 
   async function runOnlyStep(def: PipelineDefinition, userPromptRaw: string, stepId: string) {
@@ -166,6 +181,37 @@ export const useActiveRunStore = defineStore('activeRun', () => {
       error.value = result.error;
       status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
     }
+
+    saveRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
+  }
+
+  function restoreForPipeline(pipelineId: string) {
+    const saved = loadRunState(pipelineId);
+    if (!saved) return;
+    status.value = saved.status;
+    runId.value = saved.runId;
+    artifacts.value = saved.artifacts;
+    trace.value = saved.trace;
+    finalOutputKey.value = saved.finalOutputKey;
+    error.value = saved.error;
+    snapshots.value = saved.snapshots;
+    userPromptSignature.value = saved.userPromptSignature;
+    partial.value = saved.partial;
+    executedStepIds.value = saved.executedStepIds;
+    rerunSingleStepId.value = saved.rerunSingleStepId;
+    abortController.value = null;
   }
 
   return {
@@ -187,5 +233,6 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     cancel,
     run,
     runOnlyStep,
+    restoreForPipeline,
   };
 });
