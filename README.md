@@ -291,9 +291,69 @@ The browser must be allowed to call your endpoint’s HTTP API. If access is blo
 
 1. Configure the endpoint for local browser access (Ollama: set `OLLAMA_ORIGINS` or equivalent for your dev origin).
 2. Add models **manually** without discovery.
-3. (Future) use an optional local backend bridge.
+3. **Run the included CORS proxy** (recommended when accessing Lorca from a hosted URL such as GitHub Pages).
 
 Lorca does not bypass CORS silently.
+
+### CORS proxy (`scripts/llm-cors-proxy.mjs`)
+
+When you open Lorca from a non-localhost origin (e.g. `https://ctrl-escp.github.io/lorca`) the browser will block direct calls to your local endpoint because the endpoint doesn’t return the required CORS headers. The included proxy script solves this by sitting between the browser and your endpoint, adding CORS headers and handling preflight requests locally — your endpoint receives only clean forwarded requests with no `Origin` header, so Ollama’s own origin check passes too.
+
+**Download:** [`scripts/llm-cors-proxy.mjs`](https://raw.githubusercontent.com/ctrl-escp/lorca/main/scripts/llm-cors-proxy.mjs) (right-click → Save link as)
+
+**Requirements:** Node.js 18+, `openssl` in PATH (for HTTPS mode).
+
+#### HTTP mode (simplest)
+
+```bash
+node llm-cors-proxy.mjs --endpoint http://localhost:11434 --port 11435
+```
+
+Then add `http://localhost:11435` as the endpoint URL in Lorca.
+
+#### HTTPS mode (required when Lorca is served over HTTPS)
+
+Browsers block mixed content — an HTTPS page cannot call an HTTP endpoint. Use `--https` to have the proxy generate a self-signed certificate automatically:
+
+```bash
+node llm-cors-proxy.mjs \
+  --endpoint http://localhost:11434 \
+  --port 11435 \
+  --https --domain localhost
+```
+
+On first run the script creates `localhost.crt` and `localhost.key` next to itself and prints the command to trust the certificate in your OS keychain. On macOS:
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain localhost.crt
+```
+
+After trusting, add `https://localhost:11435` as the endpoint URL in Lorca.
+
+#### Multiple endpoints
+
+Run one proxy instance per endpoint, each on its own port:
+
+```bash
+# Ollama
+node llm-cors-proxy.mjs -e http://localhost:11434 -p 11435 --https --domain localhost
+
+# LM Studio
+node llm-cors-proxy.mjs -e http://localhost:1234  -p 11436 --https --domain localhost
+```
+
+#### All options
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `-e`, `--endpoint` | — | Upstream LLM base URL (**required**) |
+| `-p`, `--port` | — | Port to listen on (**required**) |
+| `-o`, `--origin` | `*` | Allowed CORS origin (e.g. `https://ctrl-escp.github.io`) |
+| `--https` | off | Enable TLS |
+| `--domain` | — | Domain / CN for the generated certificate (required with `--https`) |
+| `--cert` / `--key` | — | Supply your own PEM files instead of generating |
+| `--cert-dir` | script directory | Where generated certs are stored and reused |
 
 ### Supported endpoint kinds
 

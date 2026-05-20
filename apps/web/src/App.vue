@@ -16,6 +16,7 @@
       </div>
     </header>
     <HelpDialog :open="showAppHelp" variant="app" @close="showAppHelp = false" />
+    <CorsProxyBanner />
     <ImportErrorBanner
       v-if="importStore.importErrors.length > 0"
       :errors="importStore.importErrors"
@@ -83,6 +84,7 @@ import ImportRemapDialog from './components/import/ImportRemapDialog.vue';
 import ImportErrorBanner from './components/import/ImportErrorBanner.vue';
 import PaneResizeHandle from './components/layout/PaneResizeHandle.vue';
 import HelpDialog from './components/help/HelpDialog.vue';
+import CorsProxyBanner from './components/CorsProxyBanner.vue';
 import type {ModelRemap} from './stores/importExport.js';
 
 const showAppHelp = ref(false);
