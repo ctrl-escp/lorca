@@ -60,8 +60,7 @@ export function listStepOutputArtifacts(step: PipelineStep): ArtifactOption[] {
         mk('parsedJson', 'parsed JSON (if available)'),
       ];
     case 'prompt-wrapper':
-    case 'template':
-    case 'manual-text':
+    case 'presentation':
     case 'loop-group':
       return [mk('text')];
     case 'json-extract':

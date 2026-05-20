@@ -32,8 +32,7 @@
     <div class="loop-inner-add">
       <button type="button" class="btn btn-sm btn-accent" @click="addInner('model-call')">+ Model</button>
       <button type="button" class="btn btn-sm" @click="addInner('prompt-wrapper')">+ Wrapper</button>
-      <button type="button" class="btn btn-sm" @click="addInner('manual-text')">+ Text</button>
-      <button type="button" class="btn btn-sm" @click="addInner('template')">+ Template</button>
+      <button type="button" class="btn btn-sm" @click="addInner('presentation')">+ Text</button>
       <button type="button" class="btn btn-sm" @click="addInner('json-extract')">+ JSON</button>
     </div>
 
@@ -41,16 +40,9 @@
       <div class="loop-inner-inspector">
         <div class="loop-inner-inspector-header">{{ selectedInnerStep.label }}</div>
 
-        <template v-if="selectedInnerStep.config.type === 'manual-text'">
+        <template v-if="selectedInnerStep.config.type === 'presentation'">
           <div class="inspector-field">
             <FieldLabel label="Text" />
-            <textarea v-model="localText" rows="3" @blur="commitManualText" />
-          </div>
-        </template>
-
-        <template v-else-if="selectedInnerStep.config.type === 'template'">
-          <div class="inspector-field">
-            <FieldLabel label="Template" />
             <textarea v-model="localTemplate" rows="4" @blur="commitTemplate" />
           </div>
         </template>
@@ -126,15 +118,13 @@ const hasPromptBlocks = computed(() => {
   return s.type === 'model-call' || s.type === 'prompt-wrapper' || Boolean(s.prompt?.blocks?.length);
 });
 
-const localText = ref('');
 const localTemplate = ref('');
 const localSourceRef = ref('');
 const localModelKey = ref('');
 
 watch(selectedInnerStep, (s) => {
   if (!s) return;
-  if (s.config.type === 'manual-text') localText.value = s.config.text;
-  if (s.config.type === 'template') localTemplate.value = s.config.template;
+  if (s.config.type === 'presentation') localTemplate.value = s.config.text;
   if (s.config.type === 'json-extract') localSourceRef.value = s.config.sourceArtifactRef;
   if (s.config.type === 'model-call' && s.config.modelRef.kind === 'fixed') {
     localModelKey.value = `${s.config.modelRef.endpointId}::${s.config.modelRef.modelName}`;
@@ -156,9 +146,8 @@ function typeLabel(type: StepType): string {
   const labels: Record<StepType, string> = {
     'model-call': 'Model',
     'prompt-wrapper': 'Wrap',
-    'template': 'Tpl',
+    'presentation': 'Text',
     'json-extract': 'JSON',
-    'manual-text': 'Text',
     'capsule-instance': 'Cap',
     'loop-group': 'Loop',
   };
@@ -174,24 +163,13 @@ function modelsForEndpoint(endpointId: string) {
   return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
 }
 
-function commitManualText() {
-  const s = selectedInnerStep.value;
-  if (!s || s.config.type !== 'manual-text') return;
-  editorStore.commitLoopInnerStepEdit(
-    props.loopStepId,
-    s.id,
-    {config: {...s.config, text: localText.value}},
-    'Edit inner text',
-  );
-}
-
 function commitTemplate() {
   const s = selectedInnerStep.value;
-  if (!s || s.config.type !== 'template') return;
+  if (!s || s.config.type !== 'presentation') return;
   editorStore.commitLoopInnerStepEdit(
     props.loopStepId,
     s.id,
-    {config: {...s.config, template: localTemplate.value}},
+    {config: {...s.config, text: localTemplate.value}},
     'Edit inner template',
   );
 }

@@ -257,13 +257,13 @@ function stepToLegacyNode(
       };
     }
 
-    case 'template':
+    case 'presentation':
       return {
         id: step.id,
         type: 'template',
         artifactPrefix: step.outputNamespace,
         title: step.label,
-        template: config.template,
+        template: config.text,
       };
 
     case 'json-extract':
@@ -273,15 +273,6 @@ function stepToLegacyNode(
         artifactPrefix: step.outputNamespace,
         title: step.label,
         inputArtifactRef: config.sourceArtifactRef,
-      };
-
-    case 'manual-text':
-      return {
-        id: step.id,
-        type: 'manual-text',
-        artifactPrefix: step.outputNamespace,
-        title: step.label,
-        text: config.text,
       };
 
     case 'capsule-instance':
@@ -448,15 +439,15 @@ function legacyNodeToStep(
     case 'template':
       return {
         id: node.id,
-        type: 'template',
+        type: 'presentation',
         label,
         enabled: true,
         outputNamespace: prefix,
         primaryOutputName: 'text',
         lastEditedAt: now,
         config: {
-          type: 'template',
-          template: node.template,
+          type: 'presentation',
+          text: node.template,
           outputNames: ['text'],
         },
       } satisfies PipelineStep;
@@ -480,14 +471,14 @@ function legacyNodeToStep(
     case 'manual-text':
       return {
         id: node.id,
-        type: 'manual-text',
+        type: 'presentation',
         label,
         enabled: true,
         outputNamespace: prefix,
         primaryOutputName: 'text',
         lastEditedAt: now,
         config: {
-          type: 'manual-text',
+          type: 'presentation',
           text: node.text,
           outputNames: ['text'],
         },
@@ -528,9 +519,8 @@ function labelForNodeType(type: string): string {
   const labels: Record<string, string> = {
     'model-call': 'Model Call',
     'prompt-wrapper': 'Prompt Wrapper',
-    'template': 'Template',
+    'presentation': 'Text',
     'json-extract': 'JSON Extract',
-    'manual-text': 'Manual Text',
     'capsule-instance': 'Capsule',
   };
   return labels[type] ?? type;
@@ -547,4 +537,30 @@ export function makeEmptyPipeline(id: string, name: string, createdAt?: string):
     createdAt: now,
     updatedAt: now,
   };
+}
+
+// ── V2 manual-text → template migration ─────────────────────────────────────
+
+/** Converts persisted V2 `manual-text` and `template` steps into `presentation` steps. */
+export function migrateManualTextSteps(pipeline: PipelineDefinition): PipelineDefinition {
+  function migrateStep(step: PipelineStep): PipelineStep {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = step.config as any;
+    const t = raw.type as string;
+    if (t === 'manual-text') {
+      return {...step, type: 'presentation', config: {type: 'presentation', text: String(raw.text ?? ''), outputNames: ['text']}};
+    }
+    if (t === 'template') {
+      return {...step, type: 'presentation', config: {type: 'presentation', text: String(raw.template ?? ''), outputNames: ['text']}};
+    }
+    return step;
+  }
+  const steps = pipeline.steps.map((s) => {
+    if (s.config.type === 'loop-group') {
+      const innerSteps = s.config.steps.map(migrateStep);
+      return {...s, config: {...s.config, steps: innerSteps}};
+    }
+    return migrateStep(s);
+  });
+  return {...pipeline, steps};
 }

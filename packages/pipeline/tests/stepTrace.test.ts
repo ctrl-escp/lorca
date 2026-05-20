@@ -5,13 +5,13 @@ import {primaryOutputPreview, truncatePreview} from '../src/stepTrace.js';
 function makeStep(overrides?: Partial<PipelineStep>): PipelineStep {
   return {
     id: 's1',
-    type: 'manual-text',
+    type: 'presentation',
     label: 'Step',
     enabled: true,
     outputNamespace: 'ns',
     primaryOutputName: 'text',
     lastEditedAt: new Date().toISOString(),
-    config: {type: 'manual-text', text: 'hi', outputNames: ['text']},
+    config: {type: 'presentation', text: 'hi', outputNames: ['text']},
     ...overrides,
   };
 }

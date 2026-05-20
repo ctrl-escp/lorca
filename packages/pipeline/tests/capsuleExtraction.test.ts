@@ -16,7 +16,7 @@ function makeStep(overrides: Partial<PipelineStep> & Pick<PipelineStep, 'id' | '
     outputNamespace: overrides.outputNamespace ?? overrides.id,
     primaryOutputName: overrides.primaryOutputName ?? 'text',
     lastEditedAt: '2026-01-01T00:00:00.000Z',
-    config: overrides.config ?? {type: 'manual-text', text: 'x', outputNames: ['text']},
+    config: overrides.config ?? {type: 'presentation', text: 'x', outputNames: ['text']},
   };
   return {...base, ...overrides};
 }
@@ -36,7 +36,7 @@ function makePipeline(steps: PipelineStep[]): PipelineDefinition {
 describe('extractStepsToCapsule', () => {
   it('extracts a single step with no external deps', () => {
     const steps = [
-      makeStep({id: 'a', type: 'manual-text', config: {type: 'manual-text', text: 'hi', outputNames: ['text']}}),
+      makeStep({id: 'a', type: 'presentation', config: {type: 'presentation', text: 'hi', outputNames: ['text']}}),
     ];
     const pipeline = makePipeline(steps);
     const result = extractStepsToCapsule({
@@ -57,9 +57,9 @@ describe('extractStepsToCapsule', () => {
   it('creates input ports for history reads outside the selection', () => {
     const intent = makeStep({
       id: 'intent',
-      type: 'manual-text',
+      type: 'presentation',
       outputNamespace: 'intent_extraction',
-      config: {type: 'manual-text', text: '{}', outputNames: ['text']},
+      config: {type: 'presentation', text: '{}', outputNames: ['text']},
     });
     const rewrite = makeStep({
       id: 'rewrite',
@@ -126,8 +126,8 @@ describe('extractStepsToCapsule', () => {
 describe('extractFullPipelineToCapsule', () => {
   it('replaces all steps with one instance', () => {
     const pipeline = makePipeline([
-      makeStep({id: 'a', type: 'manual-text', config: {type: 'manual-text', text: 'a', outputNames: ['text']}}),
-      makeStep({id: 'b', type: 'manual-text', config: {type: 'manual-text', text: 'b', outputNames: ['text']}}),
+      makeStep({id: 'a', type: 'presentation', config: {type: 'presentation', text: 'a', outputNames: ['text']}}),
+      makeStep({id: 'b', type: 'presentation', config: {type: 'presentation', text: 'b', outputNames: ['text']}}),
     ]);
     const result = extractFullPipelineToCapsule(pipeline, 'cap-full', 'Full');
     expect(result.ok).toBe(true);
@@ -140,7 +140,7 @@ describe('extractFullPipelineToCapsule', () => {
 describe('computeCapsuleContentSignature', () => {
   it('changes when capsule steps change', () => {
     const pipeline = makePipeline([
-      makeStep({id: 'a', type: 'manual-text', config: {type: 'manual-text', text: 'v1', outputNames: ['text']}}),
+      makeStep({id: 'a', type: 'presentation', config: {type: 'presentation', text: 'v1', outputNames: ['text']}}),
     ]);
     const r1 = extractFullPipelineToCapsule(pipeline, 'cap-sig', 'Sig');
     expect(r1.ok).toBe(true);
@@ -148,7 +148,7 @@ describe('computeCapsuleContentSignature', () => {
     const sig1 = computeCapsuleContentSignature(r1.value.capsule);
     const edited = {
       ...r1.value.capsule,
-      steps: [{...r1.value.capsule.steps![0]!, config: {type: 'manual-text' as const, text: 'v2', outputNames: ['text'] as const}}],
+      steps: [{...r1.value.capsule.steps![0]!, config: {type: 'presentation' as const, text: 'v2', outputNames: ['text'] as const}}],
     };
     const sig2 = computeCapsuleContentSignature(edited);
     expect(sig1).not.toBe(sig2);

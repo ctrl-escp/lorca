@@ -9,6 +9,7 @@ export {
   compileActiveStepsToExecutionPlan,
   compilePipelineToLegacyGraph,
   migrateLegacyPipeline,
+  migrateManualTextSteps,
   makeEmptyPipeline,
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';

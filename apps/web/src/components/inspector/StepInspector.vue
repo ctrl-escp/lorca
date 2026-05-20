@@ -83,28 +83,14 @@
             </div>
           </template>
 
-          <template v-else-if="step.config.type === 'manual-text'">
+          <template v-else-if="step.config.type === 'presentation'">
             <div class="inspector-field">
-              <FieldLabel label="Text" title="Static text output produced by this step" />
-              <textarea
-                v-model="localText"
-                rows="6"
-                placeholder="Enter static text…"
-                title="Static text"
-                @focus="onTextFieldFocus"
-                @blur="commitManualText"
-              />
-            </div>
-          </template>
-
-          <template v-else-if="step.config.type === 'template'">
-            <div class="inspector-field">
-              <FieldLabel label="Template" title="Handlebars-style template using {{artifact.key}} placeholders" />
+              <FieldLabel label="Text" title="Free-form text with optional {{artifact.key}} interpolation" />
               <textarea
                 v-model="localTemplate"
                 rows="6"
-                placeholder="{{user_prompt.raw}}"
-                title="Template with artifact placeholders"
+                placeholder="{{artifact.user_prompt.raw}}"
+                title="Text with optional artifact placeholders"
                 @focus="onTextFieldFocus"
                 @blur="commitTemplate"
               />
@@ -353,9 +339,8 @@ function formatTime(iso: string): string {
 const TYPE_LABELS: Record<string, string> = {
   'model-call': 'Model Call',
   'prompt-wrapper': 'Prompt Wrapper',
-  'template': 'Template',
+  'presentation': 'Text',
   'json-extract': 'JSON Extract',
-  'manual-text': 'Manual Text',
   'capsule-instance': 'Capsule',
   'loop-group': 'Loop Group',
 };
@@ -365,7 +350,6 @@ const localModelKey = ref('');
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
 const localMaxTokens = ref('');
-const localText = ref('');
 const localTemplate = ref('');
 const localSourceRef = ref('');
 const localMaxIterations = ref(3);
@@ -387,8 +371,7 @@ watch(step, (s) => {
     localMaxTokens.value = cfg.maxTokens !== undefined ? String(cfg.maxTokens) : '';
   }
 
-  if (cfg.type === 'manual-text') localText.value = cfg.text;
-  if (cfg.type === 'template') localTemplate.value = cfg.template;
+  if (cfg.type === 'presentation') localTemplate.value = cfg.text;
   if (cfg.type === 'json-extract') localSourceRef.value = cfg.sourceArtifactRef;
 
   if (cfg.type === 'loop-group') {
@@ -437,16 +420,10 @@ function commitModelCall() {
   editorStore.commitStepConfigEdit(s.id, {config: {...s.config, ...patch}}, 'Update model call');
 }
 
-function commitManualText() {
-  const s = step.value;
-  if (!s || s.config.type !== 'manual-text') return;
-  editorStore.commitStepEdit(s.id, {config: {...s.config, text: localText.value}}, 'Edit text');
-}
-
 function commitTemplate() {
   const s = step.value;
-  if (!s || s.config.type !== 'template') return;
-  editorStore.commitStepEdit(s.id, {config: {...s.config, template: localTemplate.value}}, 'Edit template');
+  if (!s || s.config.type !== 'presentation') return;
+  editorStore.commitStepEdit(s.id, {config: {...s.config, text: localTemplate.value}}, 'Edit text');
 }
 
 function commitJsonExtract() {

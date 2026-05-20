@@ -1,6 +1,6 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
-import type {PipelineDefinition, PipelineStep, StepType, StepConfig} from '@lorca/core';
+import type {PipelineDefinition, PipelineStep, StepType, StepConfig, PipelineInputConfig} from '@lorca/core';
 import {
   makeEmptyPipeline,
   extractStepsToCapsule,
@@ -26,12 +26,10 @@ function defaultStepConfig(type: StepType): StepConfig {
       };
     case 'prompt-wrapper':
       return {type: 'prompt-wrapper', outputNames: ['text']};
-    case 'template':
-      return {type: 'template', template: '', outputNames: ['text']};
+    case 'presentation':
+      return {type: 'presentation', text: '', outputNames: ['text']};
     case 'json-extract':
       return {type: 'json-extract', sourceArtifactRef: '', outputNames: ['json']};
-    case 'manual-text':
-      return {type: 'manual-text', text: '', outputNames: ['text']};
     case 'capsule-instance':
       return {
         type: 'capsule-instance',
@@ -66,13 +64,20 @@ function defaultLabel(type: StepType): string {
   const labels: Record<StepType, string> = {
     'model-call': 'Model Call',
     'prompt-wrapper': 'Prompt Wrapper',
-    'template': 'Template',
+    'presentation': 'Text',
     'json-extract': 'JSON Extract',
-    'manual-text': 'Manual Text',
     'capsule-instance': 'Capsule',
     'loop-group': 'Loop Group',
   };
   return labels[type];
+}
+
+function defaultTemplateText(steps: readonly PipelineStep[], input: PipelineInputConfig): string {
+  const lastModelCall = [...steps].reverse().find((s) => s.config.type === 'model-call');
+  const inputRef = `{{artifact.${input.outputNamespace}.raw}}`;
+  if (!lastModelCall) return inputRef;
+  const responseRef = `{{artifact.${lastModelCall.outputNamespace}.text}}`;
+  return `${inputRef}\n\n${responseRef}`;
 }
 
 function defaultNamespace(type: StepType, existingNamespaces: ReadonlySet<string>): string {
@@ -659,7 +664,13 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     updatePipelineName,
     undo,
     redo,
-    buildDefaultStep: (type: StepType, overrides?: Partial<PipelineStep>) =>
-      buildDefaultStep(type, getExistingNamespaces(), overrides),
+    buildDefaultStep: (type: StepType, overrides?: Partial<PipelineStep>) => {
+      const step = buildDefaultStep(type, getExistingNamespaces(), overrides);
+      if (type === 'presentation' && step.config.type === 'presentation' && !step.config.text) {
+        const tmpl = defaultTemplateText(pipeline.value.steps, pipeline.value.input);
+        return {...step, config: {...step.config, text: tmpl}};
+      }
+      return step;
+    },
   };
 });

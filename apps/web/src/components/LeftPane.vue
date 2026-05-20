@@ -315,8 +315,7 @@ function confirmSuggestionReplace(name: string): Promise<boolean> {
 const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
   {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
   {type: 'prompt-wrapper', label: 'Prompt wrapper', description: 'Compose XML prompt blocks without calling a model'},
-  {type: 'manual-text', label: 'Manual text', description: 'Emit static text as an artifact'},
-  {type: 'template', label: 'Template', description: 'Render a Handlebars-style template into text'},
+  {type: 'presentation', label: 'Text', description: 'Free-form text with optional {{artifact.key}} interpolation'},
   {type: 'json-extract', label: 'JSON extract', description: 'Parse JSON from a prior artifact'},
   {type: 'loop-group', label: 'Loop group', description: 'Repeat an inner step chain until exit condition'},
 ];

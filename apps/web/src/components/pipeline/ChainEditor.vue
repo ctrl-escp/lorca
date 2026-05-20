@@ -192,8 +192,7 @@
       <div class="chain-add-bar-buttons">
         <button class="btn btn-sm btn-accent" @click="$emit('append', 'model-call')">+ Model call</button>
         <button class="btn btn-sm" @click="$emit('append', 'prompt-wrapper')">+ Prompt wrapper</button>
-        <button class="btn btn-sm" @click="$emit('append', 'manual-text')">+ Manual text</button>
-        <button class="btn btn-sm" @click="$emit('append', 'template')">+ Template</button>
+        <button class="btn btn-sm" @click="$emit('append', 'presentation')">+ Text</button>
         <button class="btn btn-sm" @click="$emit('append', 'json-extract')">+ JSON extract</button>
         <button class="btn btn-sm" @click="$emit('append', 'loop-group')">+ Loop</button>
         <button v-if="showCapsuleAdd" class="btn btn-sm btn-capsule" @click="$emit('append', 'capsule-instance')">+ Capsule</button>
@@ -411,9 +410,8 @@ function traceStatusClass(stepId: string): string {
 const TYPE_LABELS: Record<StepType, string> = {
   'model-call': 'Model call',
   'prompt-wrapper': 'Wrapper',
-  'template': 'Template',
+  'presentation': 'Text',
   'json-extract': 'JSON extract',
-  'manual-text': 'Manual text',
   'capsule-instance': 'Capsule',
   'loop-group': 'Loop',
 };
@@ -839,7 +837,7 @@ function runStateTitle(stepId: string): string {
 }
 .badge-model-call { background: #1e2d3d; color: #5a9fd4; }
 .badge-prompt-wrapper { background: #2a2a1a; color: #b8a050; }
-.badge-template { background: #1e2a1e; color: #5a9d5a; }
+.badge-presentation { background: #1e2a1e; color: #5a9d5a; }
 .badge-capsule-instance { background: #2a1e3d; color: #9d6db8; }
 
 .step-title {

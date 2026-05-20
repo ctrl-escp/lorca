@@ -5,13 +5,13 @@ import {executeStepChain} from '../src/stepExecutor.js';
 function makeManualStep(id: string, text: string, ns?: string): PipelineStep {
   return {
     id,
-    type: 'manual-text',
+    type: 'presentation',
     label: id,
     enabled: true,
     outputNamespace: ns ?? id,
     primaryOutputName: 'text',
     lastEditedAt: new Date().toISOString(),
-    config: {type: 'manual-text', text, outputNames: ['text']},
+    config: {type: 'presentation', text, outputNames: ['text']},
   };
 }
 

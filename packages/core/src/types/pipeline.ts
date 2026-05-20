@@ -52,9 +52,8 @@ export interface CapsuleInterface {
 export type StepType =
   | 'model-call'
   | 'prompt-wrapper'
-  | 'template'
+  | 'presentation'
   | 'json-extract'
-  | 'manual-text'
   | 'capsule-instance'
   | 'loop-group';
 
@@ -102,9 +101,9 @@ export interface PromptWrapperStepConfig {
   outputNames: readonly ['text'];
 }
 
-export interface TemplateStepConfig {
-  type: 'template';
-  template: string;
+export interface PresentationStepConfig {
+  type: 'presentation';
+  text: string;
   outputNames: readonly ['text'];
 }
 
@@ -112,12 +111,6 @@ export interface JsonExtractStepConfig {
   type: 'json-extract';
   sourceArtifactRef: string;
   outputNames: readonly ['json'];
-}
-
-export interface ManualTextStepConfig {
-  type: 'manual-text';
-  text: string;
-  outputNames: readonly ['text'];
 }
 
 export interface CapsuleInstanceStepConfig {
@@ -147,9 +140,8 @@ export interface LoopGroupStepConfig {
 export type StepConfig =
   | ModelCallStepConfig
   | PromptWrapperStepConfig
-  | TemplateStepConfig
+  | PresentationStepConfig
   | JsonExtractStepConfig
-  | ManualTextStepConfig
   | CapsuleInstanceStepConfig
   | LoopGroupStepConfig;
 

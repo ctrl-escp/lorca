@@ -2,7 +2,7 @@ import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {PipelineDefinition, LegacyPipelineDefinition} from '@lorca/core';
 import {getDb} from '@lorca/storage';
-import {migrateLegacyPipeline} from '@lorca/pipeline';
+import {migrateLegacyPipeline, migrateManualTextSteps} from '@lorca/pipeline';
 import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
 
@@ -62,9 +62,10 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     const stored = await getDb().pipelines.toArray();
     if (stored.length > 0) {
       // Migrate any V1 pipelines on load
-      const migrated = stored.map((p) =>
-        isLegacyPipeline(p) ? migrateLegacyPipeline(p) : p as PipelineDefinition,
-      );
+      const migrated = stored.map((p) => {
+        const v2 = isLegacyPipeline(p) ? migrateLegacyPipeline(p) : p as PipelineDefinition;
+        return migrateManualTextSteps(v2);
+      });
       pipelines.value = migrated;
       activePipelineId.value = migrated[0]!.id;
     } else {

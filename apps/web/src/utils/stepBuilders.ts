@@ -16,12 +16,10 @@ export function defaultStepConfig(type: StepType): StepConfig {
       };
     case 'prompt-wrapper':
       return {type: 'prompt-wrapper', outputNames: ['text']};
-    case 'template':
-      return {type: 'template', template: '', outputNames: ['text']};
+    case 'presentation':
+      return {type: 'presentation', text: '', outputNames: ['text']};
     case 'json-extract':
       return {type: 'json-extract', sourceArtifactRef: '', outputNames: ['json']};
-    case 'manual-text':
-      return {type: 'manual-text', text: '', outputNames: ['text']};
     case 'capsule-instance':
       return {
         type: 'capsule-instance',
@@ -56,9 +54,8 @@ export function defaultStepLabel(type: StepType): string {
   const labels: Record<StepType, string> = {
     'model-call': 'Model Call',
     'prompt-wrapper': 'Prompt Wrapper',
-    'template': 'Template',
+    'presentation': 'Text',
     'json-extract': 'JSON Extract',
-    'manual-text': 'Manual Text',
     'capsule-instance': 'Capsule',
     'loop-group': 'Loop Group',
   };

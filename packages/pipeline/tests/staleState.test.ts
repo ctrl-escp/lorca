@@ -11,13 +11,13 @@ import {
 function makeStep(id: string, label: string, overrides?: Partial<PipelineStep>): PipelineStep {
   return {
     id,
-    type: 'manual-text',
+    type: 'presentation',
     label,
     enabled: true,
     outputNamespace: id,
     primaryOutputName: 'text',
     lastEditedAt: new Date().toISOString(),
-    config: {type: 'manual-text', text: label, outputNames: ['text']},
+    config: {type: 'presentation', text: label, outputNames: ['text']},
     ...overrides,
   };
 }

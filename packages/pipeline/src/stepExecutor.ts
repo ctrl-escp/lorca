@@ -276,15 +276,10 @@ export async function executeStepInternal(
   const inputArtifactNames = compiledStep.inputArtifactRefs;
 
   switch (config.type) {
-    case 'manual-text': {
-      const key = `${step.outputNamespace}.text`;
-      return stepOk([makeArtifact(key, step.id, 'text', config.text)], {inputArtifactNames});
-    }
-
-    case 'template': {
+    case 'presentation': {
       const artifactValues: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(artifacts)) artifactValues[k] = v.value;
-      const renderResult = renderTemplate(config.template, {artifacts: artifactValues, allowParams: false});
+      const renderResult = renderTemplate(config.text, {artifacts: artifactValues, allowParams: false});
       if (!renderResult.ok) return {ok: false, error: {...renderResult.error, nodeId: step.id}};
       const key = `${step.outputNamespace}.text`;
       return stepOk([makeArtifact(key, step.id, 'text', renderResult.value)], {inputArtifactNames});

@@ -49,13 +49,13 @@ describe('ensureCapsuleStepChain', () => {
       ...makeGraphCapsule([inputNode, manualNode]),
       steps: [{
         id: 's1',
-        type: 'manual-text',
+        type: 'presentation',
         label: 'Note',
         enabled: true,
         outputNamespace: 'note',
         primaryOutputName: 'text',
         lastEditedAt: '2025-01-01T00:00:00.000Z',
-        config: {type: 'manual-text', text: 'hi', outputNames: ['text']},
+        config: {type: 'presentation', text: 'hi', outputNames: ['text']},
       }],
       input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
     };
