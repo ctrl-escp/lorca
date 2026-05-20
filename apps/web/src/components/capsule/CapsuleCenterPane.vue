@@ -65,6 +65,12 @@
       :filename="exportModal.filename"
       @close="exportModal.open = false"
     />
+    <ImportModal
+      :open="importModalOpen"
+      kind="capsule"
+      @close="importModalOpen = false"
+      @submit="handleImportSubmit"
+    />
 
     <!-- Test run panel -->
     <div class="test-panel">
@@ -126,10 +132,10 @@ import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
-import {pickJsonFile} from '../../utils/importFile.js';
 import ChainEditor from '../pipeline/ChainEditor.vue';
 import {FieldLabel} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
+import ImportModal from '../import/ImportModal.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -142,6 +148,7 @@ const modelsStore = useModelsStore();
 const editor = useCapsuleStepEditorStore();
 
 const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
+const importModalOpen = ref(false);
 
 const def = computed(() => editor.capsule ?? props.capsule);
 
@@ -300,14 +307,17 @@ function handleExport() {
 }
 
 function handleImport() {
-  pickJsonFile((text) => {
-    try {
-      const data = importStore.parseImportJson(text);
-      importStore.beginCapsuleImport(data);
-    } catch {
-      importStore.setImportErrors(['Import file is not valid JSON']);
-    }
-  });
+  importModalOpen.value = true;
+}
+
+function handleImportSubmit(text: string) {
+  importModalOpen.value = false;
+  try {
+    const data = importStore.parseImportJson(text);
+    importStore.beginCapsuleImport(data);
+  } catch {
+    importStore.setImportErrors(['Import file is not valid JSON']);
+  }
 }
 </script>
 

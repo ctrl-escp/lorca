@@ -104,6 +104,12 @@
       :filename="exportModal.filename"
       @close="exportModal.open = false"
     />
+    <ImportModal
+      :open="importModalOpen"
+      kind="pipeline"
+      @close="importModalOpen = false"
+      @submit="handleImportSubmit"
+    />
     <ConfirmDialog
       :open="confirmState.open"
       :title="confirmState.title"
@@ -136,7 +142,6 @@ import {usePipelinesStore} from '../../stores/pipelines.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
-import {pickJsonFile} from '../../utils/importFile.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
 import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
@@ -144,6 +149,7 @@ import ChainEditor from './ChainEditor.vue';
 import PipelineSelector from './PipelineSelector.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
+import ImportModal from '../import/ImportModal.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
@@ -160,6 +166,7 @@ const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
 
 const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
+const importModalOpen = ref(false);
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
@@ -452,14 +459,17 @@ function handleExport() {
 
 function handleImport() {
   moreMenuOpen.value = false;
-  pickJsonFile((text) => {
-    try {
-      const data = importStore.parseImportJson(text);
-      importStore.beginPipelineImport(data);
-    } catch {
-      importStore.setImportErrors(['Import file is not valid JSON']);
-    }
-  });
+  importModalOpen.value = true;
+}
+
+function handleImportSubmit(text: string) {
+  importModalOpen.value = false;
+  try {
+    const data = importStore.parseImportJson(text);
+    importStore.beginPipelineImport(data);
+  } catch {
+    importStore.setImportErrors(['Import file is not valid JSON']);
+  }
 }
 
 async function handleNew() {
