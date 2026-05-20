@@ -24,7 +24,16 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
   const buckets = new Set<ModelUsageBucket>();
 
   // Thinking / reasoning models
-  if (name.includes('think') || name.includes('reason') || name.includes('r1') || name.includes('qwq')) {
+  if (
+    name.includes('think') ||
+    name.includes('reason') ||
+    name.includes('r1') ||
+    name.includes('qwq') ||
+    name.includes('qwen3') ||   // qwen3 series supports extended thinking
+    name.includes('o1') ||
+    name.includes('o3') ||
+    name.includes('cot')
+  ) {
     buckets.add('thinking');
   }
 
@@ -44,7 +53,9 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
     name.includes('struct') ||
     name.includes('hermes') ||
     name.includes('mistral') ||
-    name.includes('functionary')
+    name.includes('functionary') ||
+    name.includes('coder') ||   // code models excel at structured output
+    name.includes('-code')
   ) {
     buckets.add('extract-json');
   }
@@ -64,17 +75,20 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
     buckets.add('verify');
   }
 
-  // General — catch-all for medium–large capable models
+  // General — well-known general-purpose families, or nothing else matched
   const isGeneral =
     buckets.size === 0 ||
-    (paramB !== null && paramB >= 7) ||
     name.includes('llama') ||
     name.includes('phi') ||
     name.includes('gemma') ||
     name.includes('qwen') ||
     name.includes('deepseek') ||
     name.includes('mixtral') ||
-    name.includes('command');
+    name.includes('mistral') ||
+    name.includes('command') ||
+    name.includes('llava') ||
+    name.includes('vicuna') ||
+    name.includes('falcon');
   if (isGeneral) {
     buckets.add('general');
   }

@@ -15,11 +15,19 @@ describe('assignBuckets', () => {
   it('assigns thinking to reasoning models', () => {
     expect(assignBuckets({providerModelName: 'deepseek-r1:7b'})).toContain('thinking');
     expect(assignBuckets({providerModelName: 'qwq:32b'})).toContain('thinking');
+    expect(assignBuckets({providerModelName: 'qwen3:8b'})).toContain('thinking');
+    expect(assignBuckets({providerModelName: 'qwen3:1.7b', parameterSize: '1.7b'})).toContain('thinking');
+  });
+
+  it('does not assign thinking to non-reasoning qwen2 models', () => {
+    expect(assignBuckets({providerModelName: 'qwen2.5:7b'})).not.toContain('thinking');
+    expect(assignBuckets({providerModelName: 'qwen2.5-coder:7b'})).not.toContain('thinking');
   });
 
   it('assigns extract-json to structured output models', () => {
     expect(assignBuckets({providerModelName: 'hermes3:8b'})).toContain('extract-json');
     expect(assignBuckets({providerModelName: 'mistral:7b'})).toContain('extract-json');
+    expect(assignBuckets({providerModelName: 'qwen2.5-coder:7b'})).toContain('extract-json');
   });
 
   it('assigns general to common capable models', () => {
