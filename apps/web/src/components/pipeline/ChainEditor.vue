@@ -1,12 +1,34 @@
 <template>
-  <div class="chain-editor">
+  <div class="chain-editor" :class="{'dnd-active': isDndActive, [`dnd-kind-${activeDragKind}`]: activeDragKind}">
     <div class="chain-viewport">
-      <div ref="scrollRef" class="chain-scroll">
+      <div
+        ref="scrollRef"
+        class="chain-scroll"
+        @dragenter="onChainDragEnter"
+        @dragleave="onChainDragLeave"
+      >
         <div class="chain-scroll-spacer" aria-hidden="true" />
 
         <!-- Insert-at-start button (shown when steps exist) -->
-        <div v-if="steps.length > 0" class="insert-zone insert-zone-top">
-          <button class="btn-insert" title="Insert step at beginning" @click="$emit('insert-at', 0)">+</button>
+        <div
+          v-if="steps.length > 0"
+          class="insert-zone insert-zone-top"
+          :class="{'drop-target-active': dropTargetIndex === 0}"
+          @dragover.prevent="onInsertZoneDragOver(0, $event)"
+          @dragleave="onInsertZoneDragLeave(0, $event)"
+          @drop.prevent="onInsertZoneDrop(0, $event)"
+        >
+          <DropSlotIndicator
+            :active="dropTargetIndex === 0"
+            :ghost="isDndActive && dropTargetIndex !== 0"
+            :label="dropHintAtIndex(0)"
+          />
+          <button
+            v-show="!isDndActive || dropTargetIndex !== 0"
+            class="btn-insert"
+            title="Insert step at beginning"
+            @click="$emit('insert-at', 0)"
+          >+</button>
         </div>
 
         <template v-for="(step, i) in steps" :key="step.id">
@@ -17,12 +39,27 @@
               selected: selectedStepId === step.id,
               'in-selection-range': isInSelectionRange(step.id),
               disabled: !step.enabled,
+              'drop-target-step': dragOverStepId === step.id && activeDragKind === 'step-reorder',
+              dragging: draggingStepId === step.id,
               [traceStatusClass(step.id)]: true,
             }"
             @click="onStepClick(step.id, $event)"
+            @dragover.prevent="onStepDragOver(step.id, i, $event)"
+            @dragleave="onStepDragLeave(step.id, $event)"
+            @drop.prevent="onStepDrop(step.id, i, $event)"
           >
             <div v-if="i > 0" class="step-connector">↓</div>
-            <div class="step-card">
+            <div
+              class="step-card"
+              draggable="true"
+              title="Drag to reorder"
+              @dragstart="onStepDragStart(step.id, $event)"
+              @dragend="onStepDragEnd"
+            >
+              <div class="step-drag-handle" aria-hidden="true">
+                <span class="step-drag-grip">⠿</span>
+              </div>
+              <div class="step-card-content">
               <div class="step-card-header">
                 <span class="step-type-badge" :class="`badge-${step.type}`">{{ stepTypeLabel(step.type) }}</span>
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
@@ -64,22 +101,64 @@
               </div>
 
               <div class="step-run-actions" v-if="step.enabled">
-                <button class="btn-run-up-to" @click.stop="$emit('run-up-to', step.id)" title="Execute pipeline up to this step">
-                  ▷ Run up to here
-                </button>
+                <button
+                  type="button"
+                  class="btn-run-up-to icon-btn"
+                  aria-label="Run up to here"
+                  @click.stop="$emit('run-up-to', step.id)"
+                  title="Execute pipeline up to this step"
+                >▷</button>
+              </div>
+              <div
+                v-if="dragOverStepId === step.id && activeDragKind === 'step-reorder'"
+                class="step-drop-banner"
+                aria-live="polite"
+              >{{ dropHintAtIndex(i) }}</div>
               </div>
             </div>
           </div>
 
           <!-- Insert between steps -->
-          <div class="insert-zone">
-            <button class="btn-insert" :title="`Insert step after ${step.label}`" @click="$emit('insert-after', step.id)">+</button>
+          <div
+            class="insert-zone"
+            :class="{'drop-target-active': dropTargetIndex === i + 1}"
+            @dragover.prevent="onInsertZoneDragOver(i + 1, $event)"
+            @dragleave="onInsertZoneDragLeave(i + 1, $event)"
+            @drop.prevent="onInsertZoneDrop(i + 1, $event)"
+          >
+            <DropSlotIndicator
+              :active="dropTargetIndex === i + 1"
+              :ghost="isDndActive && dropTargetIndex !== i + 1"
+              :label="dropHintAtIndex(i + 1)"
+            />
+            <button
+              v-show="!isDndActive || dropTargetIndex !== i + 1"
+              class="btn-insert"
+              :title="`Insert step after ${step.label}`"
+              @click="$emit('insert-after', step.id)"
+            >+</button>
           </div>
         </template>
 
         <!-- Empty state -->
-        <div v-if="steps.length === 0" class="chain-empty">
-          <p>No steps yet.</p>
+        <div
+          v-if="steps.length === 0"
+          class="chain-empty"
+          :class="{'drop-target-active': dropTargetIndex === 0}"
+          @dragover.prevent="onInsertZoneDragOver(0, $event)"
+          @dragleave="onInsertZoneDragLeave(0, $event)"
+          @drop.prevent="onInsertZoneDrop(0, $event)"
+        >
+          <DropSlotIndicator
+            v-if="isDndActive"
+            :active="dropTargetIndex === 0"
+            :ghost="dropTargetIndex !== 0"
+            :label="dropHintAtIndex(0)"
+          />
+          <template v-else>
+            <p>No steps yet.</p>
+            <p v-if="acceptSuggestionDrop" class="chain-empty-hint">Drag a Step Suggestion here, or add a step below.</p>
+          </template>
           <button class="btn btn-accent btn-sm" @click="$emit('append', 'model-call')">+ Add Model Call</button>
         </div>
 
@@ -116,10 +195,50 @@
 </template>
 
 <script setup lang="ts">
-import {ref, watch, nextTick, onMounted} from 'vue';
+import {ref, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
 import type {PipelineStep, PipelineTraceEvent, StepType} from '@lorca/core';
 import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
+import {
+  DND_STEP_ID,
+  isSuggestionDragActive,
+  readDragStepId,
+  readDragSuggestionId,
+} from '../../utils/dragDrop.js';
+import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
+
+type DragKind = 'step-reorder' | 'suggestion';
+
+const DropSlotIndicator = defineComponent({
+  name: 'DropSlotIndicator',
+  props: {
+    active: {type: Boolean, required: true},
+    ghost: {type: Boolean, required: true},
+    label: {type: String, required: true},
+  },
+  setup(props) {
+    return () => {
+      if (!props.active && !props.ghost) return null;
+      return h(
+        'div',
+        {
+          class: [
+            'drop-slot-card',
+            props.active ? 'drop-slot-card-active' : 'drop-slot-card-ghost',
+          ],
+          ...(props.active ? {'aria-label': props.label} : {'aria-hidden': 'true'}),
+        },
+        [
+          h('div', {class: 'drop-slot-card-inner'}, [
+            props.active
+              ? h('span', {class: 'drop-slot-label'}, props.label)
+              : null,
+          ]),
+        ],
+      );
+    };
+  },
+});
 
 const props = defineProps<{
   steps: PipelineStep[];
@@ -136,12 +255,15 @@ const props = defineProps<{
   lastUndoLabel?: string | null;
   lastRedoLabel?: string | null;
   runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
+  acceptSuggestionDrop?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [stepId: string, extendRange?: boolean];
   'insert-after': [anchorStepId: string];
   'insert-at': [index: number];
+  reorder: [stepId: string, targetIndex: number];
+  'drop-suggestion': [suggestionId: string, insertIndex: number];
   'move-up': [stepId: string];
   'move-down': [stepId: string];
   duplicate: [stepId: string];
@@ -154,6 +276,77 @@ const emit = defineEmits<{
 }>();
 
 const scrollRef = ref<HTMLElement | null>(null);
+const draggingStepId = ref<string | null>(null);
+const dragOverStepId = ref<string | null>(null);
+const dropTargetIndex = ref<number | null>(null);
+const activeDragKind = ref<DragKind | null>(null);
+const chainDndHover = ref(false);
+
+const isDndActive = computed(() =>
+  chainDndHover.value
+  || draggingStepId.value !== null
+  || dropTargetIndex.value !== null
+  || dragOverStepId.value !== null,
+);
+
+function isStepReorderDragActive(): boolean {
+  return draggingStepId.value !== null;
+}
+
+function resolveDragKind(): DragKind | null {
+  if (isStepReorderDragActive()) return 'step-reorder';
+  if (props.acceptSuggestionDrop && isSuggestionDragActive()) return 'suggestion';
+  return null;
+}
+
+function syncActiveDragKind() {
+  activeDragKind.value = resolveDragKind();
+}
+
+function draggedStepIdForDrop(event: DragEvent): string | null {
+  return draggingStepId.value ?? readDragStepId(event.dataTransfer);
+}
+
+function draggedSuggestionIdForDrop(event: DragEvent): string | null {
+  return readDragSuggestionId(event.dataTransfer);
+}
+
+function clearDndState() {
+  draggingStepId.value = null;
+  dragOverStepId.value = null;
+  dropTargetIndex.value = null;
+  activeDragKind.value = null;
+  chainDndHover.value = false;
+}
+
+function dropHintAtIndex(index: number): string {
+  const kind = activeDragKind.value;
+  const n = props.steps.length;
+  if (kind === 'suggestion') {
+    if (n === 0) return 'Insert suggestion as first step';
+    if (index >= n) return 'Insert suggestion at end of pipeline';
+    const target = props.steps[index];
+    return `Insert suggestion before “${target?.label ?? 'step'}”`;
+  }
+  if (kind === 'step-reorder') {
+    if (index >= n) return 'Move step to end of pipeline';
+    if (index === 0) return 'Move step to start (position 1)';
+    const target = props.steps[index];
+    return `Move step before “${target?.label ?? 'step'}” (position ${index + 1})`;
+  }
+  return 'Drop here';
+}
+
+function onChainDragEnter() {
+  if (resolveDragKind()) chainDndHover.value = true;
+}
+
+function onChainDragLeave(event: DragEvent) {
+  const scroll = scrollRef.value;
+  const related = event.relatedTarget;
+  if (scroll && related instanceof Node && scroll.contains(related)) return;
+  chainDndHover.value = false;
+}
 
 function isInSelectionRange(stepId: string): boolean {
   const range = props.selectionRange;
@@ -188,6 +381,11 @@ watch(() => props.steps.length, () => {
 onMounted(() => {
   const initialId = props.selectedStepId ?? props.steps[0]?.id;
   if (initialId) scrollToStep(initialId, 'auto');
+  document.addEventListener('dragend', clearDndState);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('dragend', clearDndState);
 });
 
 function traceFor(stepId: string): PipelineTraceEvent | undefined {
@@ -224,7 +422,103 @@ function runStateFor(stepId: string) {
 }
 
 function outputPreviewFor(stepId: string): string | null {
-  return props.runSnapshots?.[stepId]?.primaryOutputPreview ?? null;
+  const preview = props.runSnapshots?.[stepId]?.primaryOutputPreview;
+  if (!preview) return null;
+  return formatArtifactDisplay(preview, 200);
+}
+
+function onStepDragStart(stepId: string, event: DragEvent) {
+  const target = event.target as HTMLElement;
+  if (target.closest('button, input, textarea, select, a, [contenteditable="true"]')) {
+    event.preventDefault();
+    return;
+  }
+  draggingStepId.value = stepId;
+  activeDragKind.value = 'step-reorder';
+  chainDndHover.value = true;
+  event.dataTransfer?.setData(DND_STEP_ID, stepId);
+  event.dataTransfer!.effectAllowed = 'move';
+  emit('select', stepId);
+}
+
+function onStepDragEnd() {
+  clearDndState();
+}
+
+function onStepDragOver(stepId: string, index: number, event: DragEvent) {
+  if (isStepReorderDragActive()) {
+    syncActiveDragKind();
+    if (draggingStepId.value !== stepId) {
+      dragOverStepId.value = stepId;
+      dropTargetIndex.value = null;
+    }
+    event.dataTransfer!.dropEffect = 'move';
+    return;
+  }
+  if (props.acceptSuggestionDrop && isSuggestionDragActive()) {
+    syncActiveDragKind();
+    dragOverStepId.value = null;
+    dropTargetIndex.value = index;
+    event.dataTransfer!.dropEffect = 'copy';
+  }
+}
+
+function onStepDragLeave(stepId: string, event: DragEvent) {
+  const stepEl = event.currentTarget as HTMLElement;
+  const related = event.relatedTarget;
+  if (related instanceof Node && stepEl.contains(related)) return;
+  if (dragOverStepId.value === stepId) dragOverStepId.value = null;
+}
+
+function onStepDrop(stepId: string, index: number, event: DragEvent) {
+  const draggedId = draggedStepIdForDrop(event);
+  if (draggedId && draggedId !== stepId) {
+    emit('reorder', draggedId, index);
+    clearDndState();
+    return;
+  }
+  const suggestionId = draggedSuggestionIdForDrop(event);
+  if (props.acceptSuggestionDrop && suggestionId) {
+    emit('drop-suggestion', suggestionId, index);
+    clearDndState();
+  }
+}
+
+function onInsertZoneDragOver(index: number, event: DragEvent) {
+  if (isStepReorderDragActive()) {
+    syncActiveDragKind();
+    dragOverStepId.value = null;
+    dropTargetIndex.value = index;
+    event.dataTransfer!.dropEffect = 'move';
+    return;
+  }
+  if (props.acceptSuggestionDrop && isSuggestionDragActive()) {
+    syncActiveDragKind();
+    dragOverStepId.value = null;
+    dropTargetIndex.value = index;
+    event.dataTransfer!.dropEffect = 'copy';
+  }
+}
+
+function onInsertZoneDragLeave(index: number, event: DragEvent) {
+  const zone = event.currentTarget as HTMLElement;
+  const related = event.relatedTarget;
+  if (related instanceof Node && zone.contains(related)) return;
+  if (dropTargetIndex.value === index) dropTargetIndex.value = null;
+}
+
+function onInsertZoneDrop(index: number, event: DragEvent) {
+  const draggedId = draggedStepIdForDrop(event);
+  if (draggedId) {
+    emit('reorder', draggedId, index);
+    clearDndState();
+    return;
+  }
+  const suggestionId = draggedSuggestionIdForDrop(event);
+  if (props.acceptSuggestionDrop && suggestionId) {
+    emit('drop-suggestion', suggestionId, index);
+    clearDndState();
+  }
 }
 
 function runStateTitle(stepId: string): string {
@@ -295,20 +589,33 @@ function runStateTitle(stepId: string): string {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 }
 
 .step-connector { color: #444; font-size: 0.85rem; margin: 1px 0; flex-shrink: 0; }
 
 .step-card {
   width: 100%;
+  display: flex;
+  align-items: stretch;
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
-  padding: 0.55rem 0.75rem;
-  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  cursor: grab;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
-.chain-step:not(.selected) .step-card { opacity: 0.7; transform: scale(0.98); }
+.step-card:active { cursor: grabbing; }
+.chain-step.dragging .step-card { cursor: grabbing; }
+.step-card-content {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem 0.55rem 0.45rem;
+}
+.chain-step:not(.selected) .step-card { opacity: 0.82; transform: scale(0.98); }
+.chain-step:not(.selected):hover .step-card { opacity: 0.95; }
+.chain-editor.dnd-active .chain-step:not(.selected):not(.dragging) .step-card { opacity: 0.88; }
 .chain-step.in-selection-range:not(.selected) .step-card {
   border-color: #4a3a6a;
   box-shadow: 0 0 0 1px #4a3a6a44;
@@ -329,6 +636,188 @@ function runStateTitle(stepId: string): string {
 .trace-cancelled .step-card { border-left: 3px solid #666; }
 
 .step-card-header { display: flex; align-items: center; gap: 0.4rem; }
+.step-drag-handle {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  border-right: 1px solid #2a2a2a;
+  border-radius: 8px 0 0 8px;
+  background: #141414;
+  color: #555;
+  pointer-events: none;
+  user-select: none;
+}
+.step-drag-grip {
+  font-size: 0.9rem;
+  line-height: 1;
+  letter-spacing: -0.12em;
+}
+.chain-step:hover .step-drag-handle { color: #777; background: #1c1c1c; }
+.chain-step.selected .step-drag-handle {
+  background: #0e1822;
+  border-right-color: #2a5070;
+  color: #6a9fc8;
+}
+.chain-step.selected:hover .step-drag-handle { background: #152535; color: #8ec8e8; }
+.step-card-content :is(button, input, textarea, select) { cursor: pointer; }
+.chain-step.dragging .step-card { opacity: 0.45; }
+/* Full step-card outline when reordering onto an existing step */
+.chain-step.drop-target-step .step-card {
+  outline: 2px dashed #5a9fd4;
+  outline-offset: 3px;
+  border-color: #5a9fd4;
+  background: #152535;
+  box-shadow:
+    0 0 0 1px rgba(90, 159, 212, 0.35),
+    0 0 18px 4px rgba(90, 159, 212, 0.45),
+    0 0 36px 10px rgba(90, 159, 212, 0.2),
+    inset 0 0 28px rgba(90, 159, 212, 0.08);
+}
+.step-drop-banner {
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #a8dff5;
+  text-align: center;
+  background: #1a3048;
+  border: 1px dashed #5a9fd4;
+  border-radius: 4px;
+}
+.chain-editor.dnd-active .insert-zone {
+  opacity: 1 !important;
+  padding: 6px 0;
+}
+/* Card-sized drop placeholders (full element footprint) */
+.drop-slot-card {
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.drop-slot-card-inner {
+  min-height: 5.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.drop-slot-card-ghost .drop-slot-card-inner {
+  border: 2px dashed #3a5060;
+  background: #0e1218;
+  opacity: 0.65;
+  box-shadow:
+    0 0 10px 2px rgba(90, 159, 212, 0.12),
+    0 0 22px 6px rgba(90, 159, 212, 0.06),
+    inset 0 0 16px rgba(90, 159, 212, 0.04);
+}
+.drop-slot-card-active .drop-slot-card-inner {
+  border: 2px dashed #5a9fd4;
+  background: #141e28;
+  outline: 2px solid rgba(90, 159, 212, 0.35);
+  outline-offset: 2px;
+  opacity: 1;
+  box-shadow:
+    0 0 14px 3px rgba(90, 159, 212, 0.5),
+    0 0 32px 10px rgba(90, 159, 212, 0.28),
+    inset 0 0 24px rgba(90, 159, 212, 0.1);
+  animation: drop-zone-glow-pulse 1.6s ease-in-out infinite;
+}
+.chain-editor.dnd-kind-suggestion .drop-slot-card-ghost .drop-slot-card-inner {
+  border-color: #3a5040;
+  box-shadow:
+    0 0 10px 2px rgba(109, 184, 109, 0.12),
+    0 0 22px 6px rgba(109, 184, 109, 0.06),
+    inset 0 0 16px rgba(109, 184, 109, 0.04);
+}
+.chain-editor.dnd-kind-suggestion .drop-slot-card-active .drop-slot-card-inner {
+  border-color: #5a9d6e;
+  background: #141f18;
+  outline-color: rgba(109, 184, 109, 0.35);
+  box-shadow:
+    0 0 14px 3px rgba(109, 184, 109, 0.45),
+    0 0 32px 10px rgba(109, 184, 109, 0.22),
+    inset 0 0 24px rgba(109, 184, 109, 0.08);
+}
+.chain-editor.dnd-kind-suggestion .drop-slot-card-active .drop-slot-label { color: #8dda8d; }
+.chain-editor.dnd-kind-suggestion .chain-step.drop-target-step .step-card {
+  outline-color: #5a9d6e;
+  border-color: #5a9d6e;
+  background: #152518;
+  box-shadow:
+    0 0 0 1px rgba(109, 184, 109, 0.35),
+    0 0 18px 4px rgba(109, 184, 109, 0.4),
+    0 0 36px 10px rgba(109, 184, 109, 0.18),
+    inset 0 0 28px rgba(109, 184, 109, 0.07);
+}
+@keyframes drop-zone-glow-pulse-blue {
+  0%, 100% {
+    box-shadow:
+      0 0 12px 2px rgba(90, 159, 212, 0.4),
+      0 0 28px 8px rgba(90, 159, 212, 0.22),
+      inset 0 0 20px rgba(90, 159, 212, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 20px 5px rgba(90, 159, 212, 0.55),
+      0 0 40px 14px rgba(90, 159, 212, 0.32),
+      inset 0 0 32px rgba(90, 159, 212, 0.12);
+  }
+}
+@keyframes drop-zone-glow-pulse-green {
+  0%, 100% {
+    box-shadow:
+      0 0 12px 2px rgba(109, 184, 109, 0.38),
+      0 0 28px 8px rgba(109, 184, 109, 0.2),
+      inset 0 0 20px rgba(109, 184, 109, 0.07);
+  }
+  50% {
+    box-shadow:
+      0 0 20px 5px rgba(109, 184, 109, 0.52),
+      0 0 40px 14px rgba(109, 184, 109, 0.28),
+      inset 0 0 32px rgba(109, 184, 109, 0.11);
+  }
+}
+.chain-editor.dnd-kind-step-reorder .drop-slot-card-active .drop-slot-card-inner,
+.chain-editor.dnd-kind-step-reorder .chain-step.drop-target-step .step-card {
+  animation: drop-zone-glow-pulse-blue 1.8s ease-in-out infinite;
+}
+.chain-editor.dnd-kind-suggestion .drop-slot-card-active .drop-slot-card-inner {
+  animation: drop-zone-glow-pulse-green 1.8s ease-in-out infinite;
+}
+.drop-slot-label {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #7ec8e3;
+  text-align: center;
+  line-height: 1.35;
+}
+.insert-zone.drop-target-active {
+  padding: 8px 0;
+}
+.chain-empty.drop-target-active {
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow:
+    0 0 20px 6px rgba(90, 159, 212, 0.2),
+    inset 0 0 40px rgba(90, 159, 212, 0.05);
+}
+.chain-editor.dnd-kind-suggestion .chain-empty.drop-target-active {
+  box-shadow:
+    0 0 20px 6px rgba(109, 184, 109, 0.18),
+    inset 0 0 40px rgba(109, 184, 109, 0.05);
+}
+.chain-empty.drop-target-active .drop-slot-card-active .drop-slot-card-inner {
+  min-height: 6rem;
+}
+.chain-empty-drop-slot { width: 100%; margin-bottom: 0.75rem; }
+.chain-empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
 .step-type-badge {
   font-size: 0.6rem; padding: 1px 5px; border-radius: 3px;
   background: #222; color: #666; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
@@ -389,7 +878,7 @@ function runStateTitle(stepId: string): string {
 .step-run-actions { margin-top: 0.3rem; display: none; }
 .chain-step.selected .step-run-actions { display: block; }
 .btn-run-up-to {
-  font-size: 0.68rem; padding: 2px 8px;
+  font-size: 0.9rem; padding: 2px 6px;
   background: #1a2e1a; border: 1px solid #2a4d2a; color: #6db86d;
   border-radius: 3px; cursor: pointer;
 }
@@ -397,8 +886,14 @@ function runStateTitle(stepId: string): string {
 
 /* Insert zone between steps */
 .insert-zone {
-  display: flex; justify-content: center; align-items: center;
-  height: 20px; width: 100%; max-width: 480px; opacity: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  max-width: 480px;
+  opacity: 0;
   transition: opacity 0.15s;
 }
 .insert-zone-top { margin-bottom: 2px; }

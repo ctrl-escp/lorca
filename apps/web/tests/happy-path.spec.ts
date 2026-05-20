@@ -130,7 +130,7 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
 
   // Run up to Acceptance Criteria — main model must not run
   await selectStep(page, 'Acceptance Criteria');
-  await stepCard(page, 'Acceptance Criteria').getByRole('button', {name: '▷ Run up to here'}).click();
+  await stepCard(page, 'Acceptance Criteria').getByRole('button', {name: 'Run up to here'}).click();
   await expect(page.getByRole('button', {name: 'Execute Pipeline'})).toBeEnabled({timeout: 15000});
 
   const callsAfterPartial = generateCallCount;

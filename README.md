@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/web/public/lorca-pipeline-sigil.svg" alt="Lorca logo" width="72" height="72" />
+</p>
+
 # Lorca
 
 **Local AI Orchestrator** — a browser-first workbench for designing, executing, and iterating on local AI pipelines.
@@ -330,6 +334,10 @@ npm run dev --workspace=apps/web
 npm run build --workspace=apps/web
 npm run preview --workspace=apps/web
 ```
+
+### GitHub Pages
+
+Pushes to `main` run [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml): build `apps/web`, set `VITE_BASE_PATH` to `/<repo>/` (or `/` for `username.github.io`), and deploy via GitHub Pages. Enable **Settings → Pages → GitHub Actions** on the repository before the first deploy succeeds.
 
 ### Tech stack
 

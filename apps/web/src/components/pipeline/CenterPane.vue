@@ -54,7 +54,10 @@
       :last-redo-label="editorStore.lastRedoLabel"
       :selection-range="selectionRange"
       :run-snapshots="runStore.snapshots"
+      :accept-suggestion-drop="true"
       @select="handleSelectStep"
+      @reorder="handleReorder"
+      @drop-suggestion="handleDropSuggestion"
       @append="handleAppend"
       @insert-after="handleInsertAfter"
       @insert-at="handleInsertAt"
@@ -85,6 +88,7 @@ import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
+import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
 import ChainEditor from './ChainEditor.vue';
 
 const props = defineProps<{def: PipelineDefinition}>();
@@ -97,6 +101,8 @@ const uiStore = useUiStore();
 const importStore = useImportExportStore();
 const editorStore = usePipelineEditorStore();
 const modelsStore = useModelsStore();
+const suggestionInsert = useSuggestionInsert();
+const followRunLive = ref(true);
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
@@ -271,6 +277,30 @@ function handleMoveDown(stepId: string) {
   const idx = editorStore.steps.findIndex((s) => s.id === stepId);
   if (idx < editorStore.steps.length - 1) editorStore.moveStep(stepId, idx + 1);
 }
+
+function handleReorder(stepId: string, targetIndex: number) {
+  const fromIdx = editorStore.steps.findIndex((s) => s.id === stepId);
+  if (fromIdx < 0 || fromIdx === targetIndex) return;
+  editorStore.moveStep(stepId, targetIndex);
+}
+
+function handleDropSuggestion(suggestionId: string, insertIndex: number) {
+  suggestionInsert.insertSuggestionById(suggestionId, 'at-index', insertIndex);
+}
+
+watch(
+  () => runStore.trace.length,
+  () => {
+    if (!followRunLive.value || !runStore.isRunning) return;
+    const last = runStore.trace.at(-1);
+    if (!last) return;
+    const stepId = last.stepId ?? last.nodeId;
+    if (!stepId) return;
+    if (last.status === 'started' || last.status === 'completed') {
+      editorStore.selectStep(stepId);
+    }
+  },
+);
 
 function handleDuplicate(stepId: string) {
   const newId = editorStore.duplicateStep(stepId);

@@ -8,10 +8,14 @@
         <span class="breadcrumb-label">{{ activeCapsule.name || 'Capsule' }}</span>
       </template>
       <span v-else class="app-subtitle">Local AI Orchestrator</span>
-      <span v-if="runStatus !== 'idle'" class="run-status" :class="`rs-${runStatus}`" :title="`Run status: ${runStatus}`">
-        {{ runStatus }}
-      </span>
+      <div class="header-actions">
+        <span v-if="runStatus !== 'idle'" class="run-status" :class="`rs-${runStatus}`" :title="`Run status: ${runStatus}`">
+          {{ runStatus }}
+        </span>
+        <button type="button" class="btn-help" title="Help — UI overview and workflow" @click="showAppHelp = true">?</button>
+      </div>
     </header>
+    <HelpDialog :open="showAppHelp" variant="app" @close="showAppHelp = false" />
     <ImportErrorBanner
       v-if="importStore.importErrors.length > 0"
       :errors="importStore.importErrors"
@@ -78,7 +82,10 @@ import RightPane from './components/RightPane.vue';
 import ImportRemapDialog from './components/import/ImportRemapDialog.vue';
 import ImportErrorBanner from './components/import/ImportErrorBanner.vue';
 import PaneResizeHandle from './components/layout/PaneResizeHandle.vue';
+import HelpDialog from './components/help/HelpDialog.vue';
 import type {ModelRemap} from './stores/importExport.js';
+
+const showAppHelp = ref(false);
 
 const runStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
@@ -196,7 +203,14 @@ body {
 .breadcrumb-back:hover { text-decoration: underline; }
 .breadcrumb-sep { color: #444; font-size: 0.78rem; }
 .breadcrumb-label { font-size: 0.78rem; color: #888; }
-.run-status { margin-left: auto; font-size: 0.72rem; padding: 2px 8px; border-radius: 3px; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+.run-status { font-size: 0.72rem; padding: 2px 8px; border-radius: 3px; }
+.btn-help {
+  width: 1.4rem; height: 1.4rem; border-radius: 50%;
+  background: #1a2a3a; border: 1px solid #2a5070; color: #7ec8e3;
+  font-size: 0.78rem; cursor: pointer; line-height: 1;
+}
+.btn-help:hover { background: #254a62; }
 .rs-running { background: #2d2a1e; color: #e8a020; }
 .rs-completed { background: #1e2d1e; color: #5ddb9e; }
 .rs-failed, .rs-cancelled { background: #2d1e1e; color: #e07070; }

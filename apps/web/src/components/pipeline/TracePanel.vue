@@ -66,9 +66,9 @@
           <div class="ev-detail-title">Rendered prompt</div>
           <pre class="ev-prompt">{{ event.renderedPromptXml }}</pre>
         </div>
-        <div v-if="event.rawModelResponsePreview" class="ev-detail">
-          <div class="ev-detail-title">Raw model response</div>
-          <pre class="ev-preview">{{ event.rawModelResponsePreview }}</pre>
+        <div v-if="rawResponseFor(event)" class="ev-detail">
+          <div class="ev-detail-title">Model response</div>
+          <pre class="ev-preview ev-preview-full">{{ rawResponseFor(event) }}</pre>
         </div>
       </template>
 
@@ -83,8 +83,9 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
+import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
 
-const ARTIFACT_PREVIEW_MAX = 4000;
+const ARTIFACT_PREVIEW_MAX = 12000;
 
 const props = defineProps<{
   trace: PipelineTraceEvent[];
@@ -121,9 +122,18 @@ function stepLabel(event: PipelineTraceEvent): string {
 function hasDetails(event: PipelineTraceEvent): boolean {
   return Boolean(
     event.renderedPromptXml
-    || event.rawModelResponsePreview
+    || rawResponseFor(event)
     || (event.historyReadInputs && event.historyReadInputs.length > 0),
   );
+}
+
+function rawResponseFor(event: PipelineTraceEvent): string | null {
+  const rawKey = event.outputArtifactNames?.find((n) => n.endsWith('.rawResponse'));
+  if (rawKey) {
+    const full = artifactBody(rawKey);
+    if (full) return full;
+  }
+  return event.rawModelResponsePreview ?? null;
 }
 
 function toggleExpand(id: string) {
@@ -152,8 +162,10 @@ function expandedArtifactForEvent(event: PipelineTraceEvent): string | null {
 function artifactBody(name: string): string | null {
   const art = props.artifacts?.[name];
   if (!art) return null;
-  const raw = typeof art.value === 'string' ? art.value : JSON.stringify(art.value, null, 2);
-  return raw.length > ARTIFACT_PREVIEW_MAX ? `${raw.slice(0, ARTIFACT_PREVIEW_MAX)}\n… (truncated)` : raw;
+  const formatted = formatArtifactDisplay(art.value);
+  return formatted.length > ARTIFACT_PREVIEW_MAX
+    ? `${formatted.slice(0, ARTIFACT_PREVIEW_MAX)}\n… (truncated)`
+    : formatted;
 }
 </script>
 
@@ -206,6 +218,7 @@ function artifactBody(name: string): string | null {
   border: 1px solid #222; border-radius: 3px; padding: 0.35rem 0.45rem;
   white-space: pre-wrap; word-break: break-word; max-height: 12rem; overflow-y: auto;
 }
+.ev-preview-full { max-height: 28rem; }
 .ev-error { margin-top: 0.25rem; font-size: 0.75rem; }
 .ev-error-code { color: #e07070; margin-right: 0.4rem; font-family: monospace; }
 .ev-error-msg { color: #c88; }

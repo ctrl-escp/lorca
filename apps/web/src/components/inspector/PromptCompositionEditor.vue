@@ -1,5 +1,14 @@
 <template>
   <div class="prompt-composition">
+    <div class="pce-toolbar">
+      <button type="button" class="pce-help-btn" title="Artifact references and prompt composition help" @click="showPromptHelp = true">? References</button>
+    </div>
+    <HelpDialog
+      :open="showPromptHelp"
+      variant="prompt"
+      :artifact-refs="promptArtifactRefs"
+      @close="showPromptHelp = false"
+    />
 
     <!-- Previous output -->
     <div class="pce-section">
@@ -223,9 +232,11 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig, PipelineStep} from '@lorca/core';
+import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import {isValidTag, previewPromptXml} from '@lorca/prompt';
 import {
   getPriorSourceSteps,
+  listStepOutputArtifacts,
   artifactsForSourceStep,
   defaultArtifactRefForSource,
   suggestHistoryReadTagName,
@@ -234,6 +245,7 @@ import {
 } from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
+import HelpDialog from '../help/HelpDialog.vue';
 
 const props = defineProps<{
   stepId: string;
@@ -258,10 +270,24 @@ const localPrevPlacement = ref<'beforeOwnPrompt' | 'afterOwnPrompt'>('afterOwnPr
 const localHistoryReads = ref<StepHistoryReadConfig[]>([]);
 const localBlocks = ref<PromptBlock[]>([]);
 const showPreview = ref(false);
+const showPromptHelp = ref(false);
 
 const chainSteps = computed(() => props.contextSteps ?? editorStore.steps);
 
 const priorSources = computed(() => getPriorSourceSteps(chainSteps.value, props.stepId));
+
+const promptArtifactRefs = computed(() => {
+  const refs = ['user_prompt.raw', 'user_prompt.xml'];
+  for (const opt of priorSources.value) {
+    if (opt.stepId === props.stepId || opt.stepId === PIPELINE_INPUT_STEP_ID) continue;
+    const step = chainSteps.value.find((s) => s.id === opt.stepId);
+    if (!step) continue;
+    for (const art of listStepOutputArtifacts(step)) {
+      refs.push(art.ref);
+    }
+  }
+  return [...new Set(refs)];
+});
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
   const c = cfg ?? EMPTY_CONFIG;
@@ -443,6 +469,12 @@ const previewXml = computed(() => previewPromptXml(buildConfig()));
   display: flex; align-items: center; justify-content: space-between;
   border-top: 1px solid #1e1e1e; padding-top: 0.4rem;
 }
+.pce-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.35rem; }
+.pce-help-btn {
+  font-size: 0.68rem; padding: 2px 8px; background: #1a2430; border: 1px solid #2a5070;
+  color: #7ec8e3; border-radius: 3px; cursor: pointer;
+}
+.pce-help-btn:hover { background: #254a62; }
 .pce-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #444; }
 
 .pce-toggle-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: #888; cursor: pointer; }

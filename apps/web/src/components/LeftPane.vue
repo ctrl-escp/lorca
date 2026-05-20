@@ -62,19 +62,31 @@
             v-for="suggestion in filteredSuggestions"
             :key="suggestion.id"
             class="suggestion-row"
-            :title="suggestion.description"
+            :title="isPipelineContext ? `${suggestion.description} — drag into the pipeline` : suggestion.description"
           >
+            <button
+              v-if="isPipelineContext"
+              type="button"
+              class="row-drag-handle"
+              draggable="true"
+              title="Drag into pipeline"
+              aria-label="Drag suggestion into pipeline"
+              @dragstart="onSuggestionDragStart(suggestion.id, $event)"
+              @dragend="onSuggestionDragEnd"
+              @click.stop
+            ><span class="row-drag-grip" aria-hidden="true">⠿</span></button>
             <div class="suggestion-row-main">
               <span class="suggestion-row-name">{{ suggestion.name }}</span>
               <span class="suggestion-row-desc">{{ suggestion.description }}</span>
               <span class="suggestion-row-category">{{ suggestion.category }}</span>
+              <span v-if="suggestion.preferredModelBucket" class="suggestion-row-bucket" :title="`Preferred model bucket: ${suggestion.preferredModelBucket}`">{{ suggestion.preferredModelBucket }}</span>
             </div>
             <div class="suggestion-row-actions">
               <button
                 class="btn-insert-suggestion"
                 type="button"
                 title="Insert before selected step"
-                :disabled="!editorStore.selectedStepId"
+                :disabled="!isPipelineContext || !editorStore.selectedStepId"
                 @click.stop="onInsertSuggestion(suggestion, 'before')"
               >↑ Before</button>
               <button
@@ -218,7 +230,7 @@
 import {ref, computed, onMounted} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType, PipelineStep} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
-import {BUILTIN_SUGGESTIONS, instantiateSuggestion} from '@lorca/capsules';
+import {BUILTIN_SUGGESTIONS} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
@@ -226,15 +238,14 @@ import {useCapsulesStore} from '../stores/capsules.js';
 import {useUiStore} from '../stores/ui.js';
 import {useImportExportStore} from '../stores/importExport.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
+import {useActiveStepEditor} from '../composables/useActiveStepEditor.js';
+import {useSuggestionInsert} from '../composables/useSuggestionInsert.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useEndpointActions} from '../composables/useEndpointActions.js';
+import {DND_BODY_SUGGESTION, DND_SUGGESTION_ID} from '../utils/dragDrop.js';
 import {pickJsonFile} from '../utils/importFile.js';
 import {newId} from '../utils/id.js';
-import {
-  autoAssignModelsToSteps,
-  autoAssignModelToStep,
-  modelMatchesBucket,
-} from '@lorca/endpoints';
+import {autoAssignModelToStep, modelMatchesBucket} from '@lorca/endpoints';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
@@ -245,9 +256,13 @@ const modelsStore = useModelsStore();
 const capsulesStore = useCapsulesStore();
 const uiStore = useUiStore();
 const importStore = useImportExportStore();
-const editorStore = usePipelineEditorStore();
+const pipelineEditorStore = usePipelineEditorStore();
+const editorStore = useActiveStepEditor();
+const suggestionInsert = useSuggestionInsert();
 const runStore = useActiveRunStore();
 const epActions = useEndpointActions();
+
+const isPipelineContext = computed(() => uiStore.editorContext === 'pipeline');
 
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
@@ -344,10 +359,11 @@ async function onAddModel(model: DiscoveredModel) {
 }
 
 function onInsertCapsule(capsuleId: string) {
+  if (!isPipelineContext.value) return;
   const cap = capsulesStore.getCapsule(capsuleId);
   if (!cap) return;
-  const stepId = editorStore.insertCapsuleInstance(cap);
-  if (stepId) editorStore.selectStep(stepId);
+  const stepId = pipelineEditorStore.insertCapsuleInstance(cap);
+  if (stepId) pipelineEditorStore.selectStep(stepId);
 }
 
 function onDuplicateCapsule(capsuleId: string) {
@@ -355,35 +371,15 @@ function onDuplicateCapsule(capsuleId: string) {
   if (duplicatedId) uiStore.openCapsuleEditor(duplicatedId);
 }
 
-function prepareSteps(
-  steps: ReturnType<typeof instantiateSuggestion>,
-  preferredBucket?: ModelUsageBucket,
-): PipelineStep[] {
-  return autoAssignModelsToSteps(steps, modelsStore.models, preferredBucket);
+function onSuggestionDragStart(suggestionId: string, event: DragEvent) {
+  if (!isPipelineContext.value) return;
+  document.body.classList.add('lorca-dnd-active', DND_BODY_SUGGESTION);
+  event.dataTransfer?.setData(DND_SUGGESTION_ID, suggestionId);
+  event.dataTransfer!.effectAllowed = 'copy';
 }
 
-function insertStepsAfterAnchor(anchorId: string | null, newSteps: PipelineStep[]) {
-  if (newSteps.length === 0) return;
-  if (anchorId) {
-    let afterId = anchorId;
-    for (const step of newSteps) {
-      afterId = editorStore.insertStepAfter(afterId, step);
-    }
-    editorStore.selectStep(afterId);
-  } else {
-    for (const step of newSteps) {
-      editorStore.appendStep(step);
-    }
-    editorStore.selectStep(newSteps[newSteps.length - 1]!.id);
-  }
-}
-
-function insertStepsBeforeAnchor(anchorId: string, newSteps: PipelineStep[]) {
-  if (newSteps.length === 0) return;
-  for (const step of newSteps) {
-    editorStore.insertStepBefore(anchorId, step);
-  }
-  editorStore.selectStep(newSteps[newSteps.length - 1]!.id);
+function onSuggestionDragEnd() {
+  document.body.classList.remove('lorca-dnd-active', DND_BODY_SUGGESTION);
 }
 
 function onInsertStepType(type: StepType) {
@@ -399,28 +395,12 @@ function onInsertStepType(type: StepType) {
 type SuggestionInsertMode = 'before' | 'after' | 'append' | 'new';
 
 function onInsertSuggestion(suggestion: PipelineSuggestion, mode: SuggestionInsertMode) {
-  const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
-  const rawSteps = instantiateSuggestion(suggestion, existingNamespaces);
-  const newSteps = prepareSteps(rawSteps, suggestion.preferredModelBucket);
-
+  if (!isPipelineContext.value) return;
   if (mode === 'new') {
-    const hasContent = editorStore.steps.length > 0 || editorStore.pipeline.input.raw.trim();
-    if (hasContent && !window.confirm(
-      `Replace the current pipeline with "${suggestion.name}"?\n\nExisting steps and prompt will be cleared.`,
-    )) return;
     if (runStore.isRunning) runStore.cancel();
     runStore.reset();
-    editorStore.replaceSteps(newSteps, `New pipeline from "${suggestion.name}"`);
-    return;
   }
-
-  const anchorId = mode === 'append' ? null : editorStore.selectedStepId;
-  if (mode === 'before') {
-    if (!anchorId) return;
-    insertStepsBeforeAnchor(anchorId, newSteps);
-    return;
-  }
-  insertStepsAfterAnchor(anchorId, newSteps);
+  suggestionInsert.insertSuggestion(suggestion, mode);
 }
 
 function onModelClick(model: DiscoveredModel) {
@@ -579,15 +559,48 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 /* Suggestions */
 .suggestion-list { display: flex; flex-direction: column; gap: 0.3rem; }
 .suggestion-row {
-  display: flex; align-items: flex-start; gap: 0.4rem;
-  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid #222; background: #161616;
+  display: flex; align-items: stretch; gap: 0;
+  padding: 0; border-radius: 4px; border: 1px solid #222; background: #161616;
+  overflow: hidden;
 }
 .suggestion-row:hover { border-color: #2a3d2a; background: #191f19; }
-.suggestion-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.row-drag-handle {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #2a2a2a;
+  border-radius: 4px 0 0 4px;
+  background: #121612;
+  color: #5a7a5a;
+  cursor: grab;
+}
+.row-drag-grip {
+  font-size: 0.85rem;
+  line-height: 1;
+  letter-spacing: -0.12em;
+  user-select: none;
+}
+.row-drag-handle:hover { background: #1a221a; color: #8ab88a; }
+.row-drag-handle:active { cursor: grabbing; }
+.suggestion-row-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.5rem;
+}
+.suggestion-row-actions {
+  display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0; max-width: 5.5rem;
+  padding: 0.35rem 0.5rem 0.35rem 0; align-self: center;
+}
 .suggestion-row-name { font-size: 0.78rem; font-weight: 500; }
 .suggestion-row-desc { font-size: 0.62rem; color: #666; line-height: 1.3; }
 .suggestion-row-category { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a8a5a; }
-.suggestion-row-actions { display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0; max-width: 5.5rem; }
+.suggestion-row-bucket { font-size: 0.58rem; color: #6a8ab0; font-family: monospace; }
+.model-row.assignable { cursor: pointer; }
+.model-row.assignable:hover { background: #1a2430; border-radius: 4px; }
 .btn-insert-new { background: #2d1a1a; border-color: #4d2a2a; color: #b86d6d; }
 .btn-insert-new:hover { background: #381e1e; color: #da8d8d; }
 .btn-insert-suggestion:disabled { opacity: 0.35; cursor: default; }
