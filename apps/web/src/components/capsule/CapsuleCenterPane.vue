@@ -54,6 +54,7 @@
       @toggle-enabled="handleToggleEnabled"
       @delete="editor.deleteStep"
       @run-up-to="handleRunUpTo"
+      @run-only-step="handleRunOnlyStep"
       @undo="editor.undo"
       @redo="editor.redo"
     />
@@ -248,10 +249,16 @@ async function handleRunUpTo(stepId: string) {
   await runCapsule(stepId);
 }
 
-async function runCapsule(stopAtStepId?: string) {
+async function handleRunOnlyStep(stepId: string) {
+  editor.updateUserPrompt(testPrompt.value.trim());
   const c = editor.getCapsule();
   if (!c) return;
+  const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
+  uiStore.setRightPaneTab('trace');
+  await capsuleRunStore.runOnlyStep(c, testPrompt.value, inputValues, paramValues, slotAssignments, stepId);
+}
 
+function buildTestInputs(c: CapsuleDefinition) {
   const inputValues: Record<string, unknown> = {};
   for (const port of c.interface.inputs) {
     const raw = testInputValues.value[port.name] ?? '';
@@ -283,6 +290,13 @@ async function runCapsule(stopAtStepId?: string) {
     }
   }
 
+  return {inputValues, paramValues, slotAssignments};
+}
+
+async function runCapsule(stopAtStepId?: string) {
+  const c = editor.getCapsule();
+  if (!c) return;
+  const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
   uiStore.setRightPaneTab('trace');
   await capsuleRunStore.run(c, testPrompt.value, inputValues, paramValues, slotAssignments, stopAtStepId);
 }

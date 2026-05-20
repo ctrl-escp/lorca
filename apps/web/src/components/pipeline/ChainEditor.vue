@@ -109,6 +109,13 @@
                   @click.stop="$emit('run-up-to', step.id)"
                   title="Execute pipeline up to this step"
                 >▷</button>
+                <button
+                  type="button"
+                  class="btn-run-only-step icon-btn"
+                  aria-label="Re-run only this step"
+                  @click.stop="$emit('run-only-step', step.id)"
+                  title="Re-run only this step (reuses previous outputs for other steps)"
+                >↺</button>
               </div>
               <div
                 v-if="dragOverStepId === step.id && activeDragKind === 'step-reorder'"
@@ -272,6 +279,7 @@ const emit = defineEmits<{
   delete: [stepId: string];
   append: [type: StepType];
   'run-up-to': [stepId: string];
+  'run-only-step': [stepId: string];
   undo: [];
   redo: [];
 }>();
@@ -884,14 +892,20 @@ function runStateTitle(stepId: string): string {
   border: 1px solid #1e1e1e;
 }
 
-.step-run-actions { margin-top: 0.3rem; display: none; }
-.chain-step.selected .step-run-actions { display: block; }
+.step-run-actions { margin-top: 0.3rem; display: none; gap: 4px; }
+.chain-step.selected .step-run-actions { display: flex; }
 .btn-run-up-to {
   font-size: 0.9rem; padding: 2px 6px;
   background: #1a2e1a; border: 1px solid #2a4d2a; color: #6db86d;
   border-radius: 3px; cursor: pointer;
 }
 .btn-run-up-to:hover { background: #1e381e; color: #8dda8d; }
+.btn-run-only-step {
+  font-size: 0.9rem; padding: 2px 6px;
+  background: #1a1a2e; border: 1px solid #2a2a4d; color: #6d6db8;
+  border-radius: 3px; cursor: pointer;
+}
+.btn-run-only-step:hover { background: #1e1e38; color: #8d8dda; }
 
 /* Insert zone between steps */
 .insert-zone {

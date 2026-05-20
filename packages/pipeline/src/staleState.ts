@@ -117,6 +117,9 @@ export interface RunSnapshotContext {
   userPromptSignature: string;
   partial: boolean;
   executedStepIds: string[];
+  /** When set, steps after this step in the active chain are forced stale
+   *  because they were computed using this step's old output. */
+  rerunSingleStepId?: string;
 }
 
 function isCapsuleDefinitionStale(
@@ -179,9 +182,15 @@ export function computeStepStaleStates(
     });
   }
 
-  const {snapshots, userPromptSignature, partial, executedStepIds} = runContext;
+  const {snapshots, userPromptSignature, partial, executedStepIds, rerunSingleStepId} = runContext;
   const activeSteps = buildActiveStepChain(pipeline.steps);
   const executedSet = new Set(executedStepIds);
+
+  // Steps after a single-step rerun are stale because they hold outputs computed
+  // from the rerun step's old result.
+  const rerunIdx = rerunSingleStepId
+    ? activeSteps.findIndex((s) => s.id === rerunSingleStepId)
+    : -1;
 
   const directlyStale = new Map<string, boolean>();
   for (const step of pipeline.steps) {
@@ -219,7 +228,8 @@ export function computeStepStaleStates(
 
     const activeIdx = activeSteps.findIndex((s) => s.id === step.id);
     const staleByChain = chainStaleFrom !== null && activeIdx >= 0 && activeIdx >= chainStaleFrom;
-    const stale = directlyStale.get(step.id) || staleByChain;
+    const staleByRerun = rerunIdx >= 0 && activeIdx > rerunIdx;
+    const stale = directlyStale.get(step.id) || staleByChain || staleByRerun;
 
     if (snapshot.status === 'failed') {
       return {stepId: step.id, state: stale ? 'failed-stale' : 'failed-current'};

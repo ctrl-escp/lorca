@@ -20,6 +20,8 @@ export interface CapsuleTestInput {
   slotAssignments: Record<string, {endpointId: string; modelName: string}>;
   abortSignal?: AbortSignal;
   stopAtStepId?: string;
+  startAtStepId?: string;
+  seedArtifacts?: Record<string, import('@lorca/core').PipelineArtifact>;
 }
 
 export type CapsuleTestRunResult = StepChainRunResult;
@@ -129,9 +131,10 @@ async function executeCapsuleStepChainTestRun(
     innerPipeline,
     raw,
     {
-      seedArtifacts,
+      seedArtifacts: {...seedArtifacts, ...(testInput.seedArtifacts ?? {})},
       ...(testInput.abortSignal !== undefined ? {abortSignal: testInput.abortSignal} : {}),
       ...(testInput.stopAtStepId ? {stopAtStepId: testInput.stopAtStepId} : {}),
+      ...(testInput.startAtStepId ? {startAtStepId: testInput.startAtStepId} : {}),
     },
     resolveEndpoint,
     callbacks,

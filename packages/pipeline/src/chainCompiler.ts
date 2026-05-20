@@ -39,6 +39,8 @@ export interface ExecutionPlan {
 
 export interface ExecutePipelineOptions {
   stopAtStepId?: string;
+  /** When set, steps before this step are compiled as 'skip' and not executed. */
+  startAtStepId?: string;
   includeDisabled?: boolean;
   reuseValidArtifacts?: boolean;
   abortSignal?: AbortSignal;
@@ -59,18 +61,24 @@ export function compileStepChainToExecutionPlan(
     : -1;
   const slicedSteps = stopIdx >= 0 ? activeSteps.slice(0, stopIdx + 1) : activeSteps;
 
+  const startIdx = options.startAtStepId
+    ? slicedSteps.findIndex((s) => s.id === options.startAtStepId)
+    : -1;
+
   return compileActiveStepsToExecutionPlan(slicedSteps, {
     allSteps: pipeline.steps,
     ...(options.stopAtStepId ? {stopAtStepId: options.stopAtStepId} : {}),
+    ...(startIdx > 0 ? {skipBeforeIndex: startIdx} : {}),
   });
 }
 
 /** Compile an ordered active step slice into an execution plan. */
 export function compileActiveStepsToExecutionPlan(
   steps: PipelineStep[],
-  options?: {stopAtStepId?: string; allSteps?: PipelineStep[]},
+  options?: {stopAtStepId?: string; allSteps?: PipelineStep[]; skipBeforeIndex?: number},
 ): ExecutionPlan {
   const stopAtStepId = options?.stopAtStepId;
+  const skipBeforeIndex = options?.skipBeforeIndex ?? 0;
   const allSteps = options?.allSteps ?? steps;
   const requiredHistorySources = new Set<string>();
   const compiled: CompiledExecutionStep[] = [];
@@ -95,13 +103,14 @@ export function compileActiveStepsToExecutionPlan(
     }
 
     const blockReasons = getStepBlockReasons(step, allSteps);
+    const shouldSkip = i < skipBeforeIndex;
     const compiledStep: CompiledExecutionStep = {
       stepId: step.id,
       stepOrder: i,
       type: step.type,
       inputArtifactRefs,
       outputNamespace: step.outputNamespace,
-      execute: blockReasons.length > 0 ? 'blocked' : 'run',
+      execute: shouldSkip ? 'skip' : blockReasons.length > 0 ? 'blocked' : 'run',
     };
     if (blockReasons.length > 0) compiledStep.blockedReason = blockReasons.join('; ');
     if (historyReads.length > 0) compiledStep.historyReads = historyReads;

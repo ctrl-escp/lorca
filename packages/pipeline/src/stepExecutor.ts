@@ -151,6 +151,11 @@ export async function executeStepChain(
       continue;
     }
 
+    if (compiledStep.execute === 'skip') {
+      callbacks.onTraceEvent(traceEvent(runId, step.id, 'skipped'));
+      continue;
+    }
+
     if (compiledStep.execute === 'blocked') {
       const blockErr: PipelineError = {
         code: 'invalid_pipeline_graph',

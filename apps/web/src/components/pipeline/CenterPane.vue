@@ -92,6 +92,7 @@
       @toggle-enabled="handleToggleEnabled"
       @delete="editorStore.deleteStep"
       @run-up-to="handleRunUpTo"
+      @run-only-step="handleRunOnlyStep"
       @undo="editorStore.undo"
       @redo="editorStore.redo"
     />
@@ -448,6 +449,11 @@ async function handleRun() {
 async function handleRunUpTo(stepId: string) {
   editorStore.updateUserPrompt(userPrompt.value.trim());
   await runStore.run(editorStore.pipeline, userPrompt.value.trim(), stepId);
+}
+
+async function handleRunOnlyStep(stepId: string) {
+  editorStore.updateUserPrompt(userPrompt.value.trim());
+  await runStore.runOnlyStep(editorStore.pipeline, userPrompt.value.trim(), stepId);
 }
 
 function handleExport() {
