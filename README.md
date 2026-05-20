@@ -413,4 +413,4 @@ Planned or documented for later phases (see `docs/`):
 
 ## License
 
-No project license file is checked in yet. Dependencies are predominantly MIT/Apache-2.0; add a `LICENSE` at the repository root before public distribution.
+[MIT](LICENSE) — Copyright © 2026 Ben Baryo.
