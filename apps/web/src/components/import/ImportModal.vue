@@ -14,6 +14,10 @@
             placeholder="Paste JSON here…"
             spellcheck="false"
           />
+          <label class="option-row">
+            <input type="checkbox" v-model="includeStepOutputs" />
+            <span>Import included step outputs</span>
+          </label>
           <div v-if="parseError" class="parse-error">{{ parseError }}</div>
         </div>
 
@@ -40,16 +44,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  submit: [json: string];
+  submit: [json: string, includeStepOutputs: boolean];
 }>();
 
 const jsonText = ref('');
 const parseError = ref('');
+const includeStepOutputs = ref(false);
 
 const kindLabel = computed(() => props.kind === 'pipeline' ? 'Pipeline' : 'Capsule');
 
 watch(() => props.open, (open) => {
-  if (open) { jsonText.value = ''; parseError.value = ''; }
+  if (open) { jsonText.value = ''; parseError.value = ''; includeStepOutputs.value = false; }
 });
 
 function handleFile(e: Event) {
@@ -72,7 +77,7 @@ function handleImport() {
     parseError.value = 'Invalid JSON — please check the content and try again.';
     return;
   }
-  emit('submit', jsonText.value);
+  emit('submit', jsonText.value, includeStepOutputs.value);
 }
 </script>
 
@@ -106,6 +111,11 @@ function handleImport() {
   font-size: 0.75rem; padding: 0.6rem; resize: vertical; line-height: 1.5;
 }
 .json-input:focus { outline: none; border-color: #2a5070; }
+.option-row {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: 0.78rem; color: #bbb; user-select: none;
+}
+.option-row input { cursor: pointer; }
 .parse-error { font-size: 0.78rem; color: #e07070; }
 .dialog-footer {
   display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;

@@ -6,6 +6,15 @@
           <span class="dialog-title">{{ title }}</span>
           <button class="btn-close" type="button" @click="$emit('close')">×</button>
         </div>
+        <label v-if="showStepOutputOption" class="option-row" :class="{disabled: !hasStepOutputs}">
+          <input
+            type="checkbox"
+            :checked="includeStepOutputs"
+            :disabled="!hasStepOutputs"
+            @change="handleStepOutputsChange"
+          />
+          <span>Include step outputs</span>
+        </label>
         <pre class="json-view">{{ json }}</pre>
         <div class="dialog-actions">
           <button type="button" class="btn btn-secondary" @click="$emit('close')">Close</button>
@@ -25,9 +34,15 @@ const props = defineProps<{
   title: string;
   json: string;
   filename: string;
+  showStepOutputOption?: boolean;
+  includeStepOutputs?: boolean;
+  hasStepOutputs?: boolean;
 }>();
 
-defineEmits<{close: []}>();
+const emit = defineEmits<{
+  close: [];
+  'update:includeStepOutputs': [value: boolean];
+}>();
 
 const copyLabel = ref('Copy to Clipboard');
 
@@ -46,6 +61,10 @@ function handleDownload() {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+function handleStepOutputsChange(event: Event) {
+  emit('update:includeStepOutputs', (event.target as HTMLInputElement).checked);
+}
 </script>
 
 <style scoped>
@@ -63,6 +82,13 @@ function handleDownload() {
   display: flex; align-items: center; justify-content: space-between;
 }
 .dialog-title { font-size: 0.9rem; font-weight: 600; color: #e8e8e8; }
+.option-row {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: 0.78rem; color: #bbb; user-select: none;
+}
+.option-row input { cursor: pointer; }
+.option-row.disabled { color: #666; }
+.option-row.disabled input { cursor: default; }
 .btn-close {
   background: none; border: none; color: #666; font-size: 1.2rem;
   cursor: pointer; padding: 0 2px; line-height: 1;

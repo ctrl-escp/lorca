@@ -64,6 +64,10 @@
       title="Export Capsule"
       :json="exportModal.json"
       :filename="exportModal.filename"
+      :show-step-output-option="true"
+      :has-step-outputs="hasStepOutputs"
+      :include-step-outputs="exportModal.includeStepOutputs"
+      @update:include-step-outputs="setExportStepOutputs"
       @close="exportModal.open = false"
     />
     <ImportModal
@@ -124,7 +128,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, onMounted} from 'vue';
-import type {CapsuleDefinition, StepType} from '@lorca/core';
+import type {CapsuleDefinition, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
 import {useCapsuleStepEditorStore} from '../../stores/capsuleStepEditor.js';
@@ -148,10 +152,16 @@ const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
 const editor = useCapsuleStepEditorStore();
 
-const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
+const exportModal = ref<{open: boolean; json: string; filename: string; includeStepOutputs: boolean}>({
+  open: false,
+  json: '',
+  filename: '',
+  includeStepOutputs: false,
+});
 const importModalOpen = ref(false);
 
 const def = computed(() => editor.capsule ?? props.capsule);
+const hasStepOutputs = computed(() => Object.keys(capsuleRunStore.artifacts).length > 0);
 
 onMounted(() => {
   editor.loadCapsule(props.capsule);
@@ -320,19 +330,48 @@ function handleEditLocked() {
 function handleExport() {
   const c = editor.getCapsule();
   if (!c) return;
-  const {json, filename} = importStore.buildCapsuleExportJson(c);
-  exportModal.value = {open: true, json, filename};
+  refreshExportModal(c, false);
+}
+
+function refreshExportModal(c: CapsuleDefinition, includeStepOutputs: boolean) {
+  const {json, filename} = importStore.buildCapsuleExportJson(
+    c,
+    includeStepOutputs ? currentStepOutputs() : null,
+  );
+  exportModal.value = {open: true, json, filename, includeStepOutputs};
+}
+
+function setExportStepOutputs(includeStepOutputs: boolean) {
+  const c = editor.getCapsule();
+  if (c) refreshExportModal(c, includeStepOutputs);
+}
+
+function currentStepOutputs(): StepOutputsExport | null {
+  if (!hasStepOutputs.value || capsuleRunStore.status === 'idle' || capsuleRunStore.status === 'running') return null;
+  return {
+    status: capsuleRunStore.status,
+    runId: capsuleRunStore.runId,
+    artifacts: capsuleRunStore.artifacts,
+    trace: capsuleRunStore.trace,
+    finalOutputKey: capsuleRunStore.finalOutputKey,
+    error: capsuleRunStore.error,
+    snapshots: capsuleRunStore.snapshots,
+    userPromptSignature: capsuleRunStore.userPromptSignature,
+    partial: capsuleRunStore.partial,
+    executedStepIds: capsuleRunStore.executedStepIds,
+    rerunSingleStepId: capsuleRunStore.rerunSingleStepId,
+  };
 }
 
 function handleImport() {
   importModalOpen.value = true;
 }
 
-function handleImportSubmit(text: string) {
+function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   importModalOpen.value = false;
   try {
     const data = importStore.parseImportJson(text);
-    importStore.beginCapsuleImport(data);
+    importStore.beginCapsuleImport(data, includeStepOutputs);
   } catch {
     importStore.setImportErrors(['Import file is not valid JSON']);
   }

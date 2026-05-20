@@ -5,6 +5,7 @@ import type {
   PipelineDefinition,
   PipelineExportFile,
   CapsuleExportFile,
+  StepOutputsExport,
 } from '@lorca/core';
 import {
   exportPipeline,
@@ -29,10 +30,11 @@ import {useModelsStore} from './models.js';
 import {useCapsulesStore} from './capsules.js';
 import {usePipelinesStore} from './pipelines.js';
 import {newId} from '../utils/id.js';
+import {saveRunState, saveCapsuleRunState} from '../utils/runPersistence.js';
 
 export type PendingImport =
-  | {kind: 'pipeline'; preview: PipelineImportPreview}
-  | {kind: 'capsule'; preview: CapsuleImportPreview};
+  | {kind: 'pipeline'; preview: PipelineImportPreview; stepOutputs?: StepOutputsExport}
+  | {kind: 'capsule'; preview: CapsuleImportPreview; stepOutputs?: StepOutputsExport};
 
 export const useImportExportStore = defineStore('importExport', () => {
   const pendingImport = ref<PendingImport | null>(null);
@@ -64,26 +66,32 @@ export const useImportExportStore = defineStore('importExport', () => {
     return result;
   }
 
-  function exportCurrentPipeline(pipeline: PipelineDefinition) {
-    const file = exportPipeline(pipeline, resolveIncludedCapsules(pipeline));
+  function exportCurrentPipeline(pipeline: PipelineDefinition, stepOutputs?: StepOutputsExport | null) {
+    const file = exportPipeline(pipeline, resolveIncludedCapsules(pipeline), stepOutputs);
     downloadJson(`${sanitizeFilename(pipeline.name)}.pipeline.json`, file);
   }
 
-  function exportCurrentCapsule(capsule: CapsuleDefinition) {
-    const file = exportCapsule(capsule);
+  function exportCurrentCapsule(capsule: CapsuleDefinition, stepOutputs?: StepOutputsExport | null) {
+    const file = exportCapsule(capsule, stepOutputs);
     downloadJson(`${sanitizeFilename(capsule.name)}.${capsule.version}.capsule.json`, file);
   }
 
-  function buildPipelineExportJson(pipeline: PipelineDefinition): {json: string; filename: string} {
-    const file = exportPipeline(pipeline, resolveIncludedCapsules(pipeline));
+  function buildPipelineExportJson(
+    pipeline: PipelineDefinition,
+    stepOutputs?: StepOutputsExport | null,
+  ): {json: string; filename: string} {
+    const file = exportPipeline(pipeline, resolveIncludedCapsules(pipeline), stepOutputs);
     return {
       json: JSON.stringify(file, null, 2),
       filename: `${sanitizeFilename(pipeline.name)}.json`,
     };
   }
 
-  function buildCapsuleExportJson(capsule: CapsuleDefinition): {json: string; filename: string} {
-    const file = exportCapsule(capsule);
+  function buildCapsuleExportJson(
+    capsule: CapsuleDefinition,
+    stepOutputs?: StepOutputsExport | null,
+  ): {json: string; filename: string} {
+    const file = exportCapsule(capsule, stepOutputs);
     return {
       json: JSON.stringify(file, null, 2),
       filename: `${sanitizeFilename(capsule.name)}.${capsule.version}.json`,
@@ -94,7 +102,7 @@ export const useImportExportStore = defineStore('importExport', () => {
     return JSON.parse(text) as unknown;
   }
 
-  function beginPipelineImport(data: unknown): boolean {
+  function beginPipelineImport(data: unknown, includeStepOutputs = false): boolean {
     importErrors.value = [];
     const parsed = parsePipelineExport(data);
     if (isParseError(parsed)) {
@@ -115,11 +123,15 @@ export const useImportExportStore = defineStore('importExport', () => {
       pendingImport.value = null;
       return false;
     }
-    pendingImport.value = {kind: 'pipeline', preview};
+    pendingImport.value = {
+      kind: 'pipeline',
+      preview,
+      ...(includeStepOutputs && parsed.stepOutputs ? {stepOutputs: parsed.stepOutputs} : {}),
+    };
     return true;
   }
 
-  function beginCapsuleImport(data: unknown): boolean {
+  function beginCapsuleImport(data: unknown, includeStepOutputs = false): boolean {
     importErrors.value = [];
     const parsed = parseCapsuleExport(data);
     if (isParseError(parsed)) {
@@ -133,7 +145,11 @@ export const useImportExportStore = defineStore('importExport', () => {
       pendingImport.value = null;
       return false;
     }
-    pendingImport.value = {kind: 'capsule', preview};
+    pendingImport.value = {
+      kind: 'capsule',
+      preview,
+      ...(includeStepOutputs && parsed.stepOutputs ? {stepOutputs: parsed.stepOutputs} : {}),
+    };
     return true;
   }
 
@@ -158,6 +174,7 @@ export const useImportExportStore = defineStore('importExport', () => {
         remaps,
       );
       await pipelinesStore.save(pipeline);
+      if (pending.stepOutputs) saveRunState(pipeline.id, pending.stepOutputs);
       pipelinesStore.setActive(pipeline.id);
       return {kind: 'pipeline', id: pipeline.id};
     }
@@ -169,6 +186,7 @@ export const useImportExportStore = defineStore('importExport', () => {
       remaps,
     );
     capsulesStore.addCapsule(capsule);
+    if (pending.stepOutputs) saveCapsuleRunState(capsule.id, pending.stepOutputs);
     return {kind: 'capsule', id: capsule.id};
   }
 

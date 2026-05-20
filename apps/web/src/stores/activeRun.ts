@@ -228,6 +228,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     userPromptSignature,
     partial,
     executedStepIds,
+    rerunSingleStepId,
     runSnapshotContext,
     reset,
     cancel,

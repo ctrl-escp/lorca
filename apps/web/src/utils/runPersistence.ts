@@ -1,18 +1,8 @@
-import type {PipelineArtifact, PipelineTraceEvent, PipelineError, StepRunSnapshot} from '@lorca/core';
+import type {StepOutputsExport} from '@lorca/core';
 import type {RunStatus} from '../stores/activeRun.js';
 
-export interface PersistedRunState {
+export interface PersistedRunState extends StepOutputsExport {
   status: Exclude<RunStatus, 'idle' | 'running'>;
-  runId: string | null;
-  artifacts: Record<string, PipelineArtifact>;
-  trace: PipelineTraceEvent[];
-  finalOutputKey: string | null;
-  error: PipelineError | null;
-  snapshots: Record<string, StepRunSnapshot>;
-  userPromptSignature: string | null;
-  partial: boolean;
-  executedStepIds: string[];
-  rerunSingleStepId: string | null;
 }
 
 const RUN_KEY_PREFIX = 'lorca:run:';

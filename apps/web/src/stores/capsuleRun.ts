@@ -229,6 +229,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     userPromptSignature,
     partial,
     executedStepIds,
+    rerunSingleStepId,
     runSnapshotContext,
     reset,
     cancel,

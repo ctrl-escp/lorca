@@ -6,6 +6,7 @@ import type {
   CapsuleExportFile,
   PipelineNode,
   ModelRef,
+  StepOutputsExport,
 } from '@lorca/core';
 import {validatePipeline, ensureCapsuleStepChain} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
@@ -68,6 +69,7 @@ export function capsuleLookupKey(id: string, version: string): string {
 export function exportPipeline(
   pipeline: PipelineDefinition,
   includedCapsules: CapsuleDefinition[] = [],
+  stepOutputs?: StepOutputsExport | null,
 ): PipelineExportFile {
   const referenced = collectPipelineCapsuleRefs(pipeline);
   const capsules = includedCapsules.filter((c) =>
@@ -79,15 +81,20 @@ export function exportPipeline(
     kind: 'pipeline',
     pipeline: deepClone(pipeline),
     ...(capsules.length > 0 ? {includedCapsules: capsules.map((c) => deepClone(c))} : {}),
+    ...(stepOutputs ? {stepOutputs: deepClone(stepOutputs)} : {}),
   };
 }
 
-export function exportCapsule(capsule: CapsuleDefinition): CapsuleExportFile {
+export function exportCapsule(
+  capsule: CapsuleDefinition,
+  stepOutputs?: StepOutputsExport | null,
+): CapsuleExportFile {
   return {
     exportedAt: new Date().toISOString(),
     app: 'lorca',
     kind: 'capsule',
     capsule: deepClone(capsule),
+    ...(stepOutputs ? {stepOutputs: deepClone(stepOutputs)} : {}),
   };
 }
 

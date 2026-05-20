@@ -1,5 +1,9 @@
 <template>
-  <div class="chain-editor" :class="{'dnd-active': isDndActive, [`dnd-kind-${activeDragKind}`]: activeDragKind}">
+  <div
+    class="chain-editor"
+    :class="{'dnd-active': isDndActive, [`dnd-kind-${activeDragKind}`]: activeDragKind}"
+    :style="{'--chain-visible-step-count': Math.max(1, Math.min(steps.length || 1, 4))}"
+  >
     <div class="chain-viewport">
       <div
         ref="scrollRef"
@@ -547,6 +551,9 @@ function runStateTitle(stepId: string): string {
 
 <style scoped>
 .chain-editor {
+  --chain-card-max-width: clamp(760px, 72vw, 1040px);
+  --chain-card-target-height: clamp(10rem, calc(76vh / var(--chain-visible-step-count)), 50vh);
+
   flex: 1;
   min-height: 0;
   display: flex;
@@ -556,10 +563,17 @@ function runStateTitle(stepId: string): string {
 }
 
 .chain-viewport {
+  container-type: size;
   flex: 1;
   min-height: 0;
   overflow: hidden;
   position: relative;
+}
+
+@supports (height: 1cqh) {
+  .chain-editor {
+    --chain-card-target-height: clamp(10rem, calc(76cqh / var(--chain-visible-step-count)), 50cqh);
+  }
 }
 
 .chain-viewport::before,
@@ -587,18 +601,18 @@ function runStateTitle(stepId: string): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 1rem;
+  padding: 0 1.4rem;
 }
 
 .chain-scroll-spacer {
   flex-shrink: 0;
-  height: max(25vh, 80px);
+  height: max(5vh, 20px);
   width: 100%;
 }
 
 .chain-step {
   width: 100%;
-  max-width: 480px;
+  max-width: var(--chain-card-max-width);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -609,6 +623,8 @@ function runStateTitle(stepId: string): string {
 
 .step-card {
   width: 100%;
+  min-height: var(--chain-card-target-height);
+  max-height: 50cqh;
   display: flex;
   align-items: stretch;
   background: #1a1a1a;
@@ -624,7 +640,11 @@ function runStateTitle(stepId: string): string {
 .step-card-content {
   flex: 1;
   min-width: 0;
-  padding: 0.55rem 0.75rem 0.55rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(0.45rem, 1.3cqh, 0.9rem);
+  padding: clamp(1.15rem, 2.6cqh, 2rem) clamp(1.1rem, 2vw, 1.6rem) clamp(1rem, 2cqh, 1.6rem) clamp(0.85rem, 1.5vw, 1.15rem);
 }
 .chain-step:not(.selected) .step-card { opacity: 0.82; transform: scale(0.98); }
 .chain-step:not(.selected):hover .step-card { opacity: 0.95; }
@@ -655,7 +675,7 @@ function runStateTitle(stepId: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.35rem;
+  width: 1.75rem;
   border-right: 1px solid #2a2a2a;
   border-radius: 8px 0 0 8px;
   background: #141414;
@@ -707,13 +727,14 @@ function runStateTitle(stepId: string): string {
 /* Card-sized drop placeholders (full element footprint) */
 .drop-slot-card {
   width: 100%;
-  max-width: 480px;
+  max-width: var(--chain-card-max-width);
   box-sizing: border-box;
   border-radius: 8px;
   pointer-events: none;
 }
 .drop-slot-card-inner {
-  min-height: 5.25rem;
+  min-height: var(--chain-card-target-height);
+  max-height: 50cqh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -832,7 +853,7 @@ function runStateTitle(stepId: string): string {
 .chain-empty-drop-slot { width: 100%; margin-bottom: 0.75rem; }
 .chain-empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
 .step-type-badge {
-  font-size: 0.6rem; padding: 1px 5px; border-radius: 3px;
+  font-size: clamp(0.7rem, 1.5cqh, 0.95rem); padding: 2px 7px; border-radius: 3px;
   background: #222; color: #666; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .badge-model-call { background: #1e2d3d; color: #5a9fd4; }
@@ -841,7 +862,7 @@ function runStateTitle(stepId: string): string {
 .badge-capsule-instance { background: #2a1e3d; color: #9d6db8; }
 
 .step-title {
-  flex: 1; font-size: 0.82rem; font-weight: 500;
+  flex: 1; font-size: clamp(1.15rem, 2.8cqh, 1.75rem); font-weight: 650;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .step-title.disabled { text-decoration: line-through; color: #555; }
@@ -849,16 +870,16 @@ function runStateTitle(stepId: string): string {
 .step-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.1s; }
 .step-card:hover .step-actions, .chain-step.selected .step-actions { opacity: 1; }
 
-.step-meta { display: flex; gap: 0.4rem; font-size: 0.68rem; color: #555; margin-top: 0.2rem; flex-wrap: wrap; }
+.step-meta { display: flex; gap: 0.55rem; font-size: clamp(0.9rem, 1.9cqh, 1.2rem); color: #555; flex-wrap: wrap; }
 .step-model { color: #5a9fd4; }
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
-.step-badge { font-size: 0.62rem; padding: 0 4px; border-radius: 2px; }
+.step-badge { font-size: clamp(0.74rem, 1.45cqh, 1rem); padding: 1px 6px; border-radius: 2px; }
 .step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
 
 .step-run-badge {
-  border-radius: 2px; padding: 0 4px; font-size: 0.62rem; text-transform: lowercase;
+  border-radius: 2px; padding: 1px 6px; font-size: clamp(0.74rem, 1.45cqh, 1rem); text-transform: lowercase;
 }
 .run-not-run { background: #1a1a1a; color: #555; }
 .run-current { background: #1a2e1a; color: #5a9d5a; }
@@ -869,7 +890,7 @@ function runStateTitle(stepId: string): string {
 .run-skipped-partial { background: #1a1a2a; color: #606080; }
 .run-blocked { background: #2e1a1a; color: #e07070; border: 1px solid #5a3030; }
 
-.step-trace { display: flex; gap: 0.4rem; font-size: 0.68rem; margin-top: 0.15rem; }
+.step-trace { display: flex; gap: 0.55rem; font-size: clamp(0.84rem, 1.7cqh, 1.1rem); }
 .status-completed { color: #3a9d6e; }
 .status-failed { color: #c0392b; }
 .status-started, .status-running { color: #e8a020; }
@@ -877,29 +898,29 @@ function runStateTitle(stepId: string): string {
 .step-duration { color: #444; }
 
 .step-output-preview {
-  font-size: 0.7rem;
+  font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
   color: #888;
   font-family: monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  padding: 0.15rem 0.25rem;
+  padding: 0.25rem 0.4rem;
   background: #0d0d0d;
   border-radius: 3px;
   border: 1px solid #1e1e1e;
 }
 
-.step-run-actions { margin-top: 0.3rem; display: none; gap: 4px; }
+.step-run-actions { margin-top: auto; display: none; gap: 6px; }
 .chain-step.selected .step-run-actions { display: flex; }
 .btn-run-up-to {
-  font-size: 0.9rem; padding: 2px 6px;
+  font-size: clamp(1rem, 2cqh, 1.3rem); padding: 4px 10px;
   background: #1a2e1a; border: 1px solid #2a4d2a; color: #6db86d;
   border-radius: 3px; cursor: pointer;
 }
 .btn-run-up-to:hover { background: #1e381e; color: #8dda8d; }
 .btn-run-only-step {
-  font-size: 0.9rem; padding: 2px 6px;
+  font-size: clamp(1rem, 2cqh, 1.3rem); padding: 4px 10px;
   background: #1a1a2e; border: 1px solid #2a2a4d; color: #6d6db8;
   border-radius: 3px; cursor: pointer;
 }
@@ -913,7 +934,7 @@ function runStateTitle(stepId: string): string {
   align-items: center;
   gap: 0;
   width: 100%;
-  max-width: 480px;
+  max-width: var(--chain-card-max-width);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -939,7 +960,7 @@ function runStateTitle(stepId: string): string {
 .chain-output-ref {
   display: flex; gap: 0.5rem; align-items: center;
   padding: 0.35rem 0.65rem; background: #111; border: 1px dashed #333;
-  border-radius: 5px; width: 100%; max-width: 480px; flex-shrink: 0;
+  border-radius: 5px; width: 100%; max-width: var(--chain-card-max-width); flex-shrink: 0;
   opacity: 0.75;
 }
 .output-label { font-size: 0.65rem; color: #555; }

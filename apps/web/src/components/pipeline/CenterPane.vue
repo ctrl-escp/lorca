@@ -103,6 +103,10 @@
       title="Export Pipeline"
       :json="exportModal.json"
       :filename="exportModal.filename"
+      :show-step-output-option="true"
+      :has-step-outputs="hasStepOutputs"
+      :include-step-outputs="exportModal.includeStepOutputs"
+      @update:include-step-outputs="setExportStepOutputs"
       @close="exportModal.open = false"
     />
     <ImportModal
@@ -134,7 +138,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
-import type {PipelineDefinition, StepType} from '@lorca/core';
+import type {PipelineDefinition, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
@@ -166,11 +170,17 @@ const suggestionInsert = useSuggestionInsert();
 const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
 
-const exportModal = ref<{open: boolean; json: string; filename: string}>({open: false, json: '', filename: ''});
+const exportModal = ref<{open: boolean; json: string; filename: string; includeStepOutputs: boolean}>({
+  open: false,
+  json: '',
+  filename: '',
+  includeStepOutputs: false,
+});
 const importModalOpen = ref(false);
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
+const hasStepOutputs = computed(() => Object.keys(runStore.artifacts).length > 0);
 
 // ── More menu ────────────────────────────────────────────────────────────────
 
@@ -461,8 +471,36 @@ async function handleRunOnlyStep(stepId: string) {
 function handleExport() {
   moreMenuOpen.value = false;
   editorStore.updateUserPrompt(userPrompt.value.trim());
-  const {json, filename} = importStore.buildPipelineExportJson(editorStore.pipeline);
-  exportModal.value = {open: true, json, filename};
+  refreshExportModal(false);
+}
+
+function refreshExportModal(includeStepOutputs: boolean) {
+  const {json, filename} = importStore.buildPipelineExportJson(
+    editorStore.pipeline,
+    includeStepOutputs ? currentStepOutputs() : null,
+  );
+  exportModal.value = {open: true, json, filename, includeStepOutputs};
+}
+
+function setExportStepOutputs(includeStepOutputs: boolean) {
+  refreshExportModal(includeStepOutputs);
+}
+
+function currentStepOutputs(): StepOutputsExport | null {
+  if (!hasStepOutputs.value || runStore.status === 'idle' || runStore.status === 'running') return null;
+  return {
+    status: runStore.status,
+    runId: runStore.runId,
+    artifacts: runStore.artifacts,
+    trace: runStore.trace,
+    finalOutputKey: runStore.finalOutputKey,
+    error: runStore.error,
+    snapshots: runStore.snapshots,
+    userPromptSignature: runStore.userPromptSignature,
+    partial: runStore.partial,
+    executedStepIds: runStore.executedStepIds,
+    rerunSingleStepId: runStore.rerunSingleStepId,
+  };
 }
 
 function handleImport() {
@@ -470,11 +508,11 @@ function handleImport() {
   importModalOpen.value = true;
 }
 
-function handleImportSubmit(text: string) {
+function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   importModalOpen.value = false;
   try {
     const data = importStore.parseImportJson(text);
-    importStore.beginPipelineImport(data);
+    importStore.beginPipelineImport(data, includeStepOutputs);
   } catch {
     importStore.setImportErrors(['Import file is not valid JSON']);
   }

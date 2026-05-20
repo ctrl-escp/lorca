@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition, LegacyPipelineDefinition, PipelineDefinition} from '@lorca/core';
+import type {CapsuleDefinition, LegacyPipelineDefinition, PipelineDefinition, StepOutputsExport} from '@lorca/core';
 import {migrateLegacyPipeline} from '@lorca/pipeline';
 import {
   exportPipeline,
@@ -222,6 +222,39 @@ const localCtx = {
   knownCapsuleKeys: new Set(['cap-1::v1']),
 };
 
+const stepOutputs: StepOutputsExport = {
+  status: 'completed',
+  runId: 'run-1',
+  artifacts: {
+    'answer.text': {
+      name: 'answer.text',
+      stepId: 'step-1',
+      kind: 'text',
+      value: 'Hello from a saved run',
+      createdAt: '2026-01-01T00:00:00Z',
+    },
+  },
+  trace: [],
+  finalOutputKey: 'answer.text',
+  error: null,
+  snapshots: {
+    'step-1': {
+      stepId: 'step-1',
+      inputSignature: 'input',
+      configSignature: 'config',
+      historyReadSignatures: {},
+      outputArtifactRefs: ['answer.text'],
+      primaryOutputPreview: 'Hello from a saved run',
+      completedAt: '2026-01-01T00:00:01Z',
+      status: 'completed',
+    },
+  },
+  userPromptSignature: 'prompt',
+  partial: false,
+  executedStepIds: ['step-1'],
+  rerunSingleStepId: null,
+};
+
 describe('importExport', () => {
   it('exports and parses a pipeline file', () => {
     const pipeline = makePipeline();
@@ -231,6 +264,15 @@ describe('importExport', () => {
     const parsed = parsePipelineExport(file);
     if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
     expect(parsed.pipeline.name).toBe('Export Me');
+  });
+
+  it('optionally includes step outputs in a pipeline export', () => {
+    const file = exportPipeline(makePipeline(), [], stepOutputs);
+    expect(file.stepOutputs?.artifacts['answer.text']?.value).toBe('Hello from a saved run');
+
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+    expect(parsed.stepOutputs?.finalOutputKey).toBe('answer.text');
   });
 
   it('rejects invalid import files', () => {
@@ -273,6 +315,15 @@ describe('importExport', () => {
     if ('errors' in preview) throw new Error(preview.errors.join(', '));
     expect(preview.capsule.name).toBe('Verifier');
     expect(preview.missingModels).toHaveLength(0);
+  });
+
+  it('optionally includes step outputs in a capsule export', () => {
+    const file = exportCapsule(makeCapsule(), stepOutputs);
+    expect(file.stepOutputs?.snapshots['step-1']?.outputArtifactRefs).toEqual(['answer.text']);
+
+    const parsed = parseCapsuleExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+    expect(parsed.stepOutputs?.artifacts['answer.text']?.stepId).toBe('step-1');
   });
 
   it('applyModelRemapsToNodes updates capsule instance slot assignments', () => {

@@ -423,12 +423,27 @@ export interface StepRunSnapshot {
 
 // ── Export/import types ──────────────────────────────────────────────────────
 
+export interface StepOutputsExport {
+  status: 'completed' | 'failed' | 'cancelled';
+  runId: string | null;
+  artifacts: Record<string, PipelineArtifact>;
+  trace: PipelineTraceEvent[];
+  finalOutputKey: string | null;
+  error: PipelineError | null;
+  snapshots: Record<string, StepRunSnapshot>;
+  userPromptSignature: string | null;
+  partial: boolean;
+  executedStepIds: string[];
+  rerunSingleStepId: string | null;
+}
+
 export interface PipelineExportFile {
   exportedAt: string;
   app: 'lorca';
   kind: 'pipeline';
   pipeline: PipelineDefinition;
   includedCapsules?: CapsuleDefinition[];
+  stepOutputs?: StepOutputsExport;
 }
 
 export interface LegacyPipelineExportFile {
@@ -437,6 +452,7 @@ export interface LegacyPipelineExportFile {
   kind: 'pipeline';
   pipeline: LegacyPipelineDefinition;
   includedCapsules?: CapsuleDefinition[];
+  stepOutputs?: StepOutputsExport;
 }
 
 export interface CapsuleExportFile {
@@ -444,6 +460,7 @@ export interface CapsuleExportFile {
   app: 'lorca';
   kind: 'capsule';
   capsule: CapsuleDefinition;
+  stepOutputs?: StepOutputsExport;
 }
 
 // ── Runtime constants ────────────────────────────────────────────────────────
