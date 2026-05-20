@@ -45,6 +45,7 @@
               disabled: !step.enabled,
               'drop-target-step': dragOverStepId === step.id && activeDragKind === 'step-reorder',
               dragging: draggingStepId === step.id,
+              'output-expanded': Boolean(outputPreviewFor(step)) && !isStepOutputCollapsed(step.id),
               [traceStatusClass(step.id)]: true,
             }"
             @click="onStepClick(step.id, $event)"
@@ -144,7 +145,22 @@
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
               </div>
 
-              <pre v-if="outputPreviewFor(step)" class="step-output-preview" :title="outputPreviewFor(step)!">{{ outputPreviewFor(step) }}</pre>
+              <div v-if="outputPreviewFor(step)" class="step-output-preview-wrap">
+                <button
+                  type="button"
+                  class="step-output-preview-header"
+                  :aria-expanded="!isStepOutputCollapsed(step.id)"
+                  :title="isStepOutputCollapsed(step.id) ? 'Expand output preview' : 'Collapse output preview'"
+                  @click.stop="toggleStepOutput(step.id)"
+                >
+                  <span class="step-output-toggle-indicator">{{ isStepOutputCollapsed(step.id) ? '+' : '-' }}</span>
+                  <span class="step-output-preview-label">Output preview</span>
+                </button>
+                <pre
+                  v-if="!isStepOutputCollapsed(step.id)"
+                  class="step-output-preview"
+                >{{ outputPreviewFor(step) }}</pre>
+              </div>
 
               <div
                 v-if="dragOverStepId === step.id && activeDragKind === 'step-reorder'"
@@ -366,6 +382,7 @@ const dragOverStepId = ref<string | null>(null);
 const dropTargetIndex = ref<number | null>(null);
 const activeDragKind = ref<DragKind | null>(null);
 const chainDndHover = ref(false);
+const expandedOutputStepIds = ref<Set<string>>(new Set());
 
 const isDndActive = computed(() =>
   chainDndHover.value
@@ -606,6 +623,17 @@ function outputPreviewFor(step: PipelineStep): string | null {
   return formatArtifactDisplay(preview, 1200);
 }
 
+function isStepOutputCollapsed(stepId: string): boolean {
+  return !expandedOutputStepIds.value.has(stepId);
+}
+
+function toggleStepOutput(stepId: string) {
+  const next = new Set(expandedOutputStepIds.value);
+  if (next.has(stepId)) next.delete(stepId);
+  else next.add(stepId);
+  expandedOutputStepIds.value = next;
+}
+
 function onStepDragStart(stepId: string, event: DragEvent) {
   const target = event.target as HTMLElement;
   if (target.closest('button, input, textarea, select, a, [contenteditable="true"]')) {
@@ -799,15 +827,21 @@ function runStateTitle(stepId: string): string {
 }
 .step-card:active { cursor: default; }
 .chain-step.dragging .step-card { cursor: default; }
+.chain-step.output-expanded .step-card {
+  height: auto;
+  max-height: 50cqh;
+}
 .step-card-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: clamp(0.45rem, 1.3cqh, 0.9rem);
   padding: clamp(1.15rem, 2.6cqh, 2rem) clamp(1.1rem, 2vw, 1.6rem) clamp(1rem, 2cqh, 1.6rem) clamp(0.85rem, 1.5vw, 1.15rem);
 }
+.chain-step.output-expanded .step-card-content { overflow: hidden; }
 .chain-step:not(.selected) .step-card { opacity: 0.82; transform: scale(0.98); }
 .chain-step:not(.selected):hover .step-card { opacity: 0.95; }
 .chain-editor.dnd-active .chain-step:not(.selected):not(.dragging) .step-card { opacity: 0.88; }
@@ -1102,7 +1136,54 @@ function runStateTitle(stepId: string): string {
 .status-skipped, .status-cancelled { color: #555; }
 .step-duration { color: #444; }
 
+.step-output-preview-wrap {
+  max-width: 100%;
+  background: #0d0d0d;
+  border-radius: 5px;
+  border: 1px solid #242424;
+  overflow: hidden;
+}
+.chain-step.output-expanded .step-output-preview-wrap {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+.step-output-preview-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  background: transparent;
+  border-bottom: 1px solid #202020;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.step-output-preview-header:hover { background: #121212; }
+.step-output-toggle-indicator {
+  width: 1ch;
+  color: #888;
+  font-family: monospace;
+  font-size: clamp(0.86rem, 1.7cqh, 1.1rem);
+  font-weight: 700;
+}
+.step-output-preview-label {
+  flex: 1;
+  color: #666;
+  font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.step-output-preview-header:hover .step-output-preview-label,
+.step-output-preview-header:hover .step-output-toggle-indicator { color: #ccc; }
 .step-output-preview {
+  flex: 1 1 auto;
+  min-height: 0;
   font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
   color: #888;
   font-family: monospace;
@@ -1110,17 +1191,9 @@ function runStateTitle(stepId: string): string {
   white-space: pre-wrap;
   overflow: auto;
   overscroll-behavior: contain;
-  max-width: 100%;
-  max-height: clamp(7rem, 20cqh, 13rem);
   margin: 0;
   padding: 0.65rem 0.75rem;
-  background: #0d0d0d;
-  border-radius: 5px;
-  border: 1px solid #242424;
 }
-
-.step-run-actions { margin-top: auto; display: none; gap: 0.5rem; }
-.chain-step.selected .step-run-actions { display: flex; }
 .btn-run-up-to {
   width: clamp(2.75rem, 5.4cqh, 3.35rem);
   height: clamp(2.75rem, 5.4cqh, 3.35rem);

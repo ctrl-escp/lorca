@@ -21,20 +21,13 @@
           </span>
           <span v-if="outputKey" class="output-key">{{ outputKey }}</span>
           <button
-            class="btn-collapse"
-            type="button"
-            :aria-expanded="outputExpanded"
-            :title="outputExpanded ? 'Collapse output' : 'Expand output'"
-            @click="outputExpanded = !outputExpanded"
-          >{{ outputExpanded ? 'Collapse' : 'Expand' }}</button>
-          <button
             class="btn-copy"
             type="button"
             :title="copied ? 'Copied!' : 'Copy output to clipboard'"
             @click="copyOutput"
           >{{ copied ? '✓' : 'Copy' }}</button>
         </div>
-        <pre v-if="outputExpanded" class="output-text">{{ displayValue }}</pre>
+        <pre class="output-text">{{ displayValue }}</pre>
       </div>
     </template>
     <div v-else class="output-idle">No output.</div>
@@ -61,7 +54,6 @@ const displayValue = computed(() => {
 });
 
 const copied = ref(false);
-const outputExpanded = ref(true);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function copyOutput() {
@@ -97,24 +89,15 @@ async function copyOutput() {
 .output-state-label.stale { color: #c8a050; }
 .output-key { font-family: monospace; font-size: 0.72rem; color: #7ec8e3; }
 .output-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; color: #ddd; background: #111; border: 1px solid #222; border-radius: 4px; padding: 0.6rem; }
-.btn-collapse,
 .btn-copy {
+  margin-left: auto;
   font-size: 0.65rem;
   padding: 2px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-.btn-collapse {
-  margin-left: auto;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  color: #888;
-}
-.btn-collapse:hover { background: #222; color: #ccc; }
-.btn-copy {
   background: #1a2a1a;
   border: 1px solid #2a4d2a;
   color: #6db86d;
+  border-radius: 3px;
+  cursor: pointer;
 }
 .btn-copy:hover { background: #1e381e; color: #8dda8d; }
 </style>
