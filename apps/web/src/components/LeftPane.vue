@@ -210,17 +210,25 @@
       <div v-if="isExpanded('endpoints')" class="section-body">
         <AddEndpointForm v-if="showAddEndpoint" @add="onAddEndpoint" @cancel="showAddEndpoint = false" />
         <div class="ep-list">
-          <EndpointCard
-            v-for="ep in endpointsStore.endpoints"
-            :key="ep.id"
-            :endpoint="ep"
-            :model-count="(modelsStore.modelsByEndpoint.get(ep.id) ?? []).length"
-            :is-testing="epActions.testing.value.has(ep.id)"
-            :is-discovering="epActions.discovering.value.has(ep.id)"
-            @test="epActions.testAccess"
-            @discover="epActions.discoverModels"
-            @remove="onRemoveEndpoint"
-          />
+          <template v-for="ep in endpointsStore.endpoints" :key="ep.id">
+            <AddEndpointForm
+              v-if="editingEndpointId === ep.id"
+              :initial="ep"
+              @save="onSaveEndpoint"
+              @cancel="editingEndpointId = null"
+            />
+            <EndpointCard
+              v-else
+              :endpoint="ep"
+              :model-count="(modelsStore.modelsByEndpoint.get(ep.id) ?? []).length"
+              :is-testing="epActions.testing.value.has(ep.id)"
+              :is-discovering="epActions.discovering.value.has(ep.id)"
+              @test="epActions.testAccess"
+              @discover="epActions.discoverModels"
+              @edit="editingEndpointId = ep.id"
+              @remove="onRemoveEndpoint"
+            />
+          </template>
           <p v-if="endpointsStore.endpoints.length === 0" class="empty-hint">No endpoints yet. Add one above.</p>
         </div>
       </div>
@@ -280,6 +288,7 @@ const isPipelineContext = computed(() => uiStore.editorContext === 'pipeline');
 
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
+const editingEndpointId = ref<string | null>(null);
 const stepTypeQuery = ref('');
 const suggestionQuery = ref('');
 const modelBucketFilter = ref<ModelUsageBucket | ''>('');
@@ -380,6 +389,11 @@ function openAddModel() {
 async function onAddEndpoint(config: AiEndpointConfig) {
   await endpointsStore.addEndpoint(config);
   showAddEndpoint.value = false;
+}
+
+async function onSaveEndpoint(config: AiEndpointConfig) {
+  await endpointsStore.updateEndpoint(config.id, config);
+  editingEndpointId.value = null;
 }
 
 async function onRemoveEndpoint(id: string) {

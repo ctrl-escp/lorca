@@ -27,44 +27,66 @@
     </div>
     <div class="form-actions">
       <button type="button" class="btn" title="Discard and close the form" @click="$emit('cancel')">Cancel</button>
-      <button type="submit" class="btn btn-primary" title="Save this endpoint configuration">Add endpoint</button>
+      <button type="submit" class="btn btn-primary" :title="isEditing ? 'Save changes to this endpoint' : 'Save this endpoint configuration'">
+        {{ isEditing ? 'Save changes' : 'Add endpoint' }}
+      </button>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
-import {reactive} from 'vue';
+import {reactive, computed} from 'vue';
 import type {AiEndpointConfig} from '@lorca/core';
 import {newId} from '../../utils/id.js';
 import {FieldLabel} from '@lorca/ui-kit';
 
-const emit = defineEmits<{ add: [config: AiEndpointConfig]; cancel: [] }>();
+const props = defineProps<{ initial?: AiEndpointConfig }>();
+
+const emit = defineEmits<{
+  add: [config: AiEndpointConfig];
+  save: [config: AiEndpointConfig];
+  cancel: [];
+}>();
+
+const isEditing = computed(() => !!props.initial);
 
 const form = reactive({
-  name: '',
-  baseUrl: '',
-  kind: 'ollama' as AiEndpointConfig['kind'],
-  authKind: 'none' as AiEndpointConfig['authKind'],
+  name: props.initial?.name ?? '',
+  baseUrl: props.initial?.baseUrl ?? '',
+  kind: (props.initial?.kind ?? 'ollama') as AiEndpointConfig['kind'],
+  authKind: (props.initial?.authKind ?? 'none') as AiEndpointConfig['authKind'],
 });
 
 function submit() {
   const now = new Date().toISOString();
-  const config: AiEndpointConfig = {
-    id: newId('ep'),
-    name: form.name.trim(),
-    baseUrl: form.baseUrl.trim().replace(/\/$/, ''),
-    kind: form.kind,
-    enabled: true,
-    browserAccess: 'unknown',
-    authKind: form.authKind,
-    createdAt: now,
-    updatedAt: now,
-  };
-  emit('add', config);
-  form.name = '';
-  form.baseUrl = '';
-  form.kind = 'ollama';
-  form.authKind = 'none';
+  if (props.initial) {
+    const config: AiEndpointConfig = {
+      ...props.initial,
+      name: form.name.trim(),
+      baseUrl: form.baseUrl.trim().replace(/\/$/, ''),
+      kind: form.kind,
+      authKind: form.authKind,
+      updatedAt: now,
+    };
+    emit('save', config);
+  } else {
+    const config: AiEndpointConfig = {
+      id: newId('ep'),
+      name: form.name.trim(),
+      baseUrl: form.baseUrl.trim().replace(/\/$/, ''),
+      kind: form.kind,
+      enabled: true,
+      browserAccess: 'unknown',
+      authKind: form.authKind,
+      createdAt: now,
+      updatedAt: now,
+    };
+    emit('add', config);
+    form.name = '';
+    form.baseUrl = '';
+    form.kind = 'ollama';
+    form.authKind = 'none';
+  }
 }
 </script>
 

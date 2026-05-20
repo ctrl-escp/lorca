@@ -18,6 +18,7 @@
       <button class="btn btn-sm" :disabled="isDiscovering || endpoint.browserAccess !== 'available'" title="Fetch the model list from this endpoint" @click="$emit('discover', endpoint)">
         {{ isDiscovering ? 'Discovering…' : 'Discover models' }}
       </button>
+      <button class="btn btn-sm" title="Edit this endpoint's name, URL, type, or auth" @click="$emit('edit', endpoint)">Edit</button>
       <button class="btn btn-sm btn-danger" title="Remove this endpoint and its discovered models" @click="$emit('remove', endpoint.id)">Remove</button>
     </div>
     <div v-if="endpoint.browserAccess === 'blocked'" class="ep-cors-warn">
@@ -39,6 +40,7 @@ const props = defineProps<{
 defineEmits<{
   test: [ep: AiEndpointConfig];
   discover: [ep: AiEndpointConfig];
+  edit: [ep: AiEndpointConfig];
   remove: [id: string];
 }>();
 
