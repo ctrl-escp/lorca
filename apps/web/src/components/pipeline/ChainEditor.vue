@@ -106,6 +106,19 @@
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
               </div>
 
+              <div v-if="sourceBadgesByStepId[step.id]?.length" class="step-source-badges" aria-label="Step data sources">
+                <span class="step-source-label">From</span>
+                <span
+                  v-for="source in sourceBadgesByStepId[step.id]"
+                  :key="source.key"
+                  class="step-source-badge"
+                  :class="`source-${source.kind}`"
+                  :title="source.title"
+                >
+                  {{ source.label }}
+                </span>
+              </div>
+
               <div v-if="traceFor(step.id)" class="step-trace">
                 <span :class="`status-${traceFor(step.id)!.status}`">{{ traceFor(step.id)!.status }}</span>
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
@@ -221,7 +234,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
-import type {PipelineStep, PipelineTraceEvent, StepType} from '@lorca/core';
+import {PIPELINE_INPUT_STEP_ID, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
 import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
@@ -233,6 +246,15 @@ import {
 import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
 
 type DragKind = 'step-reorder' | 'suggestion';
+
+type StepDataSourceKind = 'previous' | 'history' | 'template' | 'binding' | 'direct';
+
+interface StepDataSourceBadge {
+  key: string;
+  label: string;
+  title: string;
+  kind: StepDataSourceKind;
+}
 
 const DropSlotIndicator = defineComponent({
   name: 'DropSlotIndicator',
@@ -316,6 +338,10 @@ const props = defineProps<{
   runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
   acceptSuggestionDrop?: boolean;
 }>();
+
+const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() =>
+  Object.fromEntries(props.steps.map((step, index) => [step.id, dataSourceBadges(step, index)])),
+);
 
 const emit = defineEmits<{
   select: [stepId: string, extendRange?: boolean];
@@ -474,6 +500,91 @@ function stepTypeLabel(type: StepType): string {
 
 function historyReadCount(step: PipelineStep): number {
   return getStepHistoryReads(step).length;
+}
+
+function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadge[] {
+  const badges: StepDataSourceBadge[] = [];
+  const seenRefs = new Set<string>();
+
+  function addSource(ref: string, kind: StepDataSourceKind, detail: string) {
+    const cleaned = ref.trim();
+    if (!cleaned || seenRefs.has(cleaned)) return;
+    seenRefs.add(cleaned);
+    const source = sourceLabelForArtifactRef(cleaned);
+    badges.push({
+      key: `${kind}:${cleaned}`,
+      label: source,
+      title: `${detail}: ${cleaned}`,
+      kind,
+    });
+  }
+
+  if (usesPreviousOutputSource(step)) {
+    addSource(previousInputArtifactRef(index), 'previous', 'Previous input');
+  }
+
+  for (const read of getStepHistoryReads(step)) {
+    addSource(read.sourceArtifactRef, 'history', read.required ? `Required history read <${read.tagName}>` : `Optional history read <${read.tagName}>`);
+  }
+
+  if (step.config.type === 'json-extract') {
+    addSource(step.config.sourceArtifactRef, 'direct', 'JSON source');
+  }
+
+  if (step.config.type === 'presentation') {
+    for (const ref of artifactRefsInTemplate(step.config.text)) {
+      addSource(ref, 'template', 'Template reference');
+    }
+  }
+
+  if (step.config.type === 'capsule-instance') {
+    for (const [port, ref] of Object.entries(step.config.inputBindings)) {
+      addSource(ref, 'binding', `Capsule input "${port}"`);
+    }
+  }
+
+  return badges;
+}
+
+function usesPreviousOutputSource(step: PipelineStep): boolean {
+  if (!['model-call', 'prompt-wrapper', 'loop-group'].includes(step.config.type)) return false;
+  return step.prompt ? step.prompt.previousOutput.enabled : true;
+}
+
+function previousInputArtifactRef(index: number): string {
+  const previous = previousEnabledStep(index);
+  return previous ? `${previous.outputNamespace}.${previous.primaryOutputName}` : 'user_prompt.xml';
+}
+
+function previousEnabledStep(index: number): PipelineStep | null {
+  for (let i = index - 1; i >= 0; i--) {
+    const step = props.steps[i];
+    if (step?.enabled) return step;
+  }
+  return null;
+}
+
+function artifactRefsInTemplate(text: string): string[] {
+  const refs: string[] = [];
+  const re = /\\?\{\{artifact\.([\w.-]+)\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    if (match[0].startsWith('\\')) continue;
+    refs.push(match[1]!);
+  }
+  return refs;
+}
+
+function sourceLabelForArtifactRef(ref: string): string {
+  if (ref.startsWith('user_prompt.')) return 'Pipeline Input';
+  const step = props.steps.find((s) =>
+    ref === `${s.outputNamespace}.${s.primaryOutputName}`
+    || ref.startsWith(`${s.outputNamespace}.`)
+    || (s.config.type === 'capsule-instance' && Object.values(s.config.outputBindings).includes(ref)),
+  );
+  if (step) return step.label;
+  if (ref === PIPELINE_INPUT_STEP_ID) return 'Pipeline Input';
+  return ref;
 }
 
 function stepHasModelError(step: PipelineStep): boolean {
@@ -949,6 +1060,37 @@ function runStateTitle(stepId: string): string {
 .run-disabled { background: #1a1a1a; color: #444; }
 .run-skipped-partial { background: #1a1a2a; color: #606080; }
 .run-blocked { background: #2e1a1a; color: #e07070; border: 1px solid #5a3030; }
+
+.step-source-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.step-source-label {
+  font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #555;
+}
+.step-source-badge {
+  max-width: min(100%, 18rem);
+  padding: 0.18rem 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #2a3d4a;
+  border-radius: 999px;
+  background: #121a20;
+  color: #8ab8cf;
+  font-size: clamp(0.82rem, 1.65cqh, 1.05rem);
+  font-weight: 600;
+}
+.source-history { border-color: #3a3752; background: #181725; color: #aaa0dc; }
+.source-template { border-color: #3a4a35; background: #151e14; color: #9bcf8a; }
+.source-binding { border-color: #4a3d2a; background: #211a10; color: #d2b16f; }
+.source-direct { border-color: #4a332f; background: #211514; color: #d58a7a; }
 
 .step-trace { display: flex; gap: 0.55rem; font-size: clamp(0.84rem, 1.7cqh, 1.1rem); }
 .status-completed { color: #3a9d6e; }
