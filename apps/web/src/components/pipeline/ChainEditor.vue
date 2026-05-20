@@ -69,6 +69,26 @@
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
                 <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
                 <div class="step-actions">
+                  <button
+                    v-if="step.enabled"
+                    type="button"
+                    class="btn-run-up-to icon-btn"
+                    aria-label="Run up to here"
+                    @click.stop="$emit('run-up-to', step.id)"
+                    title="Execute pipeline up to this step"
+                  >
+                    <StepIcon name="play" />
+                  </button>
+                  <button
+                    v-if="step.enabled"
+                    type="button"
+                    class="btn-run-only-step icon-btn"
+                    aria-label="Re-run only this step"
+                    @click.stop="$emit('run-only-step', step.id)"
+                    title="Re-run only this step (reuses previous outputs for other steps)"
+                  >
+                    <StepIcon name="refresh" />
+                  </button>
                   <button class="icon-btn" :disabled="i === 0" @click.stop="$emit('move-up', step.id)" title="Move up" aria-label="Move up">
                     <StepIcon name="arrow-up" />
                   </button>
@@ -126,26 +146,6 @@
 
               <pre v-if="outputPreviewFor(step)" class="step-output-preview" :title="outputPreviewFor(step)!">{{ outputPreviewFor(step) }}</pre>
 
-              <div class="step-run-actions" v-if="step.enabled">
-                <button
-                  type="button"
-                  class="btn-run-up-to icon-btn"
-                  aria-label="Run up to here"
-                  @click.stop="$emit('run-up-to', step.id)"
-                  title="Execute pipeline up to this step"
-                >
-                  <StepIcon name="play" />
-                </button>
-                <button
-                  type="button"
-                  class="btn-run-only-step icon-btn"
-                  aria-label="Re-run only this step"
-                  @click.stop="$emit('run-only-step', step.id)"
-                  title="Re-run only this step (reuses previous outputs for other steps)"
-                >
-                  <StepIcon name="refresh" />
-                </button>
-              </div>
               <div
                 v-if="dragOverStepId === step.id && activeDragKind === 'step-reorder'"
                 class="step-drop-banner"
