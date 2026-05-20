@@ -189,5 +189,6 @@ export function historyReadIssueLabel(issue: HistoryReadIssue): string {
     case 'source-after-self': return 'Source must be an earlier step';
     case 'source-is-self': return 'Cannot read from this step';
     case 'invalid-tag': return 'Invalid XML tag name';
+    default: return issue;
   }
 }

@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition, PipelineDefinition} from '@lorca/core';
+import type {CapsuleDefinition, LegacyPipelineDefinition, PipelineDefinition} from '@lorca/core';
+import {migrateLegacyPipeline} from '@lorca/pipeline';
 import {
   exportPipeline,
   exportCapsule,
@@ -11,6 +12,164 @@ import {
   prepareImportedCapsule,
   applyModelRemapsToNodes,
 } from '../src/importExport.js';
+
+function makeLegacyPipeline(): LegacyPipelineDefinition {
+  const inputId = 'input-1';
+  const wrapperId = 'wrap-1';
+  const modelId = 'model-1';
+  return {
+    schemaVersion: 1,
+    id: 'pipe-legacy',
+    name: 'Legacy Pipeline',
+    inputArtifactName: 'user_prompt',
+    nodes: [
+      {id: inputId, type: 'input'},
+      {
+        id: wrapperId,
+        type: 'prompt-wrapper',
+        artifactPrefix: 'wrapped',
+        config: {
+          tagName: 'user',
+          instructionText: 'Wrap the input.',
+          includeInputArtifact: true,
+          inputPlacement: 'before-instructions',
+        },
+      },
+      {
+        id: modelId,
+        type: 'model-call',
+        title: 'Main Model',
+        artifactPrefix: 'answer',
+        config: {
+          modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
+          mode: 'generate',
+          inputArtifactRef: 'wrapped.text',
+          systemPrompt: 'Answer the user.',
+        },
+      },
+    ],
+    edges: [
+      {id: 'e1', fromNodeId: inputId, fromOutput: 'xml', toNodeId: wrapperId, toInput: 'input'},
+      {id: 'e2', fromNodeId: wrapperId, fromOutput: 'text', toNodeId: modelId, toInput: 'input'},
+    ],
+    outputRef: {nodeId: modelId, outputName: 'text'},
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
+
+function makeRichPipeline(): PipelineDefinition {
+  return {
+    schemaVersion: 2,
+    id: 'pipe-rich',
+    name: 'Rich Pipeline',
+    input: {raw: 'hello', tagName: 'user', outputNamespace: 'user_prompt'},
+    steps: [
+      {
+        id: 'step-intent',
+        type: 'model-call',
+        label: 'Intent Extraction',
+        enabled: true,
+        outputNamespace: 'intent_extraction',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+        prompt: {
+          previousOutput: {enabled: true, placement: 'beforeOwnPrompt', tagName: 'user_prompt'},
+          historyReads: [],
+          blocks: [
+            {
+              id: 'blk-intent',
+              label: 'Instructions',
+              tagName: 'system',
+              body: 'Extract intent as JSON.',
+              enabled: true,
+              source: 'system-default',
+            },
+          ],
+        },
+      },
+      {
+        id: 'step-criteria',
+        type: 'model-call',
+        label: 'Acceptance Criteria',
+        enabled: false,
+        outputNamespace: 'acceptance_criteria',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+        prompt: {
+          previousOutput: {enabled: true, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          historyReads: [],
+          blocks: [
+            {
+              id: 'blk-criteria',
+              label: 'Instructions',
+              tagName: 'system',
+              body: 'Generate acceptance criteria.',
+              enabled: true,
+              source: 'system-default',
+            },
+          ],
+        },
+      },
+      {
+        id: 'step-main',
+        type: 'model-call',
+        label: 'Main Model',
+        enabled: true,
+        outputNamespace: 'answer',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+        prompt: {
+          previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          historyReads: [
+            {
+              sourceStepId: 'step-intent',
+              sourceArtifactRef: 'intent_extraction.text',
+              tagName: 'intent',
+              required: true,
+            },
+            {
+              sourceStepId: 'step-criteria',
+              sourceArtifactRef: 'acceptance_criteria.text',
+              tagName: 'criteria',
+              required: false,
+            },
+          ],
+          blocks: [
+            {
+              id: 'blk-main',
+              label: 'Instructions',
+              tagName: 'system',
+              body: 'Answer using intent and criteria from history.',
+              enabled: true,
+              source: 'system-default',
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
 
 function makePipeline(): PipelineDefinition {
   return {
@@ -149,5 +308,61 @@ describe('importExport', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
     expect(next.id).toBe('cap-imported');
     expect(next.id).not.toBe('cap-1');
+  });
+
+  it('round-trips prompt blocks, history reads, enabled flags, and primaryOutputName', () => {
+    const pipeline = makeRichPipeline();
+    const file = exportPipeline(pipeline);
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+
+    const rt = parsed.pipeline;
+    expect(rt.steps).toHaveLength(3);
+
+    const intent = rt.steps.find((s) => s.id === 'step-intent');
+    expect(intent?.enabled).toBe(true);
+    expect(intent?.primaryOutputName).toBe('text');
+    expect(intent?.prompt?.previousOutput).toEqual({
+      enabled: true,
+      placement: 'beforeOwnPrompt',
+      tagName: 'user_prompt',
+    });
+    expect(intent?.prompt?.blocks[0]?.body).toContain('Extract intent');
+
+    const criteria = rt.steps.find((s) => s.id === 'step-criteria');
+    expect(criteria?.enabled).toBe(false);
+    expect(criteria?.prompt?.previousOutput.placement).toBe('afterOwnPrompt');
+
+    const main = rt.steps.find((s) => s.id === 'step-main');
+    expect(main?.primaryOutputName).toBe('text');
+    expect(main?.prompt?.historyReads).toHaveLength(2);
+    expect(main?.prompt?.historyReads[0]).toMatchObject({
+      sourceStepId: 'step-intent',
+      sourceArtifactRef: 'intent_extraction.text',
+      tagName: 'intent',
+      required: true,
+    });
+    expect(main?.prompt?.historyReads[1]?.required).toBe(false);
+  });
+
+  it('migrates legacy V1 pipeline and round-trips through export', () => {
+    const migrated = migrateLegacyPipeline(makeLegacyPipeline());
+    const file = exportPipeline(migrated);
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+
+    expect(parsed.pipeline.schemaVersion).toBe(2);
+    expect(parsed.pipeline.name).toBe('Legacy Pipeline');
+    expect(parsed.pipeline.steps).toHaveLength(2);
+    expect(parsed.pipeline.steps.map((s) => s.type)).toEqual(['prompt-wrapper', 'model-call']);
+
+    const wrapper = parsed.pipeline.steps[0];
+    expect(wrapper?.prompt?.previousOutput.placement).toBe('beforeOwnPrompt');
+    expect(wrapper?.prompt?.blocks[0]?.body).toContain('Wrap the input');
+
+    const model = parsed.pipeline.steps[1];
+    expect(model?.label).toBe('Main Model');
+    expect(model?.primaryOutputName).toBe('text');
+    expect(model?.prompt?.blocks[0]?.body).toContain('Answer the user');
   });
 });

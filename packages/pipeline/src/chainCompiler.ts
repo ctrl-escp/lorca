@@ -434,13 +434,13 @@ function legacyNodeToStep(
           historyReads: [],
           blocks: node.config.instructionText
             ? [{
-                id: newStepId('block'),
-                label: 'Instructions',
-                tagName: 'system',
-                body: node.config.instructionText,
-                enabled: true,
-                source: 'system-default' as const,
-              }]
+              id: newStepId('block'),
+              label: 'Instructions',
+              tagName: 'system',
+              body: node.config.instructionText,
+              enabled: true,
+              source: 'system-default' as const,
+            }]
             : [],
         },
       };

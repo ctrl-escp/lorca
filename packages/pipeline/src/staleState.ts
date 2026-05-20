@@ -239,5 +239,6 @@ export function stepRunUiStateLabel(state: StepRunUiState): string {
     case 'disabled': return 'Disabled';
     case 'skipped-partial': return 'Skipped';
     case 'blocked': return 'Blocked';
+    default: return state;
   }
 }

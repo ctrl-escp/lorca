@@ -54,6 +54,10 @@ function defaultStepConfig(type: StepType): StepConfig {
         steps: [],
         outputNames: ['text'],
       };
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown step type: ${_exhaustive}`);
+    }
   }
 }
 
@@ -177,9 +181,9 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const loop = findLoopGroup(loopStepId);
     if (!loop || loop.config.type !== 'loop-group') return;
     const before = snapshot();
-    const steps = mutate(loop.config.steps.map((s) => JSON.parse(JSON.stringify(toRaw(s)))));
+    const innerSteps = mutate(loop.config.steps.map((s) => JSON.parse(JSON.stringify(toRaw(s)))));
     updateStepConfig(loopStepId, {
-      config: {...loop.config, steps},
+      config: {...loop.config, steps: innerSteps},
     });
     recordUndo(label, before);
   }
@@ -191,10 +195,10 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   ) {
     const loop = findLoopGroup(loopStepId);
     if (!loop || loop.config.type !== 'loop-group') return;
-    const steps = loop.config.steps.map((s) =>
+    const innerSteps = loop.config.steps.map((s) =>
       s.id === innerStepId ? {...s, ...patch, lastEditedAt: new Date().toISOString()} : s,
     );
-    updateStepConfig(loopStepId, {config: {...loop.config, steps}});
+    updateStepConfig(loopStepId, {config: {...loop.config, steps: innerSteps}});
   }
 
   function commitLoopInnerStepEdit(
@@ -213,7 +217,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     if (!loop || loop.config.type !== 'loop-group') return null;
     if (type === 'loop-group' || type === 'capsule-instance') return null;
     const draft = buildDefaultStep(type, getExistingNamespaces());
-    mutateLoopInnerSteps(loopStepId, (steps) => [...steps, draft], `Add inner "${draft.label}"`);
+    mutateLoopInnerSteps(loopStepId, (innerSteps) => [...innerSteps, draft], `Add inner "${draft.label}"`);
     return draft.id;
   }
 
@@ -224,18 +228,18 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     if (!inner) return;
     mutateLoopInnerSteps(
       loopStepId,
-      (steps) => steps.filter((s) => s.id !== innerStepId),
+      (innerSteps) => innerSteps.filter((s) => s.id !== innerStepId),
       `Delete inner "${inner.label}"`,
     );
   }
 
   function moveLoopInnerStep(loopStepId: string, innerStepId: string, direction: 'up' | 'down') {
-    mutateLoopInnerSteps(loopStepId, (steps) => {
-      const idx = steps.findIndex((s) => s.id === innerStepId);
-      if (idx < 0) return steps;
+    mutateLoopInnerSteps(loopStepId, (innerSteps) => {
+      const idx = innerSteps.findIndex((s) => s.id === innerStepId);
+      if (idx < 0) return innerSteps;
       const swap = direction === 'up' ? idx - 1 : idx + 1;
-      if (swap < 0 || swap >= steps.length) return steps;
-      const next = [...steps];
+      if (swap < 0 || swap >= innerSteps.length) return innerSteps;
+      const next = [...innerSteps];
       [next[idx], next[swap]] = [next[swap]!, next[idx]!];
       return next;
     }, 'Move inner step');
@@ -339,9 +343,9 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   function insertStepAfter(anchorStepId: string, stepDraft: PipelineStep): string {
     const before = snapshot();
     const idx = pipeline.value.steps.findIndex((s) => s.id === anchorStepId);
-    const steps = [...pipeline.value.steps];
-    steps.splice(idx + 1, 0, stepDraft);
-    pipeline.value = {...pipeline.value, steps, updatedAt: new Date().toISOString()};
+    const nextSteps = [...pipeline.value.steps];
+    nextSteps.splice(idx + 1, 0, stepDraft);
+    pipeline.value = {...pipeline.value, steps: nextSteps, updatedAt: new Date().toISOString()};
     recordUndo(`Insert "${stepDraft.label}"`, before);
     return stepDraft.id;
   }
@@ -350,9 +354,9 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const before = snapshot();
     const idx = pipeline.value.steps.findIndex((s) => s.id === anchorStepId);
     const insertAt = Math.max(0, idx);
-    const steps = [...pipeline.value.steps];
-    steps.splice(insertAt, 0, stepDraft);
-    pipeline.value = {...pipeline.value, steps, updatedAt: new Date().toISOString()};
+    const nextSteps = [...pipeline.value.steps];
+    nextSteps.splice(insertAt, 0, stepDraft);
+    pipeline.value = {...pipeline.value, steps: nextSteps, updatedAt: new Date().toISOString()};
     recordUndo(`Insert "${stepDraft.label}"`, before);
     return stepDraft.id;
   }
@@ -370,13 +374,13 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
 
   function moveStep(stepId: string, targetIndex: number) {
     const before = snapshot();
-    const steps = [...pipeline.value.steps];
-    const fromIdx = steps.findIndex((s) => s.id === stepId);
+    const nextSteps = [...pipeline.value.steps];
+    const fromIdx = nextSteps.findIndex((s) => s.id === stepId);
     if (fromIdx < 0) return;
-    const [step] = steps.splice(fromIdx, 1);
-    const clampedTarget = Math.max(0, Math.min(targetIndex, steps.length));
-    steps.splice(clampedTarget, 0, step!);
-    pipeline.value = {...pipeline.value, steps, updatedAt: new Date().toISOString()};
+    const [step] = nextSteps.splice(fromIdx, 1);
+    const clampedTarget = Math.max(0, Math.min(targetIndex, nextSteps.length));
+    nextSteps.splice(clampedTarget, 0, step!);
+    pipeline.value = {...pipeline.value, steps: nextSteps, updatedAt: new Date().toISOString()};
     recordUndo(`Move "${step!.label}"`, before);
   }
 
@@ -392,9 +396,9 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
       outputNamespace: ns,
       lastEditedAt: new Date().toISOString(),
     };
-    const steps = [...pipeline.value.steps];
-    steps.splice(idx + 1, 0, dup);
-    pipeline.value = {...pipeline.value, steps, updatedAt: new Date().toISOString()};
+    const nextSteps = [...pipeline.value.steps];
+    nextSteps.splice(idx + 1, 0, dup);
+    pipeline.value = {...pipeline.value, steps: nextSteps, updatedAt: new Date().toISOString()};
     recordUndo(`Duplicate "${original.label}"`, before);
     return dup.id;
   }
