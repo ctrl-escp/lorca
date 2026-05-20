@@ -124,9 +124,7 @@
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
               </div>
 
-              <div v-if="outputPreviewFor(step.id)" class="step-output-preview" :title="outputPreviewFor(step.id)!">
-                {{ outputPreviewFor(step.id) }}
-              </div>
+              <pre v-if="outputPreviewFor(step)" class="step-output-preview" :title="outputPreviewFor(step)!">{{ outputPreviewFor(step) }}</pre>
 
               <div class="step-run-actions" v-if="step.enabled">
                 <button
@@ -234,7 +232,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
-import {PIPELINE_INPUT_STEP_ID, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
+import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
 import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
@@ -336,6 +334,7 @@ const props = defineProps<{
   lastUndoLabel?: string | null;
   lastRedoLabel?: string | null;
   runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
+  artifacts?: Record<string, PipelineArtifact>;
   acceptSuggestionDrop?: boolean;
 }>();
 
@@ -597,10 +596,14 @@ function runStateFor(stepId: string) {
   return props.stepStates?.[stepId]?.state;
 }
 
-function outputPreviewFor(stepId: string): string | null {
-  const preview = props.runSnapshots?.[stepId]?.primaryOutputPreview;
+function outputPreviewFor(step: PipelineStep): string | null {
+  const key = `${step.outputNamespace}.${step.primaryOutputName}`;
+  const artifact = props.artifacts?.[key];
+  if (artifact) return formatArtifactDisplay(artifact.value);
+
+  const preview = props.runSnapshots?.[step.id]?.primaryOutputPreview;
   if (!preview) return null;
-  return formatArtifactDisplay(preview, 200);
+  return formatArtifactDisplay(preview, 1200);
 }
 
 function onStepDragStart(stepId: string, event: DragEvent) {
@@ -1103,14 +1106,17 @@ function runStateTitle(stepId: string): string {
   font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
   color: #888;
   font-family: monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: auto;
+  overscroll-behavior: contain;
   max-width: 100%;
-  padding: 0.25rem 0.4rem;
+  max-height: clamp(7rem, 20cqh, 13rem);
+  margin: 0;
+  padding: 0.65rem 0.75rem;
   background: #0d0d0d;
-  border-radius: 3px;
-  border: 1px solid #1e1e1e;
+  border-radius: 5px;
+  border: 1px solid #242424;
 }
 
 .step-run-actions { margin-top: auto; display: none; gap: 0.5rem; }

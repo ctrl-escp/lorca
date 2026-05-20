@@ -79,6 +79,7 @@
       :last-redo-label="editorStore.lastRedoLabel"
       :selection-range="selectionRange"
       :run-snapshots="runStore.snapshots"
+      :artifacts="runStore.artifacts"
       :accept-suggestion-drop="true"
       @select="handleSelectStep"
       @reorder="handleReorder"

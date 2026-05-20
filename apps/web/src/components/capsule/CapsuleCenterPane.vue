@@ -44,6 +44,7 @@
       :last-undo-label="editor.lastUndoLabel"
       :last-redo-label="editor.lastRedoLabel"
       :run-snapshots="capsuleRunStore.snapshots"
+      :artifacts="capsuleRunStore.artifacts"
       @select="editor.selectStep"
       @append="handleAppend"
       @insert-after="handleInsertAfter"
