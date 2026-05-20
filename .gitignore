@@ -13,3 +13,9 @@ apps/web/test-results/
 .claude
 CLAUDE.md
 AGENTS.md
+
+# llm-cors-proxy generated certificates
+*.crt
+*.key
+*.pem
+*.cnf
