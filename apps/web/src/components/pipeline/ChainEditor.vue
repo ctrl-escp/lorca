@@ -69,11 +69,21 @@
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
                 <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
                 <div class="step-actions">
-                  <button class="icon-btn" :disabled="i === 0" @click.stop="$emit('move-up', step.id)" title="Move up">↑</button>
-                  <button class="icon-btn" :disabled="i === steps.length - 1" @click.stop="$emit('move-down', step.id)" title="Move down">↓</button>
-                  <button class="icon-btn" @click.stop="$emit('duplicate', step.id)" title="Duplicate step">⊕</button>
-                  <button class="icon-btn" @click.stop="$emit('toggle-enabled', step.id)" :title="step.enabled ? 'Disable step' : 'Enable step'">{{ step.enabled ? '◉' : '○' }}</button>
-                  <button class="icon-btn danger" @click.stop="$emit('delete', step.id)" title="Delete step">×</button>
+                  <button class="icon-btn" :disabled="i === 0" @click.stop="$emit('move-up', step.id)" title="Move up" aria-label="Move up">
+                    <StepIcon name="arrow-up" />
+                  </button>
+                  <button class="icon-btn" :disabled="i === steps.length - 1" @click.stop="$emit('move-down', step.id)" title="Move down" aria-label="Move down">
+                    <StepIcon name="arrow-down" />
+                  </button>
+                  <button class="icon-btn" @click.stop="$emit('duplicate', step.id)" title="Duplicate step" aria-label="Duplicate step">
+                    <StepIcon name="copy" />
+                  </button>
+                  <button class="icon-btn" @click.stop="$emit('toggle-enabled', step.id)" :title="step.enabled ? 'Disable step' : 'Enable step'" :aria-label="step.enabled ? 'Disable step' : 'Enable step'">
+                    <StepIcon :name="step.enabled ? 'eye-off' : 'eye'" />
+                  </button>
+                  <button class="icon-btn danger" @click.stop="$emit('delete', step.id)" title="Delete step" aria-label="Delete step">
+                    <StepIcon name="trash" />
+                  </button>
                 </div>
               </div>
 
@@ -112,14 +122,18 @@
                   aria-label="Run up to here"
                   @click.stop="$emit('run-up-to', step.id)"
                   title="Execute pipeline up to this step"
-                >▷</button>
+                >
+                  <StepIcon name="play" />
+                </button>
                 <button
                   type="button"
                   class="btn-run-only-step icon-btn"
                   aria-label="Re-run only this step"
                   @click.stop="$emit('run-only-step', step.id)"
                   title="Re-run only this step (reuses previous outputs for other steps)"
-                >↺</button>
+                >
+                  <StepIcon name="refresh" />
+                </button>
               </div>
               <div
                 v-if="dragOverStepId === step.id && activeDragKind === 'step-reorder'"
@@ -248,6 +262,40 @@ const DropSlotIndicator = defineComponent({
         ],
       );
     };
+  },
+});
+
+const ICON_PATHS: Record<string, string[]> = {
+  'arrow-up': ['M12 19V5', 'M5 12l7-7 7 7'],
+  'arrow-down': ['M12 5v14', 'M19 12l-7 7-7-7'],
+  copy: ['M8 8h10v10H8z', 'M6 14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1'],
+  eye: ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+  'eye-off': ['M3 3l18 18', 'M10.6 10.6a3 3 0 0 0 4.2 4.2', 'M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.2', 'M6.6 6.6C3.6 8.5 2 12 2 12s3.5 8 10 8c1.4 0 2.6-.3 3.8-.8'],
+  trash: ['M3 6h18', 'M8 6V4h8v2', 'M6 6l1 14h10l1-14', 'M10 11v5', 'M14 11v5'],
+  play: ['M7 5v14l12-7z'],
+  refresh: ['M20 12a8 8 0 0 1-13.7 5.6', 'M4 12A8 8 0 0 1 17.7 6.4', 'M17 2v5h-5', 'M7 22v-5h5'],
+};
+
+const StepIcon = defineComponent({
+  name: 'StepIcon',
+  props: {
+    name: {type: String, required: true},
+  },
+  setup(props) {
+    return () => h(
+      'svg',
+      {
+        class: 'step-action-icon',
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 2.2,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'aria-hidden': 'true',
+      },
+      (ICON_PATHS[props.name] ?? []).map((d) => h('path', {d})),
+    );
   },
 });
 
@@ -668,7 +716,12 @@ function runStateTitle(stepId: string): string {
 .trace-skipped .step-card { opacity: 0.4; }
 .trace-cancelled .step-card { border-left: 3px solid #666; }
 
-.step-card-header { display: flex; align-items: center; gap: 0.4rem; }
+.step-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
 .step-drag-handle {
   flex-shrink: 0;
   align-self: stretch;
@@ -867,7 +920,14 @@ function runStateTitle(stepId: string): string {
 }
 .step-title.disabled { text-decoration: line-through; color: #555; }
 
-.step-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.1s; }
+.step-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  width: 100%;
+  opacity: 0.55;
+  transition: opacity 0.1s;
+}
 .step-card:hover .step-actions, .chain-step.selected .step-actions { opacity: 1; }
 
 .step-meta { display: flex; gap: 0.55rem; font-size: clamp(0.9rem, 1.9cqh, 1.2rem); color: #555; flex-wrap: wrap; }
@@ -911,18 +971,20 @@ function runStateTitle(stepId: string): string {
   border: 1px solid #1e1e1e;
 }
 
-.step-run-actions { margin-top: auto; display: none; gap: 6px; }
+.step-run-actions { margin-top: auto; display: none; gap: 0.5rem; }
 .chain-step.selected .step-run-actions { display: flex; }
 .btn-run-up-to {
-  font-size: clamp(1rem, 2cqh, 1.3rem); padding: 4px 10px;
+  width: clamp(2.75rem, 5.4cqh, 3.35rem);
+  height: clamp(2.75rem, 5.4cqh, 3.35rem);
   background: #1a2e1a; border: 1px solid #2a4d2a; color: #6db86d;
-  border-radius: 3px; cursor: pointer;
+  border-radius: 5px; cursor: pointer;
 }
 .btn-run-up-to:hover { background: #1e381e; color: #8dda8d; }
 .btn-run-only-step {
-  font-size: clamp(1rem, 2cqh, 1.3rem); padding: 4px 10px;
+  width: clamp(2.75rem, 5.4cqh, 3.35rem);
+  height: clamp(2.75rem, 5.4cqh, 3.35rem);
   background: #1a1a2e; border: 1px solid #2a2a4d; color: #6d6db8;
-  border-radius: 3px; cursor: pointer;
+  border-radius: 5px; cursor: pointer;
 }
 .btn-run-only-step:hover { background: #1e1e38; color: #8d8dda; }
 
@@ -996,8 +1058,25 @@ function runStateTitle(stepId: string): string {
 .btn-ghost { background: none; border-color: transparent; color: #555; }
 .btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: #888; border-color: #333; }
 
-.icon-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.78rem; padding: 0 2px; }
-.icon-btn:hover:not(:disabled) { color: #aaa; }
+.icon-btn {
+  width: clamp(2.45rem, 5cqh, 3rem);
+  height: clamp(2.45rem, 5cqh, 3rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #151515;
+  border: 1px solid #2a2a2a;
+  border-radius: 5px;
+  color: #777;
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { background: #202020; border-color: #3a3a3a; color: #ccc; }
 .icon-btn:disabled { opacity: 0.2; cursor: default; }
-.icon-btn.danger:hover:not(:disabled) { color: #e07070; }
+.icon-btn.danger:hover:not(:disabled) { border-color: #5a3030; color: #e07070; background: #241616; }
+.step-action-icon {
+  width: clamp(1.35rem, 2.8cqh, 1.8rem);
+  height: clamp(1.35rem, 2.8cqh, 1.8rem);
+  flex-shrink: 0;
+}
 </style>
