@@ -7,6 +7,9 @@
       </header>
 
       <div class="dialog-body">
+        <p v-if="replacesActivePipeline" class="warning">
+          This will replace your current pipeline and clear the undo history. Run results will be reset.
+        </p>
         <p v-if="missingModels.length === 0" class="hint">
           All model references resolve locally. Click Import to add this {{ kindLabel }}.
         </p>
@@ -49,6 +52,8 @@ const props = defineProps<{
   missingModels: MissingModelReference[];
   models: DiscoveredModel[];
   endpoints: AiEndpointConfig[];
+  /** When importing a pipeline into the active editor, warn before overwrite. */
+  replacesActivePipeline?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -132,6 +137,15 @@ function confirm() {
   gap: 0.75rem;
 }
 .hint { margin: 0; font-size: 0.82rem; color: #888; }
+.warning {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #c8a050;
+  background: #1a180f;
+  border: 1px solid #4a4020;
+  border-radius: 4px;
+  padding: 0.45rem 0.55rem;
+}
 .remap-row { display: flex; flex-direction: column; gap: 0.3rem; }
 .remap-label { display: flex; flex-direction: column; gap: 0.1rem; }
 .remap-title { font-size: 0.82rem; color: #ddd; }

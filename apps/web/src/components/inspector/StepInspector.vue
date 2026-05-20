@@ -2,7 +2,6 @@
   <div class="step-inspector">
     <div v-if="!step" class="inspector-empty">Select a step to configure it.</div>
     <template v-else>
-      <!-- Header -->
       <div class="inspector-header">
         <span class="step-type-badge" :title="`Step type: ${step.type}`">{{ TYPE_LABELS[step.type] ?? step.type }}</span>
         <input
@@ -15,178 +14,258 @@
         />
       </div>
 
-      <div class="ns-row">
-        <span class="ns-label" title="Artifact namespace for this step's outputs">namespace</span>
-        <code class="ns-value">{{ step.outputNamespace }}</code>
-        <span class="ns-dot">·</span>
-        <code class="ns-value">{{ step.primaryOutputName }}</code>
+      <div class="inspector-tabs" role="tablist">
+        <button
+          v-for="tab in visibleTabs"
+          :key="tab.id"
+          type="button"
+          class="inspector-tab"
+          :class="{active: activeTab === tab.id}"
+          role="tab"
+          :aria-selected="activeTab === tab.id"
+          @click="activeTab = tab.id"
+        >{{ tab.label }}</button>
       </div>
 
-      <!-- Run / validation status -->
-      <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
-        <div class="inspector-status-header">
-          <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
-          <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">
-            Last run {{ formatTime(lastSnapshot.completedAt) }}
-          </span>
-        </div>
-        <ul v-if="stepStatus.blockReasons?.length" class="inspector-status-issues">
-          <li v-for="(reason, i) in stepStatus.blockReasons" :key="i">{{ reason }}</li>
-        </ul>
-        <p v-else-if="stepStatus.state === 'stale' || stepStatus.state === 'failed-stale'" class="inspector-status-hint">
-          Upstream config or inputs changed since the last run.
-        </p>
-        <div v-if="lastSnapshot?.outputArtifactRefs.length" class="inspector-last-outputs">
-          <span class="inspector-last-label">Outputs:</span>
-          <code v-for="ref in lastSnapshot.outputArtifactRefs" :key="ref" class="inspector-artifact-ref">{{ ref }}</code>
-        </div>
-        <pre v-if="lastSnapshot?.primaryOutputPreview" class="inspector-output-preview">{{ lastSnapshot.primaryOutputPreview }}</pre>
-      </div>
+      <div class="inspector-tab-panel">
+        <!-- Config -->
+        <template v-if="activeTab === 'config'">
+          <div class="ns-row">
+            <span class="ns-label" title="Artifact namespace for this step's outputs">namespace</span>
+            <code class="ns-value">{{ step.outputNamespace }}</code>
+            <span class="ns-dot">·</span>
+            <code class="ns-value">{{ step.primaryOutputName }}</code>
+          </div>
 
-      <!-- Model Call -->
-      <template v-if="step.config.type === 'model-call'">
-        <div class="inspector-field">
-          <FieldLabel label="Model" required title="Which model to call for this step" />
-          <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
-            <option value="">— select model —</option>
-            <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
-              <option
-                v-for="m in modelsForEndpoint(ep.id)"
-                :key="m.id"
-                :value="`${m.endpointId}::${m.providerModelName}`"
-              >
-                {{ m.displayName }}
-              </option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Mode" title="Generate: single prompt → single response. Chat: system + user message roles." />
-          <select v-model="localMode" title="Inference mode" @change="commitModelCall">
-            <option value="generate">Generate</option>
-            <option value="chat">Chat</option>
-          </select>
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Temperature" title="Sampling temperature (leave blank for model default)" />
-          <input
-            type="number" min="0" max="2" step="0.05"
-            v-model="localTemperature"
-            placeholder="default"
-            title="Sampling temperature"
-            @blur="commitModelCall"
+          <template v-if="step.config.type === 'model-call'">
+            <div class="inspector-field">
+              <FieldLabel label="Model" required title="Which model to call for this step" />
+              <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
+                <option value="">— select model —</option>
+                <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
+                  <option
+                    v-for="m in modelsForEndpoint(ep.id)"
+                    :key="m.id"
+                    :value="`${m.endpointId}::${m.providerModelName}`"
+                  >
+                    {{ m.displayName }}
+                  </option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="inspector-field">
+              <FieldLabel label="Mode" title="Generate: single prompt → single response. Chat: system + user message roles." />
+              <select v-model="localMode" title="Inference mode" @change="commitModelCall">
+                <option value="generate">Generate</option>
+                <option value="chat">Chat</option>
+              </select>
+            </div>
+            <div class="inspector-field">
+              <FieldLabel label="Temperature" title="Sampling temperature (leave blank for model default)" />
+              <input
+                type="number" min="0" max="2" step="0.05"
+                v-model="localTemperature"
+                placeholder="default"
+                title="Sampling temperature"
+                @blur="commitModelCall"
+              />
+            </div>
+            <div class="inspector-field">
+              <FieldLabel label="Max tokens" title="Maximum output tokens (leave blank for model default)" />
+              <input
+                type="number" min="1" step="128"
+                v-model="localMaxTokens"
+                placeholder="default"
+                title="Maximum output tokens"
+                @blur="commitModelCall"
+              />
+            </div>
+          </template>
+
+          <template v-else-if="step.config.type === 'manual-text'">
+            <div class="inspector-field">
+              <FieldLabel label="Text" title="Static text output produced by this step" />
+              <textarea
+                v-model="localText"
+                rows="6"
+                placeholder="Enter static text…"
+                title="Static text"
+                @blur="commitManualText"
+              />
+            </div>
+          </template>
+
+          <template v-else-if="step.config.type === 'template'">
+            <div class="inspector-field">
+              <FieldLabel label="Template" title="Handlebars-style template using {{artifact.key}} placeholders" />
+              <textarea
+                v-model="localTemplate"
+                rows="6"
+                placeholder="{{user_prompt.raw}}"
+                title="Template with artifact placeholders"
+                @blur="commitTemplate"
+              />
+            </div>
+          </template>
+
+          <template v-else-if="step.config.type === 'json-extract'">
+            <div class="inspector-field">
+              <FieldLabel label="Source artifact" required title="Artifact key to parse as JSON (supports fenced code blocks)" />
+              <input
+                v-model="localSourceRef"
+                placeholder="answer.text"
+                title="Source artifact key"
+                @blur="commitJsonExtract"
+              />
+            </div>
+          </template>
+
+          <PipelineCapsuleInstanceEditor
+            v-else-if="capsuleInstanceStep"
+            :step="capsuleInstanceStep"
           />
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Max tokens" title="Maximum output tokens (leave blank for model default)" />
-          <input
-            type="number" min="1" step="128"
-            v-model="localMaxTokens"
-            placeholder="default"
-            title="Maximum output tokens"
-            @blur="commitModelCall"
-          />
-        </div>
-      </template>
 
-      <!-- Prompt Wrapper (no step-config fields; all config is in PromptCompositionEditor below) -->
-
-      <!-- Manual Text -->
-      <template v-else-if="step.config.type === 'manual-text'">
-        <div class="inspector-field">
-          <FieldLabel label="Text" title="Static text output produced by this step" />
-          <textarea
-            v-model="localText"
-            rows="6"
-            placeholder="Enter static text…"
-            title="Static text"
-            @blur="commitManualText"
-          />
-        </div>
-      </template>
-
-      <!-- Template -->
-      <template v-else-if="step.config.type === 'template'">
-        <div class="inspector-field">
-          <FieldLabel label="Template" title="Handlebars-style template using {{artifact.key}} placeholders" />
-          <textarea
-            v-model="localTemplate"
-            rows="6"
-            placeholder="{{user_prompt.raw}}"
-            title="Template with artifact placeholders"
-            @blur="commitTemplate"
-          />
-        </div>
-      </template>
-
-      <!-- JSON Extract -->
-      <template v-else-if="step.config.type === 'json-extract'">
-        <div class="inspector-field">
-          <FieldLabel label="Source artifact" required title="Artifact key to parse as JSON (supports fenced code blocks)" />
-          <input
-            v-model="localSourceRef"
-            placeholder="answer.text"
-            title="Source artifact key"
-            @blur="commitJsonExtract"
-          />
-        </div>
-      </template>
-
-      <!-- Capsule Instance -->
-      <PipelineCapsuleInstanceEditor
-        v-else-if="step.config.type === 'capsule-instance'"
-        :step="step"
-      />
-
-      <!-- Loop Group -->
-      <template v-else-if="step.config.type === 'loop-group'">
-        <div class="inspector-field">
-          <FieldLabel label="Max iterations" required title="Maximum number of times the inner chain will run" />
-          <input
-            type="number" min="1" max="20" step="1"
-            v-model="localMaxIterations"
-            title="Maximum iterations"
-            @blur="commitLoopGroup"
-          />
-        </div>
-        <div class="inspector-field">
-          <FieldLabel label="Exit condition" title="When to stop looping before reaching max iterations" />
-          <select v-model="localExitConditionType" title="Exit condition type" @change="commitLoopGroup">
-            <option value="iterations">Always run max iterations</option>
-            <option value="json-field-equals">JSON field equals value</option>
-          </select>
-        </div>
-        <template v-if="localExitConditionType === 'json-field-equals'">
-          <div class="inspector-field">
-            <FieldLabel label="Field path" title="Dot-path into last inner step's JSON output (e.g. passed)" />
-            <input
-              v-model="localExitFieldPath"
-              placeholder="passed"
-              title="JSON field path to check"
-              @blur="commitLoopGroup"
+          <template v-else-if="step.config.type === 'loop-group'">
+            <div class="inspector-field">
+              <FieldLabel label="Max iterations" required title="Maximum number of times the inner chain will run" />
+              <input
+                type="number" min="1" max="20" step="1"
+                v-model="localMaxIterations"
+                title="Maximum iterations"
+                @blur="commitLoopGroup"
+              />
+            </div>
+            <div class="inspector-field">
+              <FieldLabel label="Exit condition" title="When to stop looping before reaching max iterations" />
+              <select v-model="localExitConditionType" title="Exit condition type" @change="commitLoopGroup">
+                <option value="iterations">Always run max iterations</option>
+                <option value="json-field-equals">JSON field equals value</option>
+              </select>
+            </div>
+            <template v-if="localExitConditionType === 'json-field-equals'">
+              <div class="inspector-field">
+                <FieldLabel label="Field path" title="Dot-path into last inner step's JSON output (e.g. passed)" />
+                <input
+                  v-model="localExitFieldPath"
+                  placeholder="passed"
+                  title="JSON field path to check"
+                  @blur="commitLoopGroup"
+                />
+              </div>
+              <div class="inspector-field">
+                <FieldLabel label="Exit when value" title="Loop exits when the field equals this value" />
+                <select v-model="localExitValue" title="Expected value that triggers loop exit" @change="commitLoopGroup">
+                  <option value="true_bool">true</option>
+                  <option value="false_bool">false</option>
+                  <option value="custom">Custom string…</option>
+                </select>
+              </div>
+            </template>
+            <LoopInnerChainEditor
+              :loop-step-id="step.id"
+              :inner-steps="step.config.steps"
             />
-          </div>
-          <div class="inspector-field">
-            <FieldLabel label="Exit when value" title="Loop exits when the field equals this value" />
-            <select v-model="localExitValue" title="Expected value that triggers loop exit" @change="commitLoopGroup">
-              <option value="true_bool">true</option>
-              <option value="false_bool">false</option>
-              <option value="custom">Custom string…</option>
-            </select>
-          </div>
+          </template>
         </template>
-        <LoopInnerChainEditor
-          :loop-step-id="step.id"
-          :inner-steps="step.config.steps"
-        />
-      </template>
 
-      <!-- Prompt composition (shown for all prompt-bearing steps) -->
-      <PromptCompositionEditor
-        v-if="hasPromptBlocks && step.config.type !== 'loop-group'"
-        :step-id="step.id"
-        :config="step.prompt"
-      />
+        <!-- Prompt -->
+        <template v-else-if="activeTab === 'prompt'">
+          <PromptCompositionEditor
+            v-if="hasPromptBlocks"
+            :step-id="step.id"
+            :config="step.prompt"
+          />
+          <p v-else class="empty-hint">This step type has no prompt composition.</p>
+        </template>
+
+        <!-- Inputs -->
+        <template v-else-if="activeTab === 'inputs'">
+          <template v-if="step.config.type === 'json-extract'">
+            <div class="inspector-field">
+              <FieldLabel label="Source artifact" />
+              <code class="binding-ref">{{ step.config.sourceArtifactRef || '(not set)' }}</code>
+            </div>
+          </template>
+          <template v-else-if="step.config.type === 'capsule-instance'">
+            <div class="binding-list">
+              <div v-for="(ref, port) in step.config.inputBindings" :key="port" class="binding-row">
+                <span class="binding-port">{{ port }}</span>
+                <span class="binding-arrow">←</span>
+                <code class="binding-ref">{{ ref }}</code>
+              </div>
+              <p v-if="Object.keys(step.config.inputBindings).length === 0" class="empty-hint">No input bindings.</p>
+            </div>
+          </template>
+          <template v-else-if="hasPromptBlocks && step.prompt">
+            <p v-if="step.prompt.historyReads.length === 0" class="empty-hint">
+              No history reads. Open the Prompt tab to add prior-step outputs.
+            </p>
+            <ul v-else class="history-read-list">
+              <li v-for="(hr, i) in step.prompt.historyReads" :key="`${hr.sourceStepId}-${i}`" class="history-read-row">
+                <code class="binding-ref">{{ hr.sourceArtifactRef }}</code>
+                <span class="history-read-tag">&lt;{{ hr.tagName }}&gt;</span>
+                <span v-if="hr.required" class="history-read-required">required</span>
+              </li>
+            </ul>
+            <p v-if="step.prompt.previousOutput?.enabled" class="inputs-hint">
+              Previous output: <code>{{ step.prompt.previousOutput.tagName }}</code>
+              ({{ step.prompt.previousOutput.placement }})
+            </p>
+          </template>
+          <p v-else class="empty-hint">No configurable inputs for this step type.</p>
+        </template>
+
+        <!-- Outputs -->
+        <template v-else-if="activeTab === 'outputs'">
+          <div class="inspector-field">
+            <FieldLabel label="Primary output key" />
+            <code class="binding-ref">{{ step.outputNamespace }}.{{ step.primaryOutputName }}</code>
+          </div>
+          <div v-if="step.config.type === 'capsule-instance'" class="binding-list">
+            <div v-for="(ref, port) in step.config.outputBindings" :key="port" class="binding-row">
+              <span class="binding-port">{{ port }}</span>
+              <span class="binding-arrow">→</span>
+              <code class="binding-ref">{{ ref }}</code>
+            </div>
+          </div>
+          <div v-if="lastSnapshot?.outputArtifactRefs.length" class="inspector-last-outputs">
+            <span class="inspector-last-label">From last run:</span>
+            <code v-for="ref in lastSnapshot.outputArtifactRefs" :key="ref" class="inspector-artifact-ref">{{ ref }}</code>
+          </div>
+          <p v-else class="empty-hint">No output artifacts from a run yet.</p>
+        </template>
+
+        <!-- Last run -->
+        <template v-else-if="activeTab === 'last-run'">
+          <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
+            <div class="inspector-status-header">
+              <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
+              <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">
+                {{ formatTime(lastSnapshot.completedAt) }}
+              </span>
+            </div>
+            <pre v-if="lastSnapshot?.primaryOutputPreview" class="inspector-output-preview">{{ lastSnapshot.primaryOutputPreview }}</pre>
+            <p v-else-if="stepStatus.state === 'not-run'" class="empty-hint">This step has not been executed yet.</p>
+          </div>
+          <p v-else class="empty-hint">No run data.</p>
+        </template>
+
+        <!-- Validation -->
+        <template v-else-if="activeTab === 'validation'">
+          <div v-if="stepStatus?.blockReasons?.length" class="inspector-status status-blocked">
+            <ul class="inspector-status-issues">
+              <li v-for="(reason, i) in stepStatus.blockReasons" :key="i">{{ reason }}</li>
+            </ul>
+          </div>
+          <p v-else-if="stepStatus?.state === 'stale' || stepStatus?.state === 'failed-stale'" class="inspector-status-hint">
+            Upstream config or inputs changed since the last run. Re-run to refresh outputs.
+          </p>
+          <p v-else-if="stepStatus?.state === 'current' || stepStatus?.state === 'failed-current'" class="inspector-status-hint ok">
+            No blocking issues for this step.
+          </p>
+          <p v-else class="empty-hint">Run the pipeline to evaluate validation state.</p>
+        </template>
+      </div>
     </template>
   </div>
 </template>
@@ -205,6 +284,8 @@ import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 
+type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
+
 const editorStore = usePipelineEditorStore();
 const runStore = useActiveRunStore();
 const modelsStore = useModelsStore();
@@ -212,6 +293,7 @@ const endpointsStore = useEndpointsStore();
 const capsulesStore = useCapsulesStore();
 
 const step = computed(() => editorStore.selectedStep);
+const activeTab = ref<InspectorTab>('config');
 
 const stepStatus = computed(() => {
   const s = step.value;
@@ -231,6 +313,31 @@ const lastSnapshot = computed(() => {
   return runStore.snapshots[s.id] ?? null;
 });
 
+const hasPromptBlocks = computed(() =>
+  step.value?.config.type === 'model-call' || step.value?.config.type === 'prompt-wrapper',
+);
+
+const capsuleInstanceStep = computed(() => {
+  const s = step.value;
+  return s?.config.type === 'capsule-instance' ? s : null;
+});
+
+const visibleTabs = computed(() => {
+  const tabs: {id: InspectorTab; label: string}[] = [
+    {id: 'config', label: 'Config'},
+  ];
+  if (hasPromptBlocks.value) tabs.push({id: 'prompt', label: 'Prompt'});
+  tabs.push({id: 'inputs', label: 'Inputs'}, {id: 'outputs', label: 'Outputs'});
+  tabs.push({id: 'last-run', label: 'Last run'}, {id: 'validation', label: 'Validation'});
+  return tabs;
+});
+
+watch(step, () => {
+  if (!visibleTabs.value.some((t) => t.id === activeTab.value)) {
+    activeTab.value = 'config';
+  }
+});
+
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, {hour: '2-digit', minute: '2-digit'});
@@ -248,12 +355,6 @@ const TYPE_LABELS: Record<string, string> = {
   'capsule-instance': 'Capsule',
   'loop-group': 'Loop Group',
 };
-
-const hasPromptBlocks = computed(() =>
-  step.value?.config.type === 'model-call' || step.value?.config.type === 'prompt-wrapper',
-);
-
-// ── Local state ───────────────────────────────────────────────────────────────
 
 const localLabel = ref('');
 const localModelKey = ref('');
@@ -297,13 +398,9 @@ watch(step, (s) => {
   }
 }, {immediate: true});
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function modelsForEndpoint(endpointId: string) {
   return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
 }
-
-// ── Commit functions ──────────────────────────────────────────────────────────
 
 function commitLabel() {
   const s = step.value;
@@ -362,13 +459,26 @@ function commitLoopGroup() {
 </script>
 
 <style scoped>
-.step-inspector { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; overflow-y: auto; height: 100%; }
+.step-inspector { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; overflow: hidden; height: 100%; }
 .inspector-empty { color: #444; font-size: 0.78rem; }
 
-.inspector-header { display: flex; align-items: center; gap: 0.5rem; }
+.inspector-header { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 .step-type-badge { font-size: 0.62rem; padding: 1px 6px; background: #1a2a3a; color: #7ec8e3; border-radius: 3px; flex-shrink: 0; border: 1px solid #2a4a6a; }
 .step-label-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #2a2a2a; color: #e8e8e8; font-size: 0.9rem; font-weight: 500; padding: 2px 0; min-width: 0; }
 .step-label-input:focus { outline: none; border-bottom-color: #3a6080; }
+
+.inspector-tabs {
+  display: flex; flex-wrap: wrap; gap: 0.15rem; flex-shrink: 0;
+  border-bottom: 1px solid #1e1e1e; padding-bottom: 0.35rem;
+}
+.inspector-tab {
+  background: none; border: 1px solid transparent; color: #666;
+  font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; cursor: pointer;
+}
+.inspector-tab:hover { color: #999; }
+.inspector-tab.active { color: #7ec8e3; border-color: #2a4a6a; background: #1a2430; }
+
+.inspector-tab-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.55rem; }
 
 .ns-row { display: flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; }
 .ns-label { color: #444; }
@@ -392,6 +502,7 @@ function commitLoopGroup() {
 .inspector-status-time { color: #555; font-size: 0.65rem; }
 .inspector-status-issues { margin: 0; padding-left: 1rem; color: #e07070; }
 .inspector-status-hint { margin: 0; color: #888; font-size: 0.68rem; }
+.inspector-status-hint.ok { color: #5a9d6e; }
 .inspector-last-outputs { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
 .inspector-last-label { color: #555; font-size: 0.65rem; }
 .inspector-artifact-ref { color: #5a8a5a; font-size: 0.65rem; }
@@ -405,14 +516,11 @@ function commitLoopGroup() {
   border-radius: 4px;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 6rem;
+  max-height: 12rem;
   overflow-y: auto;
 }
 
 .inspector-field { display: flex; flex-direction: column; gap: 0.2rem; }
-.inspector-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #888; }
-.inspector-field-row label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
-.inspector-readonly p { font-size: 0.72rem; color: #555; margin: 0; }
 
 input, select, textarea {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
@@ -420,19 +528,19 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: #3a6080; }
 textarea { resize: vertical; font-family: monospace; line-height: 1.4; }
-input.invalid { border-color: #c0392b; }
-input[type="checkbox"] { width: auto; }
-
-.inspector-section-divider {
-  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #444;
-  border-top: 1px solid #1e1e1e; padding-top: 0.5rem; margin-top: 0.25rem;
-}
 
 .binding-list { display: flex; flex-direction: column; gap: 0.2rem; }
 .binding-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; }
 .binding-port { color: #888; }
 .binding-arrow { color: #444; }
 .binding-ref { color: #5a8a5a; font-size: 0.72rem; }
+
+.history-read-list { margin: 0; padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.history-read-row { font-size: 0.72rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.history-read-disabled { color: #666; font-size: 0.65rem; }
+.history-read-tag { color: #666; font-size: 0.65rem; }
+.history-read-required { color: #c8a050; font-size: 0.65rem; }
+.inputs-hint { font-size: 0.68rem; color: #666; margin: 0.35rem 0 0; }
 
 .empty-hint { font-size: 0.68rem; color: #444; margin: 0; }
 </style>

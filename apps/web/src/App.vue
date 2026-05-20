@@ -55,6 +55,7 @@
       :missing-models="pendingMissingModels"
       :models="modelsStore.models"
       :endpoints="endpointsStore.endpoints"
+      :replaces-active-pipeline="importStore.pendingImport.kind === 'pipeline'"
       @cancel="importStore.cancelImport()"
       @confirm="onConfirmImport"
     />
@@ -165,7 +166,9 @@ async function onConfirmImport(remaps: Record<string, ModelRemap>) {
   if (result?.kind === 'capsule') {
     uiStore.openCapsuleEditor(result.id);
   } else if (result?.kind === 'pipeline') {
+    runStore.reset();
     uiStore.closeCapsuleEditor();
+    pipelineEditorKey.value++;
   }
 }
 

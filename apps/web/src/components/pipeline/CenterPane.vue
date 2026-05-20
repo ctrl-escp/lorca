@@ -181,6 +181,10 @@ function handleExtractSelection() {
     window.alert('Select steps to extract. Shift+click another step to define a range.');
     return;
   }
+  const stepCount = range.endIndex - range.startIndex + 1;
+  if (!window.confirm(
+    `Replace ${stepCount} selected step(s) with a single Capsule instance?\n\nThe original steps will be saved as a new Capsule definition.`,
+  )) return;
   const defaultName = editorStore.selectedStep?.label ?? 'Extracted Capsule';
   const name = promptCapsuleName(defaultName);
   if (!name) return;
@@ -216,11 +220,6 @@ function commitPipelineName() {
     editorStore.updatePipelineName(name);
   }
 }
-
-watch(localPipelineName, () => {
-  // Live update without undo entry (undo on blur in commitPipelineName)
-  editorStore.pipeline.name = localPipelineName.value;
-});
 
 function handleAppend(type: StepType) {
   const step = editorStore.buildDefaultStep(type);

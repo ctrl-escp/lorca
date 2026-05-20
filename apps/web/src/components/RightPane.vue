@@ -32,6 +32,7 @@
       <TracePanel
         v-else-if="uiStore.rightPaneTab === 'trace'"
         :trace="activeTrace"
+        :artifacts="isCapsuleMode ? capsuleRunStore.artifacts : runStore.artifacts"
         :partial-run="!isCapsuleMode && runStore.partial"
         :selected-step-id="isCapsuleMode ? null : editorStore.selectedStepId"
       />

@@ -1,12 +1,5 @@
 <template>
   <div class="output-panel">
-    <div v-if="outputStale" class="output-stale-banner">
-      This output is stale — upstream config or inputs changed since the last run.
-    </div>
-    <div v-if="partialRun" class="output-partial-banner">
-      Partial run output — not necessarily the pipeline's configured final output.
-    </div>
-
     <div v-if="status === 'idle'" class="output-idle">Run the pipeline to see output.</div>
     <div v-else-if="status === 'running'" class="output-running">Running…</div>
     <div v-else-if="error" class="output-error">
@@ -14,10 +7,23 @@
       <div class="error-msg">{{ error.message }}</div>
       <div v-if="error.nodeId" class="error-node">Node: {{ error.nodeId }}</div>
     </div>
-    <div v-else-if="output" class="output-value" :class="{stale: outputStale}">
-      <div class="output-key">{{ outputKey }}</div>
-      <pre class="output-text">{{ displayValue }}</pre>
-    </div>
+    <template v-else-if="output">
+      <div v-if="outputStale" class="output-stale-banner">
+        Stale — from the last run. Upstream config or inputs changed; re-run to refresh.
+      </div>
+      <div v-if="partialRun" class="output-partial-banner">
+        Partial run — this is not necessarily the pipeline's configured final output.
+      </div>
+      <div class="output-value" :class="{stale: outputStale}">
+        <div class="output-header">
+          <span class="output-state-label" :class="outputStale ? 'stale' : 'current'">
+            {{ outputStale ? 'Last run output (stale)' : 'Current output' }}
+          </span>
+          <span v-if="outputKey" class="output-key">{{ outputKey }}</span>
+        </div>
+        <pre class="output-text">{{ displayValue }}</pre>
+      </div>
+    </template>
     <div v-else class="output-idle">No output.</div>
   </div>
 </template>
@@ -60,6 +66,10 @@ const displayValue = computed(() => {
 .error-node { color: #666; font-size: 0.75rem; }
 .output-value { display: flex; flex-direction: column; gap: 0.4rem; }
 .output-value.stale .output-text { border-color: #4a4020; opacity: 0.85; }
+.output-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; }
+.output-state-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.output-state-label.current { color: #5a9d6e; }
+.output-state-label.stale { color: #c8a050; }
 .output-key { font-family: monospace; font-size: 0.72rem; color: #7ec8e3; }
 .output-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; color: #ddd; background: #111; border: 1px solid #222; border-radius: 4px; padding: 0.6rem; }
 </style>

@@ -34,7 +34,21 @@
       </div>
       <div v-if="event.outputArtifactNames?.length" class="ev-artifacts">
         <span class="ev-artifacts-label">outputs</span>
-        <span v-for="name in event.outputArtifactNames" :key="name" class="artifact-tag out">{{ name }}</span>
+        <button
+          v-for="name in event.outputArtifactNames"
+          :key="name"
+          type="button"
+          class="artifact-tag out artifact-link"
+          :class="{active: expandedArtifact === artifactKey(event, name)}"
+          :title="artifacts?.[name] ? 'Show artifact body' : 'Name only — body not in run store'"
+          @click="toggleArtifact(event, name)"
+        >{{ name }}</button>
+      </div>
+
+      <div v-if="expandedArtifactForEvent(event)" class="ev-detail">
+        <div class="ev-detail-title">Artifact: {{ expandedArtifactForEvent(event) }}</div>
+        <pre v-if="artifactBody(expandedArtifactForEvent(event)!)" class="ev-preview">{{ artifactBody(expandedArtifactForEvent(event)!) }}</pre>
+        <p v-else class="ev-missing-artifact">Body not available for this artifact in the current run.</p>
       </div>
 
       <template v-if="expanded.has(event.stepId ?? event.nodeId ?? '') && hasDetails(event)">
@@ -66,16 +80,20 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {PipelineTraceEvent} from '@lorca/core';
+import type {PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
+
+const ARTIFACT_PREVIEW_MAX = 4000;
 
 const props = defineProps<{
   trace: PipelineTraceEvent[];
+  artifacts?: Record<string, PipelineArtifact>;
   partialRun?: boolean;
   selectedStepId?: string | null;
 }>();
 
 const filterToSelected = ref(false);
 const expanded = ref(new Set<string>());
+const expandedArtifact = ref<string | null>(null);
 
 watch(() => props.selectedStepId, (id) => {
   filterToSelected.value = Boolean(id);
@@ -103,6 +121,29 @@ function toggleExpand(id: string) {
   if (next.has(id)) next.delete(id);
   else next.add(id);
   expanded.value = next;
+}
+
+function artifactKey(event: PipelineTraceEvent, name: string): string {
+  return `${event.stepId ?? event.nodeId ?? ''}:${name}`;
+}
+
+function toggleArtifact(event: PipelineTraceEvent, name: string) {
+  const key = artifactKey(event, name);
+  expandedArtifact.value = expandedArtifact.value === key ? null : key;
+}
+
+function expandedArtifactForEvent(event: PipelineTraceEvent): string | null {
+  if (!expandedArtifact.value) return null;
+  const prefix = `${event.stepId ?? event.nodeId ?? ''}:`;
+  if (!expandedArtifact.value.startsWith(prefix)) return null;
+  return expandedArtifact.value.slice(prefix.length);
+}
+
+function artifactBody(name: string): string | null {
+  const art = props.artifacts?.[name];
+  if (!art) return null;
+  const raw = typeof art.value === 'string' ? art.value : JSON.stringify(art.value, null, 2);
+  return raw.length > ARTIFACT_PREVIEW_MAX ? `${raw.slice(0, ARTIFACT_PREVIEW_MAX)}\n… (truncated)` : raw;
 }
 </script>
 
@@ -142,6 +183,9 @@ function toggleExpand(id: string) {
 .ev-artifacts-label { font-size: 0.62rem; color: #555; text-transform: uppercase; margin-right: 0.15rem; }
 .artifact-tag { background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 3px; padding: 1px 5px; font-size: 0.68rem; color: #888; font-family: monospace; }
 .artifact-tag.out { color: #7ec8e3; }
+.artifact-link { cursor: pointer; }
+.artifact-link:hover, .artifact-link.active { border-color: #3a6080; background: #1a2430; }
+.ev-missing-artifact { margin: 0; font-size: 0.68rem; color: #666; font-style: italic; }
 .artifact-tag.omitted { opacity: 0.5; text-decoration: line-through; }
 .ev-detail { margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid #1a1a1a; }
 .ev-detail-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-bottom: 0.2rem; }

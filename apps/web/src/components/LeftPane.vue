@@ -1,18 +1,65 @@
 <template>
   <aside class="left-pane">
 
+    <!-- Step types (insert primitives) -->
+    <section class="pane-section" :class="{expanded: isExpanded('stepTypes')}">
+      <div class="section-header" @click="toggleSection('stepTypes')">
+        <button type="button" class="section-toggle" :aria-expanded="isExpanded('stepTypes')" title="Basic step types to insert into the pipeline">
+          <span class="chevron" :class="{open: isExpanded('stepTypes')}">›</span>
+          <span class="section-title">Step types <span class="section-count">({{ filteredStepTypes.length }})</span></span>
+        </button>
+      </div>
+      <div v-if="isExpanded('stepTypes')" class="section-body">
+        <input
+          v-model="paletteQuery"
+          class="palette-search"
+          type="search"
+          placeholder="Filter palette…"
+          aria-label="Filter step types and suggestions"
+        />
+        <div class="step-type-list">
+          <div
+            v-for="entry in filteredStepTypes"
+            :key="entry.type"
+            class="step-type-row"
+            :title="entry.description"
+          >
+            <div class="step-type-row-main">
+              <span class="step-type-row-name">{{ entry.label }}</span>
+              <span class="step-type-row-desc">{{ entry.description }}</span>
+            </div>
+            <button
+              class="btn-insert-suggestion"
+              type="button"
+              title="Insert after selected step (or append)"
+              @click.stop="onInsertStepType(entry.type)"
+            >↓ Insert</button>
+          </div>
+          <p v-if="filteredStepTypes.length === 0" class="empty-hint">No step types match your filter.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Step Suggestions (replaces destructive Examples) -->
     <section class="pane-section" :class="{expanded: isExpanded('suggestions')}">
       <div class="section-header" @click="toggleSection('suggestions')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('suggestions')" title="Insertable step recipes — click to insert into the current pipeline">
           <span class="chevron" :class="{open: isExpanded('suggestions')}">›</span>
-          <span class="section-title">Step Suggestions <span class="section-count">({{ BUILTIN_SUGGESTIONS.length }})</span></span>
+          <span class="section-title">Step Suggestions <span class="section-count">({{ filteredSuggestions.length }})</span></span>
         </button>
       </div>
       <div v-if="isExpanded('suggestions')" class="section-body">
+        <input
+          v-if="!isExpanded('stepTypes')"
+          v-model="paletteQuery"
+          class="palette-search"
+          type="search"
+          placeholder="Filter suggestions…"
+          aria-label="Filter step suggestions"
+        />
         <div class="suggestion-list">
           <div
-            v-for="suggestion in BUILTIN_SUGGESTIONS"
+            v-for="suggestion in filteredSuggestions"
             :key="suggestion.id"
             class="suggestion-row"
             :title="suggestion.description"
@@ -33,6 +80,7 @@
               </button>
             </div>
           </div>
+          <p v-if="filteredSuggestions.length === 0" class="empty-hint">No suggestions match your filter.</p>
         </div>
       </div>
     </section>
@@ -138,8 +186,8 @@
 </template>
 
 <script setup lang="ts">
-import {ref, onMounted} from 'vue';
-import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket} from '@lorca/core';
+import {ref, computed, onMounted} from 'vue';
+import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
 import {BUILTIN_SUGGESTIONS, instantiateSuggestion} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
@@ -167,12 +215,40 @@ const epActions = useEndpointActions();
 
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
+const paletteQuery = ref('');
+
+const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
+  {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
+  {type: 'prompt-wrapper', label: 'Prompt wrapper', description: 'Compose XML prompt blocks without calling a model'},
+  {type: 'manual-text', label: 'Manual text', description: 'Emit static text as an artifact'},
+  {type: 'template', label: 'Template', description: 'Render a Handlebars-style template into text'},
+  {type: 'json-extract', label: 'JSON extract', description: 'Parse JSON from a prior artifact'},
+  {type: 'loop-group', label: 'Loop group', description: 'Repeat an inner step chain until exit condition'},
+];
+
+function matchesPaletteQuery(text: string): boolean {
+  const q = paletteQuery.value.trim().toLowerCase();
+  if (!q) return true;
+  return text.toLowerCase().includes(q);
+}
+
+const filteredStepTypes = computed(() =>
+  STEP_TYPE_ENTRIES.filter((e) =>
+    matchesPaletteQuery(`${e.label} ${e.description} ${e.type}`),
+  ),
+);
+
+const filteredSuggestions = computed(() =>
+  BUILTIN_SUGGESTIONS.filter((s) =>
+    matchesPaletteQuery(`${s.name} ${s.description} ${s.category} ${s.id}`),
+  ),
+);
 
 onMounted(async () => {
   await endpointsStore.load();
   await modelsStore.load();
   uiStore.expandLeftPaneSection(
-    modelsStore.models.length === 0 ? 'endpoints' : 'suggestions',
+    modelsStore.models.length === 0 ? 'endpoints' : 'stepTypes',
   );
 });
 
@@ -217,14 +293,11 @@ function onInsertCapsule(capsuleId: string) {
 }
 
 function onDuplicateCapsule(capsuleId: string) {
-  const newId = capsulesStore.duplicateCapsule(capsuleId);
-  if (newId) uiStore.openCapsuleEditor(newId);
+  const duplicatedId = capsulesStore.duplicateCapsule(capsuleId);
+  if (duplicatedId) uiStore.openCapsuleEditor(duplicatedId);
 }
 
-function onInsertSuggestion(suggestion: PipelineSuggestion) {
-  const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
-  const newSteps = instantiateSuggestion(suggestion, existingNamespaces);
-
+function insertSteps(newSteps: ReturnType<typeof instantiateSuggestion>) {
   const anchorId = editorStore.selectedStepId;
   for (const step of newSteps) {
     if (anchorId) {
@@ -236,6 +309,20 @@ function onInsertSuggestion(suggestion: PipelineSuggestion) {
   if (newSteps.length > 0) {
     editorStore.selectStep(newSteps[newSteps.length - 1]!.id);
   }
+}
+
+function onInsertStepType(type: StepType) {
+  const step = editorStore.buildDefaultStep(type);
+  const anchorId = editorStore.selectedStepId;
+  const id = anchorId
+    ? editorStore.insertStepAfter(anchorId, step)
+    : editorStore.appendStep(step);
+  editorStore.selectStep(id);
+}
+
+function onInsertSuggestion(suggestion: PipelineSuggestion) {
+  const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
+  insertSteps(instantiateSuggestion(suggestion, existingNamespaces));
 }
 
 function onNewCapsule() {
@@ -353,6 +440,28 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   cursor: pointer;
 }
 .btn-dup-capsule:hover { color: #ccc; border-color: #555; }
+
+.palette-search {
+  width: 100%;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  color: #ccc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.palette-search:focus { outline: none; border-color: #2a5070; }
+
+.step-type-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.step-type-row {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid #222; background: #161616;
+}
+.step-type-row:hover { border-color: #2a3a4a; background: #181c22; }
+.step-type-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.step-type-row-name { font-size: 0.78rem; font-weight: 500; }
+.step-type-row-desc { font-size: 0.62rem; color: #666; line-height: 1.3; }
 
 /* Suggestions */
 .suggestion-list { display: flex; flex-direction: column; gap: 0.3rem; }
