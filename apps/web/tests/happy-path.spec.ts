@@ -96,11 +96,15 @@ async function openPromptTab(page: import('@playwright/test').Page) {
 
 test('happy path: suggestions, partial run, stale, disable, undo, capsule', async ({page}) => {
   test.setTimeout(120_000);
+  let nextCapsulePromptName = 'Happy Path Capsule';
   page.on('dialog', async (dialog) => {
     const msg = dialog.message();
     if (dialog.type() === 'prompt') {
-      if (msg.includes('Capsule name')) await dialog.accept('Happy Path Capsule');
-      else await dialog.accept('default');
+      if (msg.includes('Capsule name')) {
+        await dialog.accept(nextCapsulePromptName);
+      } else {
+        await dialog.accept('default');
+      }
     } else {
       await dialog.accept();
     }
@@ -143,6 +147,29 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   await historyReads.nth(1).locator('select').first().selectOption({label: 'Acceptance Criteria'});
   await expect(stepCard(page, 'Model Call').locator('.step-history-badge')).toHaveText(/↩ 2/);
 
+  // Previous output placement: before vs after own prompt blocks (XML preview order)
+  await openPromptTab(page);
+  const prevPlacement = page.locator('.pce-select').filter({has: page.locator('option[value="beforeOwnPrompt"]')});
+  await page.locator('.pce-section').filter({hasText: 'Previous Output'}).getByRole('checkbox').check();
+  await prevPlacement.selectOption('beforeOwnPrompt');
+  const previewToggle = page.locator('.pce-section').filter({hasText: 'XML Preview'}).getByRole('button');
+  await previewToggle.click();
+  const previewBefore = page.locator('.pce-preview');
+  await expect(previewBefore).toBeVisible();
+  const xmlBefore = await previewBefore.textContent() ?? '';
+  const closePrev = xmlBefore.indexOf('</previous_output>');
+  const tagAfterPrev = xmlBefore.indexOf('<', closePrev + 1);
+  expect(closePrev).toBeGreaterThanOrEqual(0);
+  expect(tagAfterPrev).toBeGreaterThan(closePrev);
+
+  await prevPlacement.selectOption('afterOwnPrompt');
+  await expect(previewBefore).toBeVisible();
+  const xmlAfter = await previewBefore.textContent() ?? '';
+  const openPrev = xmlAfter.indexOf('<previous_output>');
+  const closePrevAfter = xmlAfter.lastIndexOf('</previous_output>');
+  expect(openPrev).toBeGreaterThanOrEqual(0);
+  expect(closePrevAfter).toBeGreaterThan(xmlAfter.lastIndexOf('</', closePrevAfter - 1));
+
   // Edit intent prompt → downstream stale
   await selectStep(page, 'Intent Extraction');
   await openPromptTab(page);
@@ -173,19 +200,109 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   await page.getByRole('button', {name: 'Output'}).click();
   await expect(page.locator('.output-text')).toContainText(`model output #${callsAfterFull}`, {timeout: 5000});
 
-  // Convert pipeline to Capsule and insert into a new pipeline
-  await page.getByRole('button', {name: 'Convert to Capsule'}).click();
-  await expect(page.getByText('Happy Path Capsule')).toBeVisible({timeout: 5000});
-
+  // Extract Intent + Acceptance Criteria into a mid-pipeline Capsule
+  nextCapsulePromptName = 'Mid Steps Capsule';
+  await selectStep(page, 'Intent Extraction');
+  await stepCard(page, 'Acceptance Criteria').click({modifiers: ['Shift']});
+  await page.getByRole('button', {name: 'Extract to Capsule'}).click();
+  await expect(page.getByRole('button', {name: '← Pipeline'})).toBeVisible({timeout: 5000});
   await page.getByRole('button', {name: '← Pipeline'}).click();
-  await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible({timeout: 5000});
+  await expect(stepCard(page, 'Mid Steps Capsule')).toBeVisible();
+  await expect(stepCard(page, 'Intent Extraction')).not.toBeVisible();
+  await expect(stepCard(page, 'Model Call')).toBeVisible();
+
+  // Export pipeline JSON and round-trip via import
+  await page.getByPlaceholder('Pipeline name').fill('Roundtrip Pipeline');
+  await page.getByPlaceholder('Pipeline name').blur();
+  const exportPayload = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('lorca');
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+    const pipelines = await new Promise<Array<{name: string; steps: Array<{label: string}>}>>((
+      resolve,
+      reject,
+    ) => {
+      const tx = db.transaction('pipelines', 'readonly');
+      const req = tx.objectStore('pipelines').getAll();
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result as Array<{name: string; steps: Array<{label: string}>}>);
+    });
+    const capsules = await new Promise<Array<{id: string; name: string}>>((
+      resolve,
+      reject,
+    ) => {
+      const tx = db.transaction('capsules', 'readonly');
+      const req = tx.objectStore('capsules').getAll();
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result as Array<{id: string; name: string}>);
+    });
+    const p = pipelines.find((x) => x.name === 'Roundtrip Pipeline');
+    if (!p) throw new Error('pipeline not found');
+    const included = capsules.filter((c) => c.name === 'Mid Steps Capsule');
+    return JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      app: 'lorca',
+      kind: 'pipeline',
+      pipeline: p,
+      includedCapsules: included,
+    });
+  });
+
+  await page.evaluate(() =>
+    new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase('lorca');
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    }),
+  );
+  await page.reload();
+  await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible({timeout: 10000});
+  await addEndpoint(page);
+
+  const importChooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', {name: 'Import'}).click();
+  const chooser = await importChooser;
+  await chooser.setFiles({
+    name: 'roundtrip.pipeline.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(exportPayload),
+  });
+  const importDialog = page.getByRole('dialog');
+  await expect(importDialog).toBeVisible({timeout: 5000});
+  for (const select of await importDialog.locator('select').all()) {
+    await select.selectOption({index: 1});
+  }
+  await importDialog.getByRole('button', {name: 'Import'}).click();
+  await expect(page.getByPlaceholder('Pipeline name')).toHaveValue('Roundtrip Pipeline', {timeout: 10000});
+  await expect(stepCard(page, 'Mid Steps Capsule')).toBeVisible();
+  await expect(stepCard(page, 'Model Call')).toBeVisible();
+
+  // Convert a simple pipeline to Capsule (V1 cannot convert pipelines that already contain instances)
+  await page.getByTitle('Start a new empty pipeline').click();
+  await expect(page.getByPlaceholder('Enter your prompt…')).toHaveValue('', {timeout: 5000});
+  await selectStep(page, 'Model Call');
+  await page.locator('select:has(option:has-text("select model"))').selectOption({index: 1});
+
+  nextCapsulePromptName = 'Happy Path Capsule';
+  await page.getByRole('button', {name: 'Convert to Capsule'}).click();
+  await expect(page.getByRole('button', {name: '← Pipeline'})).toBeVisible({timeout: 5000});
+  await page.getByRole('button', {name: '← Pipeline'}).click();
+  await expect(stepCard(page, 'Happy Path Capsule')).toBeVisible();
 
   await page.getByTitle('Start a new empty pipeline').click();
   await expect(page.getByPlaceholder('Enter your prompt…')).toHaveValue('', {timeout: 5000});
+  await expect(page.locator('.chain-step')).toHaveCount(1);
+  await selectStep(page, 'Model Call');
 
   await expandLeftSection(page, 'Capsules');
-  const capsuleRow = page.locator('.capsule-row').filter({hasText: 'Happy Path Capsule'});
+  const capsuleRow = page.locator('.capsule-row').filter({
+    has: page.locator('.capsule-row-name', {hasText: 'Happy Path Capsule'}),
+  });
   await capsuleRow.getByRole('button', {name: '↓ Insert'}).click();
-  await expect(page.locator('.step-type-badge').filter({hasText: 'Capsule'})).toBeVisible();
+  await expect(page.locator('.chain-step')).toHaveCount(2, {timeout: 5000});
   await expect(stepCard(page, 'Happy Path Capsule')).toBeVisible();
+  await expect(stepCard(page, 'Model Call')).toBeVisible();
 });

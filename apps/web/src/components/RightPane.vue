@@ -24,6 +24,7 @@
         :artifacts="isCapsuleMode ? capsuleRunStore.artifacts : runStore.artifacts"
         :partial-run="isCapsuleMode ? capsuleRunStore.partial : runStore.partial"
         :selected-step-id="activeSelectedStepId"
+        :step-labels="traceStepLabels"
       />
       <OutputPanel
         v-else-if="uiStore.rightPaneTab === 'output'"
@@ -85,6 +86,11 @@ const activeTabs = computed(() => isCapsuleMode.value ? CAPSULE_TABS : PIPELINE_
 const activeSelectedStepId = computed(() =>
   isCapsuleMode.value ? capsuleEditorStore.selectedStepId : editorStore.selectedStepId,
 );
+
+const traceStepLabels = computed(() => {
+  const steps = isCapsuleMode.value ? capsuleEditorStore.steps : editorStore.steps;
+  return Object.fromEntries(steps.map((s) => [s.id, s.label]));
+});
 
 const activeTrace = computed(() => isCapsuleMode.value ? capsuleRunStore.trace : runStore.trace);
 const activeStatus = computed(() => isCapsuleMode.value ? capsuleRunStore.status : runStore.status);

@@ -34,7 +34,8 @@
         v-model="userPrompt"
         placeholder="Enter your prompt…"
         rows="2"
-        @blur="editorStore.updateUserPrompt(userPrompt)"
+        @focus="editorStore.beginInputEdit()"
+        @blur="editorStore.commitUserPrompt(userPrompt)"
       />
     </div>
 
@@ -120,14 +121,21 @@ onMounted(() => window.addEventListener('keydown', onKeyDown));
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown));
 
 watch(() => props.def, (def) => {
-  editorStore.loadPipeline(def);
-  userPrompt.value = def.input.raw;
-  localPipelineName.value = def.name;
+  const cur = editorStore.pipeline;
+  if (def.id !== cur.id || def.updatedAt !== cur.updatedAt) {
+    editorStore.loadPipeline(def);
+    userPrompt.value = def.input.raw;
+    localPipelineName.value = def.name;
+  }
 });
 
-watch(editorStore.pipeline, (newDef) => {
-  emit('update', newDef);
-}, {deep: true});
+watch(
+  () => editorStore.pipeline,
+  (newDef) => {
+    emit('update', newDef);
+  },
+  {deep: true},
+);
 
 const finalArtifactKey = computed(() => {
   const steps = editorStore.steps.filter((s) => s.enabled);
@@ -178,7 +186,7 @@ function promptCapsuleName(defaultName: string): string | null {
   return name.trim();
 }
 
-function handleExtractSelection() {
+async function handleExtractSelection() {
   const range = editorStore.getSelectionRange();
   if (!range) {
     window.alert('Select steps to extract. Shift+click another step to define a range.');
@@ -197,10 +205,11 @@ function handleExtractSelection() {
     return;
   }
   capsulesStore.addCapsule(result.capsule);
+  await pipelinesStore.save(editorStore.pipeline);
   uiStore.openCapsuleEditor(result.capsule.id);
 }
 
-function handleConvertPipeline() {
+async function handleConvertPipeline() {
   if (editorStore.steps.length === 0) {
     window.alert('Add steps before converting the pipeline to a Capsule.');
     return;
@@ -214,6 +223,7 @@ function handleConvertPipeline() {
     return;
   }
   capsulesStore.addCapsule(result.capsule);
+  await pipelinesStore.save(editorStore.pipeline);
   uiStore.openCapsuleEditor(result.capsule.id);
 }
 

@@ -24,8 +24,6 @@ export const useCapsulesStore = defineStore('capsules', () => {
     return [...userLocked, ...builtins];
   });
 
-  const builtinExamples = computed(() => getBuiltinExamples());
-
   const draftCapsules = computed(() =>
     capsules.value.filter((c) => c.status === 'draft'),
   );
@@ -121,7 +119,6 @@ export const useCapsulesStore = defineStore('capsules', () => {
   return {
     capsules,
     lockedCapsules,
-    builtinExamples,
     draftCapsules,
     loaded,
     load,

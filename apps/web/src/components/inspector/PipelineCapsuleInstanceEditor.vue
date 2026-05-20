@@ -1,5 +1,14 @@
 <template>
   <div class="pci-editor">
+    <div v-if="definitionStale" class="pci-stale-banner" role="status">
+      <p class="pci-stale-text">
+        The saved Capsule definition changed since this instance was bound. Outputs may be stale until you rebind.
+      </p>
+      <button type="button" class="btn btn-sm btn-rebind" @click="rebindDefinition">
+        Rebind to current Capsule
+      </button>
+    </div>
+
     <div class="inspector-field">
       <FieldLabel label="Capsule" required title="Capsule definition for this instance" />
       <select v-model="localCapsuleKey" title="Select a saved Capsule" @change="onCapsuleSelect">
@@ -18,6 +27,7 @@
           <input
             v-model="localInputBindings[port.name]"
             :placeholder="port.defaultArtifactKey ?? `${port.name}.text`"
+            @focus="beginBindingsEdit"
             @blur="commitBindings"
           />
         </div>
@@ -30,6 +40,7 @@
           <input
             v-model="localOutputBindings[port.name]"
             :placeholder="port.sourceArtifactKey ?? port.name"
+            @focus="beginBindingsEdit"
             @blur="commitBindings"
           />
         </div>
@@ -42,6 +53,7 @@
 import {ref, computed, watch} from 'vue';
 import type {PipelineStep, CapsuleInstanceStepConfig} from '@lorca/core';
 import {computeCapsuleContentSignature} from '@lorca/pipeline';
+import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import FieldLabel from '../common/FieldLabel.vue';
@@ -50,7 +62,8 @@ const props = defineProps<{
   step: PipelineStep & {config: CapsuleInstanceStepConfig};
 }>();
 
-const editorStore = usePipelineEditorStore();
+const editorStore = useActiveStepEditor();
+const pipelineEditor = usePipelineEditorStore();
 const capsulesStore = useCapsulesStore();
 
 const availableCapsules = computed(() => capsulesStore.capsules);
@@ -65,6 +78,13 @@ const resolvedCapsule = computed(() => {
   return id && version ? capsulesStore.getCapsule(id, version) : undefined;
 });
 
+const definitionStale = computed(() => {
+  const cap = resolvedCapsule.value;
+  const bound = props.step.config.boundContentSignature;
+  if (!cap || !bound) return false;
+  return computeCapsuleContentSignature(cap) !== bound;
+});
+
 watch(() => props.step, (s) => {
   localCapsuleKey.value = `${s.config.capsuleId}::${s.config.capsuleVersion}`;
   localInputBindings.value = {...s.config.inputBindings};
@@ -74,7 +94,7 @@ watch(() => props.step, (s) => {
 function onCapsuleSelect() {
   const cap = resolvedCapsule.value;
   if (!cap) return;
-  const draft = editorStore.buildCapsuleInstanceStep(cap, {id: props.step.id, label: props.step.label});
+  const draft = pipelineEditor.buildCapsuleInstanceStep(cap, {id: props.step.id, label: props.step.label});
   if (draft.config.type !== 'capsule-instance') return;
   editorStore.commitStepConfigEdit(props.step.id, {
     config: draft.config,
@@ -85,10 +105,14 @@ function onCapsuleSelect() {
   localOutputBindings.value = {...draft.config.outputBindings};
 }
 
+function beginBindingsEdit() {
+  editorStore.beginStepEdit(props.step.id);
+}
+
 function commitBindings() {
   const cap = resolvedCapsule.value;
   if (!cap) return;
-  editorStore.commitStepConfigEdit(props.step.id, {
+  editorStore.commitStepEdit(props.step.id, {
     config: {
       ...props.step.config,
       inputBindings: {...localInputBindings.value},
@@ -97,10 +121,38 @@ function commitBindings() {
     },
   }, 'Update Capsule bindings');
 }
+
+function rebindDefinition() {
+  const cap = resolvedCapsule.value;
+  if (!cap) return;
+  editorStore.commitStepConfigEdit(props.step.id, {
+    config: {
+      ...props.step.config,
+      boundContentSignature: computeCapsuleContentSignature(cap),
+    },
+  }, 'Rebind Capsule definition');
+}
 </script>
 
 <style scoped>
 .pci-editor { display: flex; flex-direction: column; gap: 0.45rem; }
+.pci-stale-banner {
+  padding: 0.45rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #4a4020;
+  background: #2a2418;
+}
+.pci-stale-text { margin: 0 0 0.4rem; font-size: 0.72rem; color: #c8a050; line-height: 1.35; }
+.btn-rebind {
+  background: #2d2a1e;
+  border: 1px solid #4d3d1a;
+  color: #c8a85a;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-rebind:hover { background: #3d3822; }
 .binding-edit-row {
   display: flex; align-items: center; gap: 0.35rem;
   margin-bottom: 0.25rem;

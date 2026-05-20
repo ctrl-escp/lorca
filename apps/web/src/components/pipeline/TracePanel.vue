@@ -17,7 +17,9 @@
     >
       <div class="ev-header">
         <span v-if="event.capsuleInstanceId" class="ev-capsule-id">{{ event.capsuleInstanceId }}<template v-if="event.capsuleIteration !== undefined"> #{{ event.capsuleIteration }}</template></span>
-        <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}">{{ event.stepId ?? event.nodeId }}</span>
+        <span class="ev-node" :class="{'ev-node-internal': !!event.capsuleInstanceId}" :title="event.stepId ?? event.nodeId ?? ''">
+          {{ stepLabel(event) }}
+        </span>
         <span class="ev-status">{{ event.status }}</span>
         <span v-if="event.durationMs !== undefined" class="ev-duration">{{ event.durationMs }}ms</span>
         <button
@@ -89,6 +91,8 @@ const props = defineProps<{
   artifacts?: Record<string, PipelineArtifact>;
   partialRun?: boolean;
   selectedStepId?: string | null;
+  /** stepId → display label for trace rows */
+  stepLabels?: Record<string, string>;
 }>();
 
 const filterToSelected = ref(false);
@@ -107,6 +111,12 @@ const displayTrace = computed(() => {
     (e) => e.nodeId === id || e.stepId === id,
   );
 });
+
+function stepLabel(event: PipelineTraceEvent): string {
+  const id = event.stepId ?? event.nodeId;
+  if (!id) return '—';
+  return props.stepLabels?.[id] ?? id;
+}
 
 function hasDetails(event: PipelineTraceEvent): boolean {
   return Boolean(

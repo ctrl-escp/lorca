@@ -24,7 +24,8 @@
         v-model="testPrompt"
         placeholder="Enter your prompt…"
         rows="2"
-        @blur="editor.updateUserPrompt(testPrompt)"
+        @focus="editor.beginInputEdit()"
+        @blur="editor.commitUserPrompt(testPrompt)"
       />
     </div>
 

@@ -1,7 +1,6 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
 import type {PipelineDefinition, PipelineStep, StepType, StepConfig} from '@lorca/core';
-import {getDb} from '@lorca/storage';
 import {
   makeEmptyPipeline,
   extractStepsToCapsule,
@@ -11,6 +10,7 @@ import {
 import type {CapsuleExtractionResult} from '@lorca/pipeline';
 import type {CapsuleDefinition} from '@lorca/core';
 import {cloneForStorage} from '../utils/storage.js';
+import {usePipelinesStore} from './pipelines.js';
 
 // ── ID helpers ───────────────────────────────────────────────────────────────
 
@@ -136,6 +136,8 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   const selectionAnchorId = ref<string | null>(null);
   const undoStack = ref<UndoEntry[]>([]);
   const redoStack = ref<UndoEntry[]>([]);
+  let pendingStepEdit: {stepId: string; before: PipelineEditorSnapshot} | null = null;
+  let pendingInputEdit: PipelineEditorSnapshot | null = null;
 
   const steps = computed(() => pipeline.value.steps);
   const selectedStep = computed(() =>
@@ -322,9 +324,72 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     persistPipeline();
   }
 
+  function snapshotsEqual(a: PipelineEditorSnapshot, b: PipelineEditorSnapshot): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  /** Finish a batched text edit (one undo entry if the pipeline changed). */
+  function finishPendingStepEdit(label = 'Edit step') {
+    if (!pendingStepEdit) return;
+    const after = snapshot();
+    if (!snapshotsEqual(pendingStepEdit.before, after)) {
+      recordUndo(label, pendingStepEdit.before);
+    }
+    pendingStepEdit = null;
+  }
+
+  function beginStepEdit(stepId: string) {
+    if (pendingStepEdit?.stepId === stepId) return;
+    finishPendingStepEdit();
+    pendingInputEdit = null;
+    pendingStepEdit = {stepId, before: snapshot()};
+  }
+
+  function updateStepDuringEdit(stepId: string, patch: Partial<PipelineStep>) {
+    if (!pendingStepEdit || pendingStepEdit.stepId !== stepId) beginStepEdit(stepId);
+    updateStepConfig(stepId, patch);
+  }
+
+  function commitStepEdit(stepId: string, patch: Partial<PipelineStep>, label: string) {
+    updateStepConfig(stepId, patch);
+    if (pendingStepEdit?.stepId === stepId) {
+      const after = snapshot();
+      if (!snapshotsEqual(pendingStepEdit.before, after)) {
+        recordUndo(label, pendingStepEdit.before);
+      }
+      pendingStepEdit = null;
+    } else {
+      persistPipeline();
+    }
+  }
+
+  function beginInputEdit() {
+    finishPendingStepEdit();
+    pendingInputEdit = snapshot();
+  }
+
+  function updateUserPrompt(raw: string) {
+    pipeline.value = {
+      ...pipeline.value,
+      input: {...pipeline.value.input, raw},
+      updatedAt: new Date().toISOString(),
+    };
+    persistPipeline();
+  }
+
+  function commitUserPrompt(raw: string) {
+    updateUserPrompt(raw);
+    if (pendingInputEdit) {
+      const after = snapshot();
+      if (!snapshotsEqual(pendingInputEdit, after)) {
+        recordUndo('Edit user prompt', pendingInputEdit);
+      }
+      pendingInputEdit = null;
+    }
+  }
+
   function persistPipeline() {
-    const plain = cloneForStorage(pipeline.value);
-    void getDb().pipelines.put(plain);
+    void usePipelinesStore().save(cloneForStorage(pipeline.value));
   }
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -336,6 +401,8 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     selectionAnchorId.value = null;
     undoStack.value = [];
     redoStack.value = [];
+    pendingStepEdit = null;
+    pendingInputEdit = null;
   }
 
   // ── Step actions ─────────────────────────────────────────────────────────────
@@ -448,7 +515,9 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   }
 
   function selectStep(stepId: string | null, options?: {extendRange?: boolean}) {
+    if (stepId && stepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
     if (!stepId) {
+      finishPendingStepEdit();
       selectedStepId.value = null;
       selectionAnchorId.value = null;
       return;
@@ -520,15 +589,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     recordUndo('Rename pipeline', before);
   }
 
-  function updateUserPrompt(raw: string) {
-    pipeline.value = {
-      ...pipeline.value,
-      input: {...pipeline.value.input, raw},
-      updatedAt: new Date().toISOString(),
-    };
-    persistPipeline();
-  }
-
   function replaceSteps(newSteps: PipelineStep[], label = 'Replace steps') {
     const before = snapshot();
     pipeline.value = {
@@ -595,9 +655,14 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     setStepEnabled,
     updateStepConfig,
     commitStepConfigEdit,
+    beginStepEdit,
+    updateStepDuringEdit,
+    commitStepEdit,
+    beginInputEdit,
+    updateUserPrompt,
+    commitUserPrompt,
     selectStep,
     updatePipelineName,
-    updateUserPrompt,
     undo,
     redo,
     buildDefaultStep: (type: StepType, overrides?: Partial<PipelineStep>) =>

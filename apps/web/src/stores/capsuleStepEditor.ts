@@ -31,6 +31,8 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
   const selectedStepId = ref<string | null>(null);
   const undoStack = ref<UndoEntry[]>([]);
   const redoStack = ref<UndoEntry[]>([]);
+  let pendingStepEdit: {stepId: string; before: CapsuleEditorSnapshot} | null = null;
+  let pendingInputEdit: CapsuleEditorSnapshot | null = null;
 
   const steps = computed(() => capsule.value?.steps ?? []);
   const selectedStep = computed(() =>
@@ -95,6 +97,64 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     redoStack.value = [];
   }
 
+  function snapshotsEqual(a: CapsuleEditorSnapshot, b: CapsuleEditorSnapshot): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  function finishPendingStepEdit(label = 'Edit step') {
+    if (!pendingStepEdit) return;
+    const after = snapshot();
+    if (!snapshotsEqual(pendingStepEdit.before, after)) {
+      recordUndo(label, pendingStepEdit.before);
+    }
+    pendingStepEdit = null;
+  }
+
+  function beginStepEdit(stepId: string) {
+    if (pendingStepEdit?.stepId === stepId) return;
+    finishPendingStepEdit();
+    pendingInputEdit = null;
+    pendingStepEdit = {stepId, before: snapshot()};
+  }
+
+  function updateStepDuringEdit(stepId: string, patch: Partial<PipelineStep>) {
+    if (!pendingStepEdit || pendingStepEdit.stepId !== stepId) beginStepEdit(stepId);
+    updateStepConfig(stepId, patch);
+  }
+
+  function commitStepEdit(stepId: string, patch: Partial<PipelineStep>, label: string) {
+    updateStepConfig(stepId, patch);
+    if (pendingStepEdit?.stepId === stepId) {
+      const after = snapshot();
+      if (!snapshotsEqual(pendingStepEdit.before, after)) {
+        recordUndo(label, pendingStepEdit.before);
+      }
+      pendingStepEdit = null;
+    }
+  }
+
+  function beginInputEdit() {
+    finishPendingStepEdit();
+    pendingInputEdit = snapshot();
+  }
+
+  function updateUserPrompt(raw: string) {
+    if (!capsule.value || isReadOnly.value) return;
+    const input = {...(capsule.value.input ?? {raw: '', tagName: 'user', outputNamespace: 'user_prompt'}), raw};
+    capsule.value = {...capsule.value, input, updatedAt: new Date().toISOString()};
+  }
+
+  function commitUserPrompt(raw: string) {
+    updateUserPrompt(raw);
+    if (pendingInputEdit) {
+      const after = snapshot();
+      if (!snapshotsEqual(pendingInputEdit, after)) {
+        recordUndo('Edit test prompt', pendingInputEdit);
+      }
+      pendingInputEdit = null;
+    }
+  }
+
   function mutateSteps(mutator: (steps: PipelineStep[]) => PipelineStep[], label: string) {
     if (!capsule.value || isReadOnly.value) return;
     const before = snapshot();
@@ -108,6 +168,8 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     selectedStepId.value = null;
     undoStack.value = [];
     redoStack.value = [];
+    pendingStepEdit = null;
+    pendingInputEdit = null;
   }
 
   function getCapsule(): CapsuleDefinition | null {
@@ -198,13 +260,9 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
   }
 
   function selectStep(stepId: string | null) {
+    if (stepId && stepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
+    if (!stepId) finishPendingStepEdit();
     selectedStepId.value = stepId;
-  }
-
-  function updateUserPrompt(raw: string) {
-    if (!capsule.value || isReadOnly.value) return;
-    const input = {...(capsule.value.input ?? {raw: '', tagName: 'user', outputNamespace: 'user_prompt'}), raw};
-    capsule.value = {...capsule.value, input, updatedAt: new Date().toISOString()};
   }
 
   function updateCapsuleName(name: string) {
@@ -326,8 +384,13 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     setStepEnabled,
     updateStepConfig,
     commitStepConfigEdit,
-    selectStep,
+    beginStepEdit,
+    updateStepDuringEdit,
+    commitStepEdit,
+    beginInputEdit,
     updateUserPrompt,
+    commitUserPrompt,
+    selectStep,
     updateCapsuleName,
     contextStepsForLoopInner,
     mutateLoopInnerSteps,

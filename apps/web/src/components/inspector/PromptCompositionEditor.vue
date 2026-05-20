@@ -18,6 +18,7 @@
             v-model="localPrevTagName"
             :class="{invalid: localPrevTagName && !isValidTag(localPrevTagName)}"
             placeholder="previous_output"
+            @focus="beginPromptEdit"
             @blur="commitPrev"
           />
         </div>
@@ -123,6 +124,7 @@
             :class="{invalid: read.tagName && !isValidTag(read.tagName)}"
             placeholder="intent"
             title="XML tag name"
+            @focus="beginPromptEdit"
             @input="onTagNameInput(idx, ($event.target as HTMLInputElement).value)"
             @blur="commitHistoryReads('Edit history read tag')"
           />
@@ -180,6 +182,7 @@
             :class="{invalid: block.tagName && !isValidTag(block.tagName)}"
             placeholder="tag_name"
             title="XML tag name for this block"
+            @focus="beginPromptEdit"
             @input="liveUpdate"
             @blur="commitBlocks('Edit block tag')"
           />
@@ -196,6 +199,7 @@
           rows="4"
           :placeholder="block.source === 'system-default' ? 'System instructions…' : 'Block content…'"
           title="Block body text"
+          @focus="beginPromptEdit"
           @input="liveUpdate"
           @blur="commitBlocks('Edit block body')"
         />
@@ -292,10 +296,15 @@ function applyStepPatch(patch: Partial<PipelineStep>, label?: string) {
     return;
   }
   if (label) {
-    editorStore.commitStepConfigEdit(props.stepId, patch, label);
+    editorStore.commitStepEdit(props.stepId, patch, label);
   } else {
-    editorStore.updateStepConfig(props.stepId, patch);
+    editorStore.updateStepDuringEdit(props.stepId, patch);
   }
+}
+
+function beginPromptEdit() {
+  if (props.loopGroupStepId) return;
+  editorStore.beginStepEdit(props.stepId);
 }
 
 function liveUpdate() {

@@ -9,6 +9,7 @@
           v-model="localLabel"
           placeholder="Step label"
           title="Display label for this step"
+          @focus="onLabelFocus"
           @blur="commitLabel"
           @keydown.enter="($event.target as HTMLInputElement).blur()"
         />
@@ -90,6 +91,7 @@
                 rows="6"
                 placeholder="Enter static text…"
                 title="Static text"
+                @focus="onTextFieldFocus"
                 @blur="commitManualText"
               />
             </div>
@@ -103,6 +105,7 @@
                 rows="6"
                 placeholder="{{user_prompt.raw}}"
                 title="Template with artifact placeholders"
+                @focus="onTextFieldFocus"
                 @blur="commitTemplate"
               />
             </div>
@@ -408,10 +411,20 @@ function modelsForEndpoint(endpointId: string) {
   return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
 }
 
+function onLabelFocus() {
+  const s = step.value;
+  if (s) editorStore.beginStepEdit(s.id);
+}
+
+function onTextFieldFocus() {
+  const s = step.value;
+  if (s) editorStore.beginStepEdit(s.id);
+}
+
 function commitLabel() {
   const s = step.value;
   if (!s || localLabel.value === s.label) return;
-  editorStore.commitStepConfigEdit(s.id, {label: localLabel.value.trim() || s.label}, 'Rename step');
+  editorStore.commitStepEdit(s.id, {label: localLabel.value.trim() || s.label}, 'Rename step');
 }
 
 function commitModelCall() {
@@ -432,13 +445,13 @@ function commitModelCall() {
 function commitManualText() {
   const s = step.value;
   if (!s || s.config.type !== 'manual-text') return;
-  editorStore.commitStepConfigEdit(s.id, {config: {...s.config, text: localText.value}}, 'Edit text');
+  editorStore.commitStepEdit(s.id, {config: {...s.config, text: localText.value}}, 'Edit text');
 }
 
 function commitTemplate() {
   const s = step.value;
   if (!s || s.config.type !== 'template') return;
-  editorStore.commitStepConfigEdit(s.id, {config: {...s.config, template: localTemplate.value}}, 'Edit template');
+  editorStore.commitStepEdit(s.id, {config: {...s.config, template: localTemplate.value}}, 'Edit template');
 }
 
 function commitJsonExtract() {

@@ -82,7 +82,6 @@ export const usePipelinesStore = defineStore('pipelines', () => {
 
   async function save(def: PipelineDefinition) {
     const plain = cloneForStorage(def);
-    await getDb().pipelines.put(plain);
     const idx = pipelines.value.findIndex((p) => p.id === plain.id);
     if (idx !== -1) {
       pipelines.value[idx] = plain;
@@ -90,6 +89,7 @@ export const usePipelinesStore = defineStore('pipelines', () => {
       pipelines.value.push(plain);
       if (!activePipelineId.value) activePipelineId.value = plain.id;
     }
+    await getDb().pipelines.put(plain);
   }
 
   function addPipeline(pipeline: PipelineDefinition) {
