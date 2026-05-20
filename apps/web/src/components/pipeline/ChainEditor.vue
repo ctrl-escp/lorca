@@ -63,6 +63,7 @@
               <div class="step-card-header">
                 <span class="step-type-badge" :class="`badge-${step.type}`">{{ stepTypeLabel(step.type) }}</span>
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
+                <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
                 <div class="step-actions">
                   <button class="icon-btn" :disabled="i === 0" @click.stop="$emit('move-up', step.id)" title="Move up">↑</button>
                   <button class="icon-btn" :disabled="i === steps.length - 1" @click.stop="$emit('move-down', step.id)" title="Move down">↓</button>
@@ -415,6 +416,12 @@ function stepTypeLabel(type: StepType): string {
 
 function historyReadCount(step: PipelineStep): number {
   return getStepHistoryReads(step).length;
+}
+
+function stepHasModelError(step: PipelineStep): boolean {
+  if (step.type !== 'model-call' || step.config.type !== 'model-call') return false;
+  const modelRef = step.config.modelRef;
+  return modelRef.kind === 'fixed' && (!modelRef.endpointId || !modelRef.modelName);
 }
 
 function runStateFor(stepId: string) {
@@ -841,6 +848,8 @@ function runStateTitle(stepId: string): string {
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
+.step-badge { font-size: 0.62rem; padding: 0 4px; border-radius: 2px; }
+.step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
 
 .step-run-badge {
   border-radius: 2px; padding: 0 4px; font-size: 0.62rem; text-transform: lowercase;

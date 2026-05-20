@@ -339,13 +339,23 @@ export interface CapsuleDefinition {
   version: `v${number}`;
   status: 'draft' | 'locked';
   interface: CapsuleInterface;
-  nodes: PipelineNode[];
-  edges: PipelineEdge[];
-  outputRef: PipelineOutputRef;
-  /** V2 step-chain body when extracted from a pipeline (preferred for execution). */
+  /**
+   * V2 step-chain body. Present for all Capsules created/edited after Phase 11.
+   * Preferred execution path; takes precedence over nodes/edges when present.
+   */
   steps?: PipelineStep[];
   /** Default input config for step-chain capsules (mirrors pipeline input). */
   input?: PipelineInputConfig;
+  /**
+   * @deprecated Legacy graph representation. Kept for import compatibility only.
+   * Will be removed once all persisted Capsules have been migrated.
+   * New code must not write these fields; readers must guard with `?? []`.
+   */
+  nodes?: PipelineNode[];
+  /** @deprecated See nodes. */
+  edges?: PipelineEdge[];
+  /** @deprecated See nodes. */
+  outputRef?: PipelineOutputRef;
   tests: CapsuleTestCase[];
   createdAt: string;
   updatedAt: string;

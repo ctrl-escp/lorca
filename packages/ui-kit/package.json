@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "build": "tsc --noEmit" },
-  "dependencies": { "@lorca/core": "*" },
-  "devDependencies": { "typescript": "*" }
+  "scripts": { "build": "vue-tsc --noEmit" },
+  "dependencies": { "@lorca/core": "*", "vue": "^3.5.0" },
+  "devDependencies": { "typescript": "*", "vue-tsc": "^2.0.0" }
 }

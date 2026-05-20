@@ -1,21 +1,24 @@
-import type {CapsuleDefinition, PipelineError, Result} from '@lorca/core';
+import type {CapsuleDefinition, PipelineEdge, PipelineError, PipelineNode, Result} from '@lorca/core';
 import {ok, err} from '@lorca/core';
 import {outputKey} from '@lorca/pipeline';
 
 export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineError> {
-  const nodeIds = new Set(def.nodes.map((n) => n.id));
-  if (nodeIds.size !== def.nodes.length) {
+  const nodes = def.nodes ?? [];
+  const edges = def.edges ?? [];
+
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  if (nodeIds.size !== nodes.length) {
     return err({code: 'invalid_pipeline_graph', message: 'Duplicate node IDs detected'});
   }
 
   // Capsules may have at most one InputNode (not required)
-  const inputNodes = def.nodes.filter((n) => n.type === 'input');
+  const inputNodes = nodes.filter((n) => n.type === 'input');
   if (inputNodes.length > 1) {
     return err({code: 'invalid_pipeline_graph', message: 'Capsule must have at most one InputNode'});
   }
 
   // CapsuleInstanceNode not supported inside Capsule in Phase 8
-  const capsuleNodes = def.nodes.filter((n) => n.type === 'capsule-instance');
+  const capsuleNodes = nodes.filter((n) => n.type === 'capsule-instance');
   if (capsuleNodes.length > 0) {
     return err({
       code: 'missing_capsule',
@@ -24,8 +27,8 @@ export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineEr
     });
   }
 
-  if (def.nodes.length > 0) {
-    const outputNode = def.nodes.find((n) => n.id === def.outputRef.nodeId);
+  if (nodes.length > 0 && def.outputRef) {
+    const outputNode = nodes.find((n) => n.id === def.outputRef!.nodeId);
     if (!outputNode) {
       return err({
         code: 'invalid_pipeline_graph',
@@ -34,7 +37,7 @@ export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineEr
     }
   }
 
-  for (const edge of def.edges) {
+  for (const edge of edges) {
     if (!nodeIds.has(edge.fromNodeId)) {
       return err({
         code: 'invalid_pipeline_graph',
@@ -49,12 +52,12 @@ export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineEr
     }
   }
 
-  const cycleErr = detectCycle(def);
+  const cycleErr = detectCycle(nodes, edges);
   if (cycleErr) return cycleErr;
 
   // Validate model slot references
   const declaredSlots = new Set(def.interface.modelSlots.map((s) => s.name));
-  for (const node of def.nodes) {
+  for (const node of nodes) {
     if (node.type === 'model-call' && node.config.modelRef.kind === 'slot') {
       if (!declaredSlots.has(node.config.modelRef.slotName)) {
         return err({
@@ -66,22 +69,22 @@ export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineEr
     }
   }
 
-  const keyErr = checkDuplicateArtifactKeys(def);
+  const keyErr = checkDuplicateArtifactKeys(nodes);
   if (keyErr) return keyErr;
 
   return ok(undefined);
 }
 
-function detectCycle(def: CapsuleDefinition): Result<never, PipelineError> | null {
+function detectCycle(nodes: PipelineNode[], edges: PipelineEdge[]): Result<never, PipelineError> | null {
   const adj = new Map<string, string[]>();
-  for (const node of def.nodes) adj.set(node.id, []);
-  for (const edge of def.edges) {
+  for (const node of nodes) adj.set(node.id, []);
+  for (const edge of edges) {
     adj.get(edge.fromNodeId)?.push(edge.toNodeId);
   }
 
   const WHITE = 0, GRAY = 1, BLACK = 2;
   const color = new Map<string, number>();
-  for (const node of def.nodes) color.set(node.id, WHITE);
+  for (const node of nodes) color.set(node.id, WHITE);
 
   function dfs(id: string): boolean {
     color.set(id, GRAY);
@@ -93,7 +96,7 @@ function detectCycle(def: CapsuleDefinition): Result<never, PipelineError> | nul
     return false;
   }
 
-  for (const node of def.nodes) {
+  for (const node of nodes) {
     if (color.get(node.id) === WHITE && dfs(node.id)) {
       return err({code: 'cycle_detected', message: 'Capsule graph contains a cycle'});
     }
@@ -102,10 +105,10 @@ function detectCycle(def: CapsuleDefinition): Result<never, PipelineError> | nul
 }
 
 function checkDuplicateArtifactKeys(
-  def: CapsuleDefinition,
+  nodes: PipelineNode[],
 ): Result<never, PipelineError> | null {
   const seen = new Set<string>();
-  for (const node of def.nodes) {
+  for (const node of nodes) {
     const keys = nodeOutputKeys(node);
     for (const key of keys) {
       if (seen.has(key)) {
@@ -117,7 +120,7 @@ function checkDuplicateArtifactKeys(
   return null;
 }
 
-function nodeOutputKeys(node: CapsuleDefinition['nodes'][number]): string[] {
+function nodeOutputKeys(node: PipelineNode): string[] {
   switch (node.type) {
     case 'input': return ['user_prompt.raw', 'user_prompt.xml'];
     case 'prompt-wrapper':

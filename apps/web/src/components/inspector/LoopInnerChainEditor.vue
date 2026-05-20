@@ -96,7 +96,7 @@ import type {PipelineStep, StepType} from '@lorca/core';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 
 const props = defineProps<{

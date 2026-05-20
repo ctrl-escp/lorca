@@ -71,7 +71,7 @@ The project grew out of work on Smartazz and related pipeline experiments: rathe
 ### Install and run
 
 ```bash
-git clone <your-repo-url> lorca
+git clone https://github.com/ctrl-escp/lorca.git lorca
 cd lorca
 npm install
 npm run dev
@@ -146,7 +146,7 @@ flowchart TB
     Pipeline["@lorca/pipeline<br/>validate, execute"]
     Capsules["@lorca/capsules<br/>lock, examples, tests"]
     Storage["@lorca/storage<br/>Dexie, import/export"]
-    UIKit["@lorca/ui-kit<br/>shared UI stubs"]
+    UIKit["@lorca/ui-kit<br/>shared Vue components"]
   end
 
   Vue --> Core
@@ -190,7 +190,7 @@ lorca/
 │   ├── pipeline/            # validatePipeline, executePipeline, artifacts
 │   ├── capsules/            # Capsule validate/execute/lock, built-in examples
 │   ├── storage/             # Dexie DB, JSON import/export
-│   └── ui-kit/              # Placeholder for shared UI primitives
+│   └── ui-kit/              # Shared Vue UI primitives (FieldLabel, dialogs)
 ├── docs/                    # Product pitch and implementation plan
 ├── package.json             # Workspace root scripts
 ├── vitest.config.ts
@@ -199,15 +199,16 @@ lorca/
 
 ### Package responsibilities
 
-| Package | Role |
-| --- | --- |
-| `@lorca/core` | Domain types: `PipelineDefinition`, `CapsuleDefinition`, nodes, edges, artifacts, traces, export file shapes |
-| `@lorca/prompt` | `buildUserPromptArtifacts`, `renderPromptWrapper`, `renderTemplate`, XML/tag helpers |
-| `@lorca/endpoints` | `testBrowserAccess`, `listModels`, `executeModelCall`; `ollamaAdapter` + bucket heuristics |
-| `@lorca/pipeline` | `validatePipeline`, `topologicalOrder`, `executePipeline`, artifact key helpers |
-| `@lorca/capsules` | `validateCapsule`, `executeCapsuleTestRun`, locking/versioning, built-in examples |
-| `@lorca/storage` | IndexedDB via Dexie; pipeline/Capsule export, parse, import preview/remap |
-| `@lorca/web` | Application UI and stores |
+| Package | Role | Status |
+| --- | --- | --- |
+| `@lorca/core` | Domain types: `PipelineDefinition`, `CapsuleDefinition`, nodes, edges, artifacts, traces, export file shapes | ✅ Implemented |
+| `@lorca/prompt` | `buildUserPromptArtifacts`, `renderPromptWrapper`, `renderTemplate`, XML/tag helpers | ✅ Implemented |
+| `@lorca/endpoints` | `testBrowserAccess`, `listModels`, `executeModelCall`; `ollamaAdapter` + bucket heuristics | ✅ Implemented |
+| `@lorca/pipeline` | `validatePipeline`, `topologicalOrder`, `executePipeline`, artifact key helpers | ✅ Implemented |
+| `@lorca/capsules` | `validateCapsule`, `executeCapsuleTestRun`, locking/versioning, built-in examples | ✅ Implemented |
+| `@lorca/storage` | IndexedDB via Dexie; pipeline/Capsule export, parse, import preview/remap | ✅ Implemented |
+| `@lorca/ui-kit` | Shared Vue UI primitives (`FieldLabel`, `ConfirmDialog`, `PromptDialog`) | ✅ Implemented |
+| `@lorca/web` | Application UI and stores | ✅ Implemented |
 
 ---
 

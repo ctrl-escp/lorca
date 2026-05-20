@@ -56,7 +56,7 @@ import {computeCapsuleContentSignature} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 
 const props = defineProps<{
   step: PipelineStep & {config: CapsuleInstanceStepConfig};

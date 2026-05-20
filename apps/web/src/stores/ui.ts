@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia';
-import {ref} from 'vue';
+import {ref, watch} from 'vue';
 
 export type EditorContext = 'pipeline' | 'capsule';
 export type RightPaneTab = 'inspector' | 'interface' | 'trace' | 'output';
@@ -14,14 +14,43 @@ export interface UiState {
   rightPaneWidth: number;
 }
 
+const PANE_SIZE_STORAGE_KEY = 'lorca:ui:paneSizes';
+
+function readPersistedSizes(): {left: number; right: number} {
+  try {
+    const raw = localStorage.getItem(PANE_SIZE_STORAGE_KEY);
+    if (!raw) return {left: 280, right: 360};
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === 'object') {
+      const p = parsed as Record<string, unknown>;
+      return {
+        left: typeof p.left === 'number' ? p.left : 280,
+        right: typeof p.right === 'number' ? p.right : 360,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return {left: 280, right: 360};
+}
+
 export const useUiStore = defineStore('ui', () => {
   const editorContext = ref<EditorContext>('pipeline');
   const activeCapsuleEditId = ref<string | null>(null);
   const selectedNodeId = ref<string | null>(null);
   const rightPaneTab = ref<RightPaneTab>('inspector');
-  const leftPaneWidth = ref(280);
-  const rightPaneWidth = ref(360);
+  const sizes = readPersistedSizes();
+  const leftPaneWidth = ref(sizes.left);
+  const rightPaneWidth = ref(sizes.right);
   const leftPaneExpandedSection = ref<LeftPaneSection | null>(null);
+
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  watch([leftPaneWidth, rightPaneWidth], ([l, r]) => {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      localStorage.setItem(PANE_SIZE_STORAGE_KEY, JSON.stringify({left: l, right: r}));
+    }, 250);
+  });
 
   function openCapsuleEditor(capsuleId: string) {
     editorContext.value = 'capsule';

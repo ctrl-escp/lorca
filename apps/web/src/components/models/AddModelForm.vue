@@ -29,7 +29,7 @@
 import {reactive} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel} from '@lorca/core';
 import {assignBuckets} from '@lorca/endpoints';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 
 const props = defineProps<{endpoints: AiEndpointConfig[]}>();
 const emit = defineEmits<{add: [model: DiscoveredModel]; cancel: []}>();

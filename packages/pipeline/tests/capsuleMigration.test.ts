@@ -39,7 +39,7 @@ describe('ensureCapsuleStepChain', () => {
     expect(migrated.steps).toHaveLength(1);
     expect(migrated.steps![0]!.type).toBe('model-call');
     expect(migrated.input?.outputNamespace).toBe('user_prompt');
-    expect(migrated.nodes.length).toBeGreaterThan(0);
+    expect((migrated.nodes ?? []).length).toBeGreaterThan(0);
   });
 
   it('keeps existing steps and refreshes legacy graph', () => {

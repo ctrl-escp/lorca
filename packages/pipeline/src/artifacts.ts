@@ -23,9 +23,10 @@ export function stepArtifactKey(step: PipelineStep, outputName?: string): string
 // Resolves an outputRef to an artifact key given the node list.
 // For looped capsule instances, returns the .final. artifact key per spec §15.
 export function resolveOutputRef(
-  ref: PipelineOutputRef,
+  ref: PipelineOutputRef | undefined,
   nodes: PipelineNode[],
 ): string | null {
+  if (!ref) return null;
   const node = nodes.find((n) => n.id === ref.nodeId);
   if (!node) return null;
   if (node.type === 'capsule-instance' && node.config.loop?.enabled) {

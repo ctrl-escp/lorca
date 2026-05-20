@@ -20,6 +20,12 @@
             {{ outputStale ? 'Last run output (stale)' : 'Current output' }}
           </span>
           <span v-if="outputKey" class="output-key">{{ outputKey }}</span>
+          <button
+            class="btn-copy"
+            type="button"
+            :title="copied ? 'Copied!' : 'Copy output to clipboard'"
+            @click="copyOutput"
+          >{{ copied ? '✓' : 'Copy' }}</button>
         </div>
         <pre class="output-text">{{ displayValue }}</pre>
       </div>
@@ -29,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue';
+import {computed, ref} from 'vue';
 import type {PipelineArtifact, PipelineError} from '@lorca/core';
 
 const props = defineProps<{
@@ -46,6 +52,17 @@ const displayValue = computed(() => {
   if (typeof props.output.value === 'string') return props.output.value;
   return JSON.stringify(props.output.value, null, 2);
 });
+
+const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function copyOutput() {
+  if (!displayValue.value) return;
+  await navigator.clipboard.writeText(displayValue.value);
+  copied.value = true;
+  if (copyTimer) clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => { copied.value = false; }, 1800);
+}
 </script>
 
 <style scoped>
@@ -72,4 +89,15 @@ const displayValue = computed(() => {
 .output-state-label.stale { color: #c8a050; }
 .output-key { font-family: monospace; font-size: 0.72rem; color: #7ec8e3; }
 .output-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; color: #ddd; background: #111; border: 1px solid #222; border-radius: 4px; padding: 0.6rem; }
+.btn-copy {
+  margin-left: auto;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  background: #1a2a1a;
+  border: 1px solid #2a4d2a;
+  color: #6db86d;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-copy:hover { background: #1e381e; color: #8dda8d; }
 </style>

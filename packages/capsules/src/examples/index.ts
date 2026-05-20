@@ -45,7 +45,7 @@ export function duplicateExampleCapsule(example: CapsuleDefinition, newId: strin
 
 /** Collect template strings from example Capsule nodes (for snapshot tests). */
 export function collectExampleTemplateStrings(def: CapsuleDefinition): string[] {
-  return def.nodes
+  return (def.nodes ?? [])
     .filter((n): n is Extract<typeof n, {type: 'template'}> => n.type === 'template')
     .map((n) => n.template);
 }

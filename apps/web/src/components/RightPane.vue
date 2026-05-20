@@ -40,14 +40,14 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue';
+import {computed, watch} from 'vue';
 import type {CapsuleDefinition, CapsuleInterface} from '@lorca/core';
-import {computeStepStaleStates} from '@lorca/pipeline';
+import {useStepStaleStateMap} from '../composables/useStepStaleStateMap.js';
 import {useUiStore} from '../stores/ui.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useCapsuleRunStore} from '../stores/capsuleRun.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
-import {useCapsulesStore} from '../stores/capsules.js';
+
 import StepInspector from './inspector/StepInspector.vue';
 import {useCapsuleStepEditorStore} from '../stores/capsuleStepEditor.js';
 import CapsuleInterfacePanel from './capsule/CapsuleInterfacePanel.vue';
@@ -64,7 +64,6 @@ const runStore = useActiveRunStore();
 const editorStore = usePipelineEditorStore();
 const capsuleEditorStore = useCapsuleStepEditorStore();
 const capsuleRunStore = useCapsuleRunStore();
-const capsulesStore = useCapsulesStore();
 
 const isCapsuleMode = computed(() => uiStore.editorContext === 'capsule');
 
@@ -98,19 +97,15 @@ const activeOutput = computed(() => isCapsuleMode.value ? capsuleRunStore.finalO
 const activeOutputKey = computed(() => isCapsuleMode.value ? capsuleRunStore.finalOutputKey : runStore.finalOutputKey);
 const activeError = computed(() => isCapsuleMode.value ? capsuleRunStore.error : runStore.error);
 
+const {stateFor: staleStateFor} = useStepStaleStateMap(() => editorStore.pipeline.input.raw);
+
 const pipelineOutputStale = computed(() => {
   if (isCapsuleMode.value || !runStore.finalOutputKey) return false;
   const step = editorStore.steps.find(
     (s) => `${s.outputNamespace}.${s.primaryOutputName}` === runStore.finalOutputKey,
   );
   if (!step) return false;
-  const states = computeStepStaleStates(
-    editorStore.pipeline,
-    runStore.runSnapshotContext,
-    editorStore.pipeline.input.raw,
-    (id, version) => capsulesStore.getCapsule(id, version),
-  );
-  const st = states.find((s) => s.stepId === step.id)?.state;
+  const st = staleStateFor(step.id)?.state;
   return st === 'stale' || st === 'failed-stale';
 });
 
@@ -119,7 +114,6 @@ function onUpdateInterface(iface: CapsuleInterface) {
 }
 
 // Auto-switch to output tab when run completes
-import {watch} from 'vue';
 watch(() => runStore.status, (s) => {
   if (!isCapsuleMode.value && (s === 'completed' || s === 'failed')) uiStore.setRightPaneTab('output');
 });

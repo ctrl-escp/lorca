@@ -1,2 +1,3 @@
-// Shared Vue components are added as the UI is built (Phase 6+).
-// This package exists to give apps/web a stable import boundary for reusable UI primitives.
+export {default as FieldLabel} from './components/FieldLabel.vue';
+export {default as ConfirmDialog} from './components/ConfirmDialog.vue';
+export {default as PromptDialog} from './components/PromptDialog.vue';

@@ -7,7 +7,10 @@ import type {
   CapsuleValueKind,
   LegacyPipelineDefinition,
   PipelineDefinition,
+  PipelineEdge,
   PipelineInputConfig,
+  PipelineNode,
+  PipelineOutputRef,
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';
@@ -303,7 +306,7 @@ export function syncCapsuleLegacyGraphFromSteps(
   capsuleName: string,
   steps: PipelineStep[],
   input: PipelineInputConfig,
-): Pick<CapsuleDefinition, 'nodes' | 'edges' | 'outputRef'> {
+): {nodes: PipelineNode[]; edges: PipelineEdge[]; outputRef: PipelineOutputRef} {
   const miniPipeline: PipelineDefinition = {
     schemaVersion: 2,
     id: capsuleId,
@@ -478,7 +481,7 @@ export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefin
     return {...capsule, input, ...graph};
   }
 
-  if (!capsule.nodes.length) {
+  if (!(capsule.nodes?.length ?? 0)) {
     return {...capsule, input, steps: []};
   }
 
@@ -487,9 +490,9 @@ export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefin
     id: capsule.id,
     name: capsule.name,
     inputArtifactName: 'user_prompt',
-    nodes: capsule.nodes,
-    edges: capsule.edges,
-    outputRef: capsule.outputRef,
+    nodes: capsule.nodes ?? [],
+    edges: capsule.edges ?? [],
+    outputRef: capsule.outputRef ?? {nodeId: '', outputName: 'text'},
     createdAt: capsule.createdAt,
     updatedAt: capsule.updatedAt,
   };

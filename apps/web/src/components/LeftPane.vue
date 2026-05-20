@@ -11,11 +11,11 @@
       </div>
       <div v-if="isExpanded('stepTypes')" class="section-body">
         <input
-          v-model="paletteQuery"
+          v-model="stepTypeQuery"
           class="palette-search"
           type="search"
           placeholder="Filter palette…"
-          aria-label="Filter step types and suggestions"
+          aria-label="Filter step types"
         />
         <div class="step-type-list">
           <div
@@ -50,8 +50,7 @@
       </div>
       <div v-if="isExpanded('suggestions')" class="section-body">
         <input
-          v-if="!isExpanded('stepTypes')"
-          v-model="paletteQuery"
+          v-model="suggestionQuery"
           class="palette-search"
           type="search"
           placeholder="Filter suggestions…"
@@ -140,7 +139,10 @@
               @click="uiStore.openCapsuleEditor(cap.id)"
             >
               <span class="capsule-row-name">{{ cap.name || '(unnamed)' }}</span>
-              <span class="capsule-row-meta">{{ cap.version }} · {{ cap.status }}</span>
+              <span class="capsule-row-meta">
+                {{ cap.version }} ·
+                <span class="capsule-status" :class="`cs-${cap.status}`">{{ cap.status }}</span>
+              </span>
             </div>
             <button
               class="btn-insert-capsule"
@@ -224,11 +226,22 @@
       </div>
     </section>
   </aside>
+
+  <!-- Suggestion replace confirmation dialog -->
+  <ConfirmDialog
+    :open="replaceConfirmOpen"
+    title="Replace Pipeline"
+    :message="replaceConfirmMessage"
+    confirm-label="Replace"
+    :destructive="true"
+    @confirm="resolveReplaceConfirm(true)"
+    @cancel="resolveReplaceConfirm(false)"
+  />
 </template>
 
 <script setup lang="ts">
 import {ref, computed, onMounted} from 'vue';
-import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType, PipelineStep} from '@lorca/core';
+import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
 import {BUILTIN_SUGGESTIONS} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
@@ -250,6 +263,7 @@ import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
 import ModelBucketEditor from './models/ModelBucketEditor.vue';
+import {ConfirmDialog} from '@lorca/ui-kit';
 
 const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
@@ -266,8 +280,28 @@ const isPipelineContext = computed(() => uiStore.editorContext === 'pipeline');
 
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
-const paletteQuery = ref('');
+const stepTypeQuery = ref('');
+const suggestionQuery = ref('');
 const modelBucketFilter = ref<ModelUsageBucket | ''>('');
+
+// Suggestion replace dialog
+const replaceConfirmOpen = ref(false);
+const replaceConfirmMessage = ref('');
+let replaceConfirmResolve: ((v: boolean) => void) | null = null;
+
+function resolveReplaceConfirm(value: boolean) {
+  replaceConfirmOpen.value = false;
+  replaceConfirmResolve?.(value);
+  replaceConfirmResolve = null;
+}
+
+function confirmSuggestionReplace(name: string): Promise<boolean> {
+  replaceConfirmMessage.value = `Replace the current pipeline with "${name}"?\n\nExisting steps and prompt will be cleared.`;
+  return new Promise((resolve) => {
+    replaceConfirmResolve = resolve;
+    replaceConfirmOpen.value = true;
+  });
+}
 
 const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
   {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
@@ -278,21 +312,21 @@ const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] 
   {type: 'loop-group', label: 'Loop group', description: 'Repeat an inner step chain until exit condition'},
 ];
 
-function matchesPaletteQuery(text: string): boolean {
-  const q = paletteQuery.value.trim().toLowerCase();
+function matchesQuery(query: string, text: string): boolean {
+  const q = query.trim().toLowerCase();
   if (!q) return true;
   return text.toLowerCase().includes(q);
 }
 
 const filteredStepTypes = computed(() =>
   STEP_TYPE_ENTRIES.filter((e) =>
-    matchesPaletteQuery(`${e.label} ${e.description} ${e.type}`),
+    matchesQuery(stepTypeQuery.value, `${e.label} ${e.description} ${e.type}`),
   ),
 );
 
 const filteredSuggestions = computed(() =>
   BUILTIN_SUGGESTIONS.filter((s) =>
-    matchesPaletteQuery(`${s.name} ${s.description} ${s.category} ${s.id}`),
+    matchesQuery(suggestionQuery.value, `${s.name} ${s.description} ${s.category} ${s.id}`),
   ),
 );
 
@@ -394,13 +428,15 @@ function onInsertStepType(type: StepType) {
 
 type SuggestionInsertMode = 'before' | 'after' | 'append' | 'new';
 
-function onInsertSuggestion(suggestion: PipelineSuggestion, mode: SuggestionInsertMode) {
+async function onInsertSuggestion(suggestion: PipelineSuggestion, mode: SuggestionInsertMode) {
   if (!isPipelineContext.value) return;
   if (mode === 'new') {
     if (runStore.isRunning) runStore.cancel();
     runStore.reset();
   }
-  suggestionInsert.insertSuggestion(suggestion, mode);
+  await suggestionInsert.insertSuggestion(suggestion, mode, {
+    confirmReplace: () => confirmSuggestionReplace(suggestion.name),
+  });
 }
 
 function onModelClick(model: DiscoveredModel) {
@@ -429,9 +465,7 @@ function onNewCapsule() {
     version: 'v1',
     status: 'draft',
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    nodes: [{id: `${id}-input`, type: 'input'}],
-    edges: [],
-    outputRef: {nodeId: `${id}-input`, outputName: 'xml'},
+    steps: [],
     tests: [],
     createdAt: now,
     updatedAt: now,
@@ -511,6 +545,9 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .capsule-row-main { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; }
 .capsule-row-name { font-size: 0.8rem; font-weight: 500; }
 .capsule-row-meta { font-size: 0.65rem; color: #555; }
+.capsule-status { font-size: 0.62rem; padding: 0 3px; border-radius: 2px; }
+.cs-draft { color: #c8a050; }
+.cs-locked { color: #7ec8e3; background: #1a2a3a; border: 1px solid #2a4a6a; }
 .btn-insert-capsule {
   flex-shrink: 0;
   font-size: 0.68rem;

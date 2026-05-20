@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {CapsuleInstanceNode, CapsuleDefinition} from '@lorca/core';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 
 const props = defineProps<{
   node: CapsuleInstanceNode;

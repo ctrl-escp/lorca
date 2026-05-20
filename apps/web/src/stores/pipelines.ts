@@ -4,11 +4,7 @@ import type {PipelineDefinition, LegacyPipelineDefinition} from '@lorca/core';
 import {getDb} from '@lorca/storage';
 import {migrateLegacyPipeline} from '@lorca/pipeline';
 import {cloneForStorage} from '../utils/storage.js';
-
-let _counter = 0;
-function newId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
-}
+import {newId} from '../utils/id.js';
 
 export function createDefaultPipeline(preserveId?: string): PipelineDefinition {
   const now = new Date().toISOString();
@@ -125,5 +121,12 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     return def;
   }
 
-  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive, resetActivePipeline};
+  async function addNewPipeline(): Promise<PipelineDefinition> {
+    const def = createDefaultPipeline();
+    await save(def);
+    activePipelineId.value = def.id;
+    return def;
+  }
+
+  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive, resetActivePipeline, addNewPipeline};
 });

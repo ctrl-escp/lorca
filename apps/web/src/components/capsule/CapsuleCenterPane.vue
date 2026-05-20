@@ -110,8 +110,7 @@
 <script setup lang="ts">
 import {ref, computed, watch, onMounted} from 'vue';
 import type {CapsuleDefinition, StepType} from '@lorca/core';
-import {computeStepStaleStates} from '@lorca/pipeline';
-import type {StepStaleState} from '@lorca/pipeline';
+import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
 import {useCapsuleStepEditorStore} from '../../stores/capsuleStepEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
@@ -121,7 +120,7 @@ import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {pickJsonFile} from '../../utils/importFile.js';
 import ChainEditor from '../pipeline/ChainEditor.vue';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -169,17 +168,7 @@ const finalArtifactKey = computed(() => {
   return `${last.outputNamespace}.${last.primaryOutputName}`;
 });
 
-const stepStates = computed(() => {
-  const ctx = capsuleRunStore.runSnapshotContext;
-  if (!ctx) return {} as Record<string, StepStaleState>;
-  const states = computeStepStaleStates(
-    editor.pipeline,
-    ctx,
-    testPrompt.value,
-    (id, version) => capsulesStore.getCapsule(id, version),
-  );
-  return Object.fromEntries(states.map((s) => [s.stepId, s])) as Record<string, StepStaleState>;
-});
+const {map: stepStates} = useStepStaleStateMap(testPrompt);
 
 function withDefaultModel(step: import('@lorca/core').PipelineStep) {
   return autoAssignModelToStep(step, modelsStore.models, step.type === 'model-call' ? 'general' : undefined);

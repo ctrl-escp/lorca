@@ -35,6 +35,18 @@
               <li>Save reusable flows as <strong>Capsules</strong> and insert them as capsule-instance steps.</li>
             </ul>
           </section>
+          <section>
+            <h3>Keyboard shortcuts</h3>
+            <table class="help-shortcuts">
+              <tbody>
+                <tr><td class="shortcut-key"><kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd></td><td>Undo last pipeline edit</td></tr>
+                <tr><td class="shortcut-key"><kbd>⌘⇧Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>Redo</td></tr>
+                <tr><td class="shortcut-key"><kbd>⌘↵</kbd> / <kbd>Ctrl+↵</kbd></td><td>Execute Pipeline (or Cancel if running)</td></tr>
+                <tr><td class="shortcut-key"><kbd>Shift+click</kbd></td><td>Extend step selection range</td></tr>
+                <tr><td class="shortcut-key"><kbd>Click</kbd></td><td>Select step</td></tr>
+              </tbody>
+            </table>
+          </section>
         </template>
         <template v-else>
           <section>
@@ -127,4 +139,11 @@ const title = computed(() =>
 .help-ref-list li { margin-bottom: 0.2rem; }
 .help-muted { color: #666; font-style: italic; }
 code { font-family: monospace; color: #7ec8e3; font-size: 0.78rem; }
+.help-shortcuts { width: 100%; border-collapse: collapse; margin-top: 0.25rem; }
+.help-shortcuts td { padding: 3px 0; vertical-align: middle; }
+.shortcut-key { width: 40%; white-space: nowrap; }
+kbd {
+  display: inline-block; padding: 1px 5px; font-family: monospace; font-size: 0.75rem;
+  background: #1a1a1a; border: 1px solid #333; border-radius: 3px; color: #ccc;
+}
 </style>

@@ -36,7 +36,7 @@
 import {reactive} from 'vue';
 import type {AiEndpointConfig} from '@lorca/core';
 import {newId} from '../../utils/id.js';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 
 const emit = defineEmits<{ add: [config: AiEndpointConfig]; cancel: [] }>();
 

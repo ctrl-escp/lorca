@@ -14,7 +14,7 @@ const lintTargets = [
   'packages/*/tests/**/*.ts',
 ];
 
-const vueLintTargets = ['apps/web/src/**/*.vue'];
+const vueLintTargets = ['apps/web/src/**/*.vue', 'packages/ui-kit/src/**/*.vue'];
 
 const tsLintTargets = lintTargets.filter((target) => target.endsWith('.ts'));
 

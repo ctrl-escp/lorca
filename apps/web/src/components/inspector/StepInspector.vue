@@ -276,15 +276,15 @@
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
 import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig} from '@lorca/core';
-import {computeStepStaleStates, stepRunUiStateLabel} from '@lorca/pipeline';
+import {stepRunUiStateLabel} from '@lorca/pipeline';
+import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
-import {useCapsulesStore} from '../../stores/capsules.js';
-import FieldLabel from '../common/FieldLabel.vue';
+import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
@@ -298,7 +298,8 @@ const capsuleRunStore = useCapsuleRunStore();
 const runStore = computed(() => uiStore.editorContext === 'capsule' ? capsuleRunStore : pipelineRunStore);
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
-const capsulesStore = useCapsulesStore();
+
+const {stateFor} = useStepStaleStateMap(() => editorStore.pipeline.input.raw);
 
 const step = computed(() => editorStore.selectedStep);
 const activeTab = ref<InspectorTab>('config');
@@ -306,13 +307,7 @@ const activeTab = ref<InspectorTab>('config');
 const stepStatus = computed(() => {
   const s = step.value;
   if (!s) return null;
-  const states = computeStepStaleStates(
-    editorStore.pipeline,
-    runStore.value.runSnapshotContext,
-    editorStore.pipeline.input.raw,
-    (id, version) => capsulesStore.getCapsule(id, version),
-  );
-  return states.find((st) => st.stepId === s.id) ?? null;
+  return stateFor(s.id);
 });
 
 const lastSnapshot = computed(() => {
@@ -345,7 +340,7 @@ watch(step, () => {
   if (!visibleTabs.value.some((t) => t.id === activeTab.value)) {
     activeTab.value = 'config';
   }
-});
+}, {flush: 'sync'});
 
 function formatTime(iso: string): string {
   try {

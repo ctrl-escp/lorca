@@ -105,10 +105,6 @@ type NodeEditorPane = {updateNode: (nodeId: string, patch: Record<string, unknow
 const centerPaneRef = ref<NodeEditorPane | null>(null);
 const capsuleCenterPaneRef = ref<NodeEditorPane | null>(null);
 
-// Tracks the live pipeline definition as edited in CenterPane.
-// Starts null; gets set on first CenterPane update emit so the right pane
-// node list stays in sync with CenterPane's internal editor state.
-const currentDef = ref<PipelineDefinition | null>(null);
 const pipelineEditorKey = ref(0);
 
 const activeCapsule = computed(() =>
@@ -118,12 +114,10 @@ const activeCapsule = computed(() =>
 );
 
 async function onUpdateDef(def: PipelineDefinition) {
-  currentDef.value = def;
   await pipelinesStore.save(def);
 }
 
 function onNewPipeline() {
-  currentDef.value = null;
   pipelineEditorKey.value++;
 }
 

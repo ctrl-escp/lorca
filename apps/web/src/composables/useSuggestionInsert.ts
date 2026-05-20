@@ -56,22 +56,31 @@ export function useSuggestionInsert() {
     insertStepsBeforeAnchor(steps[index]!.id, newSteps);
   }
 
-  function insertSuggestion(suggestion: PipelineSuggestion, mode: SuggestionInsertMode, index?: number) {
+  async function insertSuggestion(
+    suggestion: PipelineSuggestion,
+    mode: SuggestionInsertMode,
+    options?: {index?: number; confirmReplace?: () => Promise<boolean>},
+  ): Promise<boolean> {
     const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
     const rawSteps = instantiateSuggestion(suggestion, existingNamespaces);
     const newSteps = prepareSteps(rawSteps, suggestion.preferredModelBucket);
 
     if (mode === 'new') {
       const hasContent = editorStore.steps.length > 0 || editorStore.pipeline.input.raw.trim();
-      if (hasContent && !window.confirm(
-        `Replace the current pipeline with "${suggestion.name}"?\n\nExisting steps and prompt will be cleared.`,
-      )) return false;
+      if (hasContent) {
+        const confirmed = options?.confirmReplace
+          ? await options.confirmReplace()
+          : window.confirm(
+            `Replace the current pipeline with "${suggestion.name}"?\n\nExisting steps and prompt will be cleared.`,
+          );
+        if (!confirmed) return false;
+      }
       editorStore.replaceSteps(newSteps, `New pipeline from "${suggestion.name}"`);
       return true;
     }
 
     if (mode === 'at-index') {
-      insertStepsAtIndex(index ?? editorStore.steps.length, newSteps);
+      insertStepsAtIndex(options?.index ?? editorStore.steps.length, newSteps);
       return true;
     }
 
@@ -85,10 +94,10 @@ export function useSuggestionInsert() {
     return true;
   }
 
-  function insertSuggestionById(suggestionId: string, mode: SuggestionInsertMode, index?: number): boolean {
+  async function insertSuggestionById(suggestionId: string, mode: SuggestionInsertMode, index?: number): Promise<boolean> {
     const suggestion = BUILTIN_SUGGESTIONS.find((s) => s.id === suggestionId);
     if (!suggestion) return false;
-    return insertSuggestion(suggestion, mode, index);
+    return insertSuggestion(suggestion, mode, index !== undefined ? {index} : undefined);
   }
 
   return {insertSuggestion, insertSuggestionById, insertStepsAtIndex};

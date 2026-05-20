@@ -7,7 +7,7 @@ import type {
   PipelineNode,
   ModelRef,
 } from '@lorca/core';
-import {validatePipeline} from '@lorca/pipeline';
+import {validatePipeline, ensureCapsuleStepChain} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
 
 const PIPELINE_SCHEMA_VERSION = 2;
@@ -148,11 +148,15 @@ export function previewCapsuleImport(
   file: CapsuleExportFile,
   ctx: ImportContext,
 ): CapsuleImportPreview | ImportParseError {
+  const cap = file.capsule;
+  const modelRefs = cap.steps
+    ? collectModelRefsFromSteps(cap.steps)
+    : collectModelRefs(cap.nodes ?? []);
   return {
     ok: true,
     kind: 'capsule',
-    capsule: structuredClone(file.capsule),
-    missingModels: findMissingModels(collectModelRefs(file.capsule.nodes), ctx),
+    capsule: structuredClone(cap),
+    missingModels: findMissingModels(modelRefs, ctx),
   };
 }
 
@@ -249,13 +253,13 @@ export function prepareImportedCapsule(
   remaps: Record<string, ModelRemap>,
 ): CapsuleDefinition {
   const now = new Date().toISOString();
-  return {
-    ...capsule,
-    id: newId,
-    nodes: applyModelRemapsToNodes(capsule.nodes, remaps),
-    updatedAt: now,
-    createdAt: now,
+  const migrated = ensureCapsuleStepChain(capsule);
+  const withRemaps: CapsuleDefinition = {
+    ...migrated,
+    ...(migrated.steps ? {steps: applyModelRemapsToSteps(migrated.steps, remaps)} : {}),
+    ...(migrated.nodes ? {nodes: applyModelRemapsToNodes(migrated.nodes, remaps)} : {}),
   };
+  return {...withRemaps, id: newId, updatedAt: now, createdAt: now};
 }
 
 export function collectPipelineCapsuleRefs(

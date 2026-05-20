@@ -10,14 +10,8 @@ import {
 import type {CapsuleExtractionResult} from '@lorca/pipeline';
 import type {CapsuleDefinition} from '@lorca/core';
 import {cloneForStorage} from '../utils/storage.js';
+import {newId} from '../utils/id.js';
 import {usePipelinesStore} from './pipelines.js';
-
-// ── ID helpers ───────────────────────────────────────────────────────────────
-
-let _counter = 0;
-function newId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
-}
 
 // ── Default step builders ────────────────────────────────────────────────────
 

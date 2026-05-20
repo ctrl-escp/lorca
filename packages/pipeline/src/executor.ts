@@ -304,7 +304,7 @@ async function executeCapsuleInstance(
     return {ok: false, error: {code: 'missing_capsule', message: `Capsule not found: ${capsuleDefinitionId} ${capsuleVersion}`, nodeId: node.id}};
   }
 
-  const resolvedNodes = resolveCapsuleSlots(capsule.nodes, modelSlotAssignments);
+  const resolvedNodes = resolveCapsuleSlots(capsule.nodes ?? [], modelSlotAssignments);
 
   if (node.config.loop?.enabled) {
     return executeCapsuleInstanceLooped(node, capsule, resolvedNodes, ctx, resolveEndpoint, callbacks, resolveCapsule);
@@ -337,8 +337,8 @@ async function executeCapsuleInstance(
     name: capsule.name,
     inputArtifactName: 'user_prompt',
     nodes: resolvedNodes,
-    edges: capsule.edges,
-    outputRef: capsule.outputRef,
+    edges: capsule.edges ?? [],
+    outputRef: capsule.outputRef ?? {nodeId: '', outputName: 'text'},
     createdAt: capsule.createdAt,
     updatedAt: capsule.updatedAt,
   });
@@ -409,7 +409,7 @@ async function executeCapsuleInstance(
     if (primaryKey) {
       const internalArtifact = internalCtx.artifacts[primaryKey];
       if (internalArtifact) {
-        const portName = capsule.outputRef.outputName;
+        const portName = capsule.outputRef?.outputName ?? 'text';
         const parentKey = outputBindings[portName] ?? `${instancePrefix}.${portName}`;
         publicOutputs.push({...internalArtifact, name: parentKey});
       }
@@ -440,7 +440,7 @@ async function executeCapsuleInstanceLooped(
   const syntheticDef = {
     schemaVersion: 1 as const,
     id: capsule.id, name: capsule.name, inputArtifactName: 'user_prompt',
-    nodes: resolvedNodes, edges: capsule.edges, outputRef: capsule.outputRef,
+    nodes: resolvedNodes, edges: capsule.edges ?? [], outputRef: capsule.outputRef ?? {nodeId: '', outputName: 'text'},
     createdAt: capsule.createdAt, updatedAt: capsule.updatedAt,
   };
   const order = topologicalOrder(syntheticDef);
@@ -531,7 +531,7 @@ async function executeCapsuleInstanceLooped(
     if (capsule.interface.outputs.length === 0 && primaryKey) {
       const artifact = internalCtx.artifacts[primaryKey];
       if (artifact) {
-        const portName = capsule.outputRef.outputName;
+        const portName = capsule.outputRef?.outputName ?? 'text';
         const iterKey = `${instancePrefix}.iteration_${iteration}.${portName}`;
         const iterArtifact = {...artifact, name: iterKey};
         ctx.artifacts[iterKey] = iterArtifact;

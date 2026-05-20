@@ -38,7 +38,7 @@ export async function executeCapsuleTestRun(
   }
 
   // Resolve slot model refs → fixed refs using provided slot assignments
-  const resolvedNodes = resolveSlots(def.nodes, testInput.slotAssignments);
+  const resolvedNodes = resolveSlots(def.nodes ?? [], testInput.slotAssignments);
 
   const syntheticDef: LegacyPipelineDefinition = {
     schemaVersion: 1,
@@ -46,8 +46,8 @@ export async function executeCapsuleTestRun(
     name: def.name,
     inputArtifactName: 'user_prompt',
     nodes: resolvedNodes,
-    edges: def.edges,
-    outputRef: def.outputRef,
+    edges: def.edges ?? [],
+    outputRef: def.outputRef ?? {nodeId: '', outputName: 'text'},
     createdAt: def.createdAt,
     updatedAt: def.updatedAt,
   };

@@ -10,8 +10,8 @@
 
     <div v-if="displayTrace.length === 0" class="trace-empty">No trace yet. Execute Pipeline to see step details.</div>
     <div
-      v-for="event in displayTrace"
-      :key="`${event.stepId ?? event.nodeId}-${event.status}-${event.timestamp}`"
+      v-for="(event, idx) in displayTrace"
+      :key="`${idx}-${event.stepId ?? event.nodeId}-${event.status}`"
       class="trace-event"
       :class="`ev-${event.status}`"
     >
