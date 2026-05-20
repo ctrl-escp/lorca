@@ -35,6 +35,7 @@ function modelStep(id: string, ns: string): PipelineStep {
       type: 'model-call',
       modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'llama'},
       mode: 'generate',
+      outputNames: ['text', 'rawResponse'],
     },
     prompt: {
       previousOutput: {enabled: false, placement: 'beforeOwnPrompt', tagName: 'previous_output'},

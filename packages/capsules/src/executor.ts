@@ -114,7 +114,10 @@ async function executeCapsuleStepChainTestRun(
   const result = await executeStepChain(
     innerPipeline,
     raw,
-    {abortSignal: testInput.abortSignal, seedArtifacts},
+    {
+      seedArtifacts,
+      ...(testInput.abortSignal !== undefined ? {abortSignal: testInput.abortSignal} : {}),
+    },
     resolveEndpoint,
     callbacks,
   );

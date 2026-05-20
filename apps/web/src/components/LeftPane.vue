@@ -216,7 +216,7 @@
 
 <script setup lang="ts">
 import {ref, computed, onMounted} from 'vue';
-import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
+import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType, PipelineStep} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
 import {BUILTIN_SUGGESTIONS, instantiateSuggestion} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';

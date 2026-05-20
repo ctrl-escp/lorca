@@ -1,4 +1,5 @@
 import {describe, it, expect} from 'vitest';
+import type {PromptCompositionConfig} from '@lorca/core';
 import {escapePromptText, unescapePromptText} from '../src/escape.js';
 import {buildUserPromptArtifacts} from '../src/envelope.js';
 import {renderTemplate} from '../src/template.js';
@@ -123,7 +124,7 @@ describe('renderTemplate', () => {
 });
 
 describe('renderPromptComposition', () => {
-  const baseConfig = () => ({
+  const baseConfig = (): PromptCompositionConfig => ({
     previousOutput: {enabled: false, placement: 'afterOwnPrompt' as 'beforeOwnPrompt' | 'afterOwnPrompt', tagName: 'previous_output'},
     historyReads: [],
     blocks: [

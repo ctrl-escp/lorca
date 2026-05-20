@@ -272,7 +272,7 @@
 
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
-import type {ModelCallStepConfig} from '@lorca/core';
+import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig} from '@lorca/core';
 import {computeStepStaleStates, stepRunUiStateLabel} from '@lorca/pipeline';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
@@ -317,9 +317,10 @@ const hasPromptBlocks = computed(() =>
   step.value?.config.type === 'model-call' || step.value?.config.type === 'prompt-wrapper',
 );
 
-const capsuleInstanceStep = computed(() => {
+const capsuleInstanceStep = computed((): (PipelineStep & {config: CapsuleInstanceStepConfig}) | null => {
   const s = step.value;
-  return s?.config.type === 'capsule-instance' ? s : null;
+  if (!s || s.config.type !== 'capsule-instance') return null;
+  return s as PipelineStep & {config: CapsuleInstanceStepConfig};
 });
 
 const visibleTabs = computed(() => {

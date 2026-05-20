@@ -104,7 +104,7 @@ describe('getStepBlockReasons', () => {
       {
         ...makeStep('b', 'B'),
         prompt: {
-          previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          previousOutput: {enabled: false, placement: 'afterOwnPrompt' as const, tagName: 'previous_output'},
           historyReads: [{
             sourceStepId: 'a',
             sourceArtifactRef: 'a.text',
@@ -126,7 +126,7 @@ describe('getStepBlockReasons', () => {
       {
         ...makeStep('b', 'B'),
         prompt: {
-          previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
+          previousOutput: {enabled: false, placement: 'afterOwnPrompt' as const, tagName: 'previous_output'},
           historyReads: [{
             sourceStepId: 'a',
             sourceArtifactRef: 'a.text',

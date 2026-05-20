@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import {ref, watch} from 'vue';
-import type {CapsuleDefinition, PipelineNode} from '@lorca/core';
+import type {CapsuleDefinition} from '@lorca/core';
 import {useCapsuleEditor} from '../../composables/useCapsuleEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
@@ -121,11 +121,6 @@ const testPrompt = ref('');
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
-
-function handleAddNode(type: PipelineNode['type']) {
-  const nodeId = editor.addNode(type);
-  if (nodeId) uiStore.selectNodeAndInspect(nodeId);
-}
 
 function handleLock() {
   if (!uiStore.activeCapsuleEditId) return;

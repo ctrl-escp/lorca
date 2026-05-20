@@ -7,7 +7,6 @@ import type {
   AiEndpointConfig,
   PipelineError,
   CapsuleTestRunSummary,
-  PipelineStep,
 } from '../src/index.js';
 import {ok, err, CAPSULE_LOOP_MAX_COUNT} from '../src/index.js';
 

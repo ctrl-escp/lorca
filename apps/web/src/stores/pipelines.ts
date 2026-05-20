@@ -2,7 +2,7 @@ import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {PipelineDefinition, LegacyPipelineDefinition} from '@lorca/core';
 import {getDb} from '@lorca/storage';
-import {migrateLegacyPipeline, makeEmptyPipeline} from '@lorca/pipeline';
+import {migrateLegacyPipeline} from '@lorca/pipeline';
 import {cloneForStorage} from '../utils/storage.js';
 
 let _counter = 0;

@@ -75,6 +75,7 @@ function onCapsuleSelect() {
   const cap = resolvedCapsule.value;
   if (!cap) return;
   const draft = editorStore.buildCapsuleInstanceStep(cap, {id: props.step.id, label: props.step.label});
+  if (draft.config.type !== 'capsule-instance') return;
   editorStore.commitStepConfigEdit(props.step.id, {
     config: draft.config,
     outputNamespace: draft.outputNamespace,

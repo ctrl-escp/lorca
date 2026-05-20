@@ -79,11 +79,11 @@ export const useCapsulesStore = defineStore('capsules', () => {
       ...source,
       id,
       name: `${source.name} (copy)`,
-      version: 'v1',
-      status: 'draft',
+      version: 'v1' as const,
+      status: 'draft' as const,
       createdAt: now,
       updatedAt: now,
-    });
+    }) as CapsuleDefinition;
     delete (copy as {lockedAt?: string}).lockedAt;
     addCapsule(copy);
     return id;

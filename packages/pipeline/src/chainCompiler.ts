@@ -8,7 +8,6 @@ import type {
   ModelCallConfig,
   PromptWrapperConfig,
 } from '@lorca/core';
-import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
 import {newStepId} from './stepId.js';
 
@@ -362,22 +361,12 @@ function buildLinearChain(
 
 function legacyNodeToStep(
   node: PipelineNode,
-  allNonInputNodes: PipelineNode[],
-  index: number,
+  _allNonInputNodes: PipelineNode[],
+  _index: number,
 ): PipelineStep {
   const prefix = node.artifactPrefix ?? node.id;
   const now = new Date().toISOString();
   const label = node.title ?? labelForNodeType(node.type);
-
-  const prevNode = index > 0 ? allNonInputNodes[index - 1] : undefined;
-
-  const baseStep = {
-    id: node.id,
-    label,
-    enabled: true,
-    outputNamespace: prefix,
-    lastEditedAt: now,
-  };
 
   switch (node.type) {
     case 'model-call': {
