@@ -56,12 +56,15 @@
             <div v-if="i > 0" class="step-connector">↓</div>
             <div
               class="step-card"
-              draggable="true"
-              title="Drag to reorder"
-              @dragstart="onStepDragStart(step.id, $event)"
               @dragend="onStepDragEnd"
             >
-              <div class="step-drag-handle" aria-hidden="true">
+              <div
+                class="step-drag-handle"
+                aria-hidden="true"
+                draggable="true"
+                title="Drag to reorder"
+                @dragstart="onStepDragStart(step.id, $event)"
+              >
                 <span class="step-drag-grip">⠿</span>
               </div>
               <div class="step-card-content">
@@ -881,7 +884,6 @@ function runStateTitle(stepId: string): string {
   border-radius: 8px 0 0 8px;
   background: #141414;
   color: #555;
-  pointer-events: none;
   user-select: none;
 }
 .step-drag-grip {
