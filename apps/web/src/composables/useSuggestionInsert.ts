@@ -70,9 +70,7 @@ export function useSuggestionInsert() {
       if (hasContent) {
         const confirmed = options?.confirmReplace
           ? await options.confirmReplace()
-          : window.confirm(
-            `Replace the current pipeline with "${suggestion.name}"?\n\nExisting steps and prompt will be cleared.`,
-          );
+          : true;
         if (!confirmed) return false;
       }
       editorStore.replaceSteps(newSteps, `New pipeline from "${suggestion.name}"`);
