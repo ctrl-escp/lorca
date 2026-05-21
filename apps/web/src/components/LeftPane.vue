@@ -75,37 +75,39 @@
               @click.stop
             ><span class="row-drag-grip" aria-hidden="true">⠿</span></button>
             <div class="suggestion-row-main">
-              <span class="suggestion-row-name">{{ suggestion.name }}</span>
+              <div class="suggestion-row-info">
+                <span class="suggestion-row-name">{{ suggestion.name }}</span>
+                <span class="suggestion-row-category">{{ suggestion.category }}</span>
+              </div>
               <span class="suggestion-row-desc">{{ suggestion.description }}</span>
-              <span class="suggestion-row-category">{{ suggestion.category }}</span>
               <span v-if="suggestion.preferredModelBucket" class="suggestion-row-bucket" :title="`Preferred model bucket: ${suggestion.preferredModelBucket}`">{{ suggestion.preferredModelBucket }}</span>
-            </div>
-            <div class="suggestion-row-actions">
-              <button
-                class="btn-insert-suggestion"
-                type="button"
-                title="Insert before selected step"
-                :disabled="!isPipelineContext || !editorStore.selectedStepId"
-                @click.stop="onInsertSuggestion(suggestion, 'before')"
-              >↑ Before</button>
-              <button
-                class="btn-insert-suggestion"
-                type="button"
-                title="Insert after selected step (or append)"
-                @click.stop="onInsertSuggestion(suggestion, 'after')"
-              >↓ After</button>
-              <button
-                class="btn-insert-suggestion"
-                type="button"
-                title="Append to end of pipeline"
-                @click.stop="onInsertSuggestion(suggestion, 'append')"
-              >+ Append</button>
-              <button
-                class="btn-insert-suggestion btn-insert-new"
-                type="button"
-                title="Replace current pipeline with this suggestion"
-                @click.stop="onInsertSuggestion(suggestion, 'new')"
-              >New</button>
+              <div class="suggestion-row-actions">
+                <button
+                  class="btn-insert-suggestion"
+                  type="button"
+                  title="Insert before selected step"
+                  :disabled="!isPipelineContext || !editorStore.selectedStepId"
+                  @click.stop="onInsertSuggestion(suggestion, 'before')"
+                >↑ Before</button>
+                <button
+                  class="btn-insert-suggestion"
+                  type="button"
+                  title="Insert after selected step (or append)"
+                  @click.stop="onInsertSuggestion(suggestion, 'after')"
+                >↓ After</button>
+                <button
+                  class="btn-insert-suggestion"
+                  type="button"
+                  title="Append to end of pipeline"
+                  @click.stop="onInsertSuggestion(suggestion, 'append')"
+                >+ Append</button>
+                <button
+                  class="btn-insert-suggestion btn-insert-new"
+                  type="button"
+                  title="Replace current pipeline with this suggestion"
+                  @click.stop="onInsertSuggestion(suggestion, 'new')"
+                >New</button>
+              </div>
             </div>
           </div>
           <p v-if="filteredSuggestions.length === 0" class="empty-hint">No suggestions match your filter.</p>
@@ -522,64 +524,64 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0.5rem 0.75rem; cursor: pointer; flex-shrink: 0; user-select: none;
+  padding: 0.9rem 1.1rem; cursor: pointer; flex-shrink: 0; user-select: none;
 }
 .section-header:hover { background: #151515; }
 
 .section-toggle {
-  display: flex; align-items: center; gap: 0.35rem;
+  display: flex; align-items: center; gap: 0.5rem;
   background: none; border: none; padding: 0; cursor: pointer;
   color: inherit; flex: 1; min-width: 0; text-align: left;
 }
 
-.chevron { display: inline-block; font-size: 0.85rem; color: #555; transition: transform 0.15s; width: 0.75rem; flex-shrink: 0; }
+.chevron { display: inline-block; font-size: 1.1rem; color: #555; transition: transform 0.15s; width: 1rem; flex-shrink: 0; }
 .chevron.open { transform: rotate(90deg); color: #7ec8e3; }
 
-.section-title { font-size: 0.72rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
-.section-count { font-weight: 500; color: #555; letter-spacing: 0; }
+.section-title { font-size: 1rem; font-weight: 700; color: #bbb; letter-spacing: 0.01em; }
+.section-count { font-weight: 500; color: #555; }
 
-.section-actions { display: flex; gap: 0.25rem; }
+.section-actions { display: flex; gap: 0.35rem; }
 
-.section-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.section-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
-.icon-btn { background: none; border: 1px solid #333; color: #888; border-radius: 4px; width: 22px; height: 22px; cursor: pointer; font-size: 1rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.icon-btn { background: none; border: 1px solid #333; color: #888; border-radius: 5px; width: 36px; height: 36px; cursor: pointer; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .icon-btn:hover:not(:disabled) { background: #222; color: #ccc; }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
 .icon-btn.active { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 
-.ep-list, .model-list, .capsule-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.ep-list, .model-list, .capsule-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .capsule-row {
-  padding: 0.3rem 0.45rem; border-radius: 4px; border: 1px solid #222;
-  display: flex; align-items: center; gap: 0.35rem; background: #1a1a1a;
+  padding: 0.7rem 0.85rem; border-radius: 6px; border: 1px solid #222;
+  display: flex; align-items: center; gap: 0.5rem; background: #1a1a1a;
 }
 .capsule-row:hover { background: #222; border-color: #333; }
 .capsule-row.active { background: #1e2d3d; border-color: #2a4d6e; }
-.capsule-row-main { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; }
-.capsule-row-name { font-size: 0.8rem; font-weight: 500; }
-.capsule-row-meta { font-size: 0.65rem; color: #555; }
-.capsule-status { font-size: 0.62rem; padding: 0 3px; border-radius: 2px; }
+.capsule-row-main { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; }
+.capsule-row-name { font-size: 0.95rem; font-weight: 500; }
+.capsule-row-meta { font-size: 0.78rem; color: #555; }
+.capsule-status { font-size: 0.72rem; padding: 1px 5px; border-radius: 3px; }
 .cs-draft { color: #c8a050; }
 .cs-locked { color: #7ec8e3; background: #1a2a3a; border: 1px solid #2a4a6a; }
 .btn-insert-capsule {
   flex-shrink: 0;
-  font-size: 0.68rem;
-  padding: 2px 6px;
+  font-size: 0.82rem;
+  padding: 6px 11px;
   background: #1a2430;
   border: 1px solid #2a4a6a;
   color: #9d6db8;
-  border-radius: 3px;
+  border-radius: 5px;
   cursor: pointer;
 }
 .btn-insert-capsule:hover { background: #243040; }
 .btn-dup-capsule {
   flex-shrink: 0;
-  font-size: 0.75rem;
-  padding: 2px 5px;
+  font-size: 0.9rem;
+  padding: 5px 8px;
   background: transparent;
   border: 1px solid #333;
   color: #888;
-  border-radius: 3px;
+  border-radius: 5px;
   cursor: pointer;
 }
 .btn-dup-capsule:hover { color: #ccc; border-color: #555; }
@@ -589,28 +591,28 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   background: #111;
   border: 1px solid #2a2a2a;
   color: #ccc;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  margin-bottom: 0.35rem;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
 }
 .palette-search:focus { outline: none; border-color: #2a5070; }
 
-.step-type-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.step-type-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .step-type-row {
-  display: flex; align-items: flex-start; gap: 0.4rem;
-  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid #222; background: #161616;
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.7rem 0.85rem; border-radius: 6px; border: 1px solid #222; background: #161616;
 }
 .step-type-row:hover { border-color: #2a3a4a; background: #181c22; }
-.step-type-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.step-type-row-name { font-size: 0.78rem; font-weight: 500; }
-.step-type-row-desc { font-size: 0.62rem; color: #666; line-height: 1.3; }
+.step-type-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.step-type-row-name { font-size: 1rem; font-weight: 500; }
+.step-type-row-desc { font-size: 0.78rem; color: #666; line-height: 1.35; }
 
 /* Suggestions */
-.suggestion-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.suggestion-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .suggestion-row {
-  display: flex; align-items: stretch; gap: 0;
-  padding: 0; border-radius: 4px; border: 1px solid #222; background: #161616;
+  display: flex; align-items: stretch;
+  border-radius: 6px; border: 1px solid #222; background: #161616;
   overflow: hidden;
 }
 .suggestion-row:hover { border-color: #2a3d2a; background: #191f19; }
@@ -620,17 +622,17 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
+  width: 1.75rem;
   padding: 0;
   border: none;
   border-right: 1px solid #2a2a2a;
-  border-radius: 4px 0 0 4px;
+  border-radius: 6px 0 0 6px;
   background: #121612;
   color: #5a7a5a;
   cursor: grab;
 }
 .row-drag-grip {
-  font-size: 0.85rem;
+  font-size: 1rem;
   line-height: 1;
   letter-spacing: -0.12em;
   user-select: none;
@@ -638,19 +640,22 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .row-drag-handle:hover { background: #1a221a; color: #8ab88a; }
 .row-drag-handle:active { cursor: grabbing; }
 .suggestion-row-main {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem;
-  padding: 0.35rem 0.4rem 0.35rem 0.5rem;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
 }
+.suggestion-row-info {
+  display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+}
+.suggestion-row-name { font-size: 1rem; font-weight: 600; }
+.suggestion-row-desc { font-size: 0.78rem; color: #666; line-height: 1.35; }
+.suggestion-row-category { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a8a5a; }
+.suggestion-row-bucket { font-size: 0.7rem; color: #6a8ab0; font-family: monospace; }
 .suggestion-row-actions {
-  display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0; max-width: 5.5rem;
-  padding: 0.35rem 0.5rem 0.35rem 0; align-self: center;
+  display: flex; flex-wrap: wrap; gap: 0.3rem;
+  padding-top: 0.45rem;
 }
-.suggestion-row-name { font-size: 0.78rem; font-weight: 500; }
-.suggestion-row-desc { font-size: 0.62rem; color: #666; line-height: 1.3; }
-.suggestion-row-category { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a8a5a; }
-.suggestion-row-bucket { font-size: 0.58rem; color: #6a8ab0; font-family: monospace; }
 .model-row.assignable { cursor: pointer; }
-.model-row.assignable:hover { background: #1a2430; border-radius: 4px; }
+.model-row.assignable:hover { background: #1a2430; border-radius: 6px; }
 .btn-insert-new { background: #2d1a1a; border-color: #4d2a2a; color: #b86d6d; }
 .btn-insert-new:hover { background: #381e1e; color: #da8d8d; }
 .btn-insert-suggestion:disabled { opacity: 0.35; cursor: default; }
@@ -660,31 +665,31 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   background: #111;
   border: 1px solid #2a2a2a;
   color: #ccc;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.72rem;
-  margin-bottom: 0.35rem;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  margin-bottom: 0.2rem;
 }
 .model-assign-hint {
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   color: #7ec8e3;
   margin: 0 0 0.35rem;
 }
 .model-row.assignable { cursor: pointer; border-color: #2a4a6a; }
 .model-row.assignable:hover { background: #1e2d3d; border-color: #3a6a9a; }
 .btn-insert-suggestion {
-  font-size: 0.65rem; padding: 2px 6px;
+  font-size: 0.82rem; padding: 5px 11px;
   background: #1a2d1a; border: 1px solid #2a4d2a; color: #6db86d;
-  border-radius: 3px; cursor: pointer; white-space: nowrap;
+  border-radius: 5px; cursor: pointer; white-space: nowrap;
 }
 .btn-insert-suggestion:hover { background: #1e381e; color: #8dda8d; }
 
-.empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
+.empty-hint { font-size: 0.88rem; color: #555; margin: 0; }
 
-.model-row { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 0.45rem 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.model-row { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 7px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .model-row-header { display: flex; justify-content: space-between; align-items: center; }
-.model-name { font-size: 0.8rem; font-weight: 500; }
-.model-source { font-size: 0.65rem; padding: 1px 5px; border-radius: 3px; }
+.model-name { font-size: 0.95rem; font-weight: 500; }
+.model-source { font-size: 0.75rem; padding: 2px 7px; border-radius: 4px; }
 .source-discovered { background: #1e2d1e; color: #6db86d; }
 .source-manual { background: #2d2a1e; color: #c8a85a; }
 </style>

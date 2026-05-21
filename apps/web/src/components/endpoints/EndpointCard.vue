@@ -55,42 +55,42 @@ const accessLabel = {
 .ep-card {
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  padding: 0.75rem;
+  border-radius: 7px;
+  padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.55rem;
 }
 .ep-card.status-available { border-left: 3px solid #3a9d6e; }
 .ep-card.status-blocked { border-left: 3px solid #c0392b; }
 .ep-card.status-unknown { border-left: 3px solid #555; }
 
 .ep-card-header { display: flex; justify-content: space-between; align-items: center; }
-.ep-name { font-weight: 600; font-size: 0.9rem; }
-.ep-badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 3px; }
+.ep-name { font-weight: 600; font-size: 1rem; }
+.ep-badge { font-size: 0.78rem; padding: 3px 8px; border-radius: 4px; }
 .badge-available { background: #1e4d37; color: #5ddb9e; }
 .badge-blocked { background: #4d1e1e; color: #e07070; }
 .badge-unknown { background: #333; color: #999; }
 
-.ep-url { font-size: 0.75rem; color: #888; font-family: monospace; }
-.ep-meta { display: flex; gap: 0.75rem; font-size: 0.75rem; color: #666; }
-.ep-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.ep-url { font-size: 0.82rem; color: #888; font-family: monospace; }
+.ep-meta { display: flex; gap: 0.85rem; font-size: 0.82rem; color: #666; }
+.ep-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.1rem; }
 
 .ep-cors-warn {
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: #e07070;
   background: #2d1a1a;
-  border-radius: 4px;
-  padding: 0.4rem 0.6rem;
+  border-radius: 5px;
+  padding: 0.5rem 0.75rem;
 }
 
 .btn {
   background: #2a2a2a;
   border: 1px solid #3a3a3a;
   color: #ccc;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-size: 0.82rem;
   cursor: pointer;
 }
 .btn:hover:not(:disabled) { background: #333; }

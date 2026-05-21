@@ -450,35 +450,35 @@ function commitLoopGroup() {
 </script>
 
 <style scoped>
-.step-inspector { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; overflow: hidden; height: 100%; }
-.inspector-empty { color: #444; font-size: 0.78rem; }
+.step-inspector { padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.65rem; overflow: hidden; height: 100%; }
+.inspector-empty { color: #444; font-size: 0.88rem; }
 
-.inspector-header { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-.step-type-badge { font-size: 0.62rem; padding: 1px 6px; background: #1a2a3a; color: #7ec8e3; border-radius: 3px; flex-shrink: 0; border: 1px solid #2a4a6a; }
-.step-label-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #2a2a2a; color: #e8e8e8; font-size: 0.9rem; font-weight: 500; padding: 2px 0; min-width: 0; }
+.inspector-header { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.step-type-badge { font-size: 0.72rem; padding: 2px 8px; background: #1a2a3a; color: #7ec8e3; border-radius: 4px; flex-shrink: 0; border: 1px solid #2a4a6a; }
+.step-label-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #2a2a2a; color: #e8e8e8; font-size: 1rem; font-weight: 500; padding: 3px 0; min-width: 0; }
 .step-label-input:focus { outline: none; border-bottom-color: #3a6080; }
 
 .inspector-tabs {
-  display: flex; flex-wrap: wrap; gap: 0.15rem; flex-shrink: 0;
-  border-bottom: 1px solid #1e1e1e; padding-bottom: 0.35rem;
+  display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0;
+  border-bottom: 1px solid #1e1e1e; padding-bottom: 0.45rem;
 }
 .inspector-tab {
   background: none; border: 1px solid transparent; color: #666;
-  font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  font-size: 0.78rem; padding: 4px 9px; border-radius: 4px; cursor: pointer;
 }
 .inspector-tab:hover { color: #999; }
 .inspector-tab.active { color: #7ec8e3; border-color: #2a4a6a; background: #1a2430; }
 
-.inspector-tab-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.55rem; }
+.inspector-tab-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.65rem; }
 
-.ns-row { display: flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; }
+.ns-row { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; }
 .ns-label { color: #444; }
-.ns-value { color: #5a8a5a; font-size: 0.65rem; }
+.ns-value { color: #5a8a5a; font-size: 0.75rem; }
 .ns-dot { color: #333; }
 
 .inspector-status {
-  border: 1px solid #2a2a2a; border-radius: 4px; padding: 0.45rem 0.55rem;
-  display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem;
+  border: 1px solid #2a2a2a; border-radius: 5px; padding: 0.55rem 0.7rem;
+  display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem;
 }
 .status-current { border-left: 2px solid #3a9d6e; background: #0f1a0f; }
 .status-stale, .status-failed-stale { border-left: 2px solid #c8a050; background: #1a180f; }
@@ -490,48 +490,48 @@ function commitLoopGroup() {
 
 .inspector-status-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
 .inspector-status-label { color: #aaa; font-weight: 500; }
-.inspector-status-time { color: #555; font-size: 0.65rem; }
+.inspector-status-time { color: #555; font-size: 0.75rem; }
 .inspector-status-issues { margin: 0; padding-left: 1rem; color: #e07070; }
-.inspector-status-hint { margin: 0; color: #888; font-size: 0.68rem; }
+.inspector-status-hint { margin: 0; color: #888; font-size: 0.78rem; }
 .inspector-status-hint.ok { color: #5a9d6e; }
-.inspector-last-outputs { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
-.inspector-last-label { color: #555; font-size: 0.65rem; }
-.inspector-artifact-ref { color: #5a8a5a; font-size: 0.65rem; }
+.inspector-last-outputs { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.inspector-last-label { color: #555; font-size: 0.75rem; }
+.inspector-artifact-ref { color: #5a8a5a; font-size: 0.75rem; }
 .inspector-output-preview {
-  margin: 0.35rem 0 0;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.68rem;
+  margin: 0.4rem 0 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
   color: #999;
   background: #0d0d0d;
   border: 1px solid #1e1e1e;
-  border-radius: 4px;
+  border-radius: 5px;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 12rem;
   overflow-y: auto;
 }
 
-.inspector-field { display: flex; flex-direction: column; gap: 0.2rem; }
+.inspector-field { display: flex; flex-direction: column; gap: 0.25rem; }
 
 input, select, textarea {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
-  border-radius: 4px; padding: 4px 8px; font-size: 0.82rem; width: 100%;
+  border-radius: 5px; padding: 6px 10px; font-size: 0.88rem; width: 100%;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: #3a6080; }
 textarea { resize: vertical; font-family: monospace; line-height: 1.4; }
 
-.binding-list { display: flex; flex-direction: column; gap: 0.2rem; }
-.binding-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; }
+.binding-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.binding-row { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
 .binding-port { color: #888; }
 .binding-arrow { color: #444; }
-.binding-ref { color: #5a8a5a; font-size: 0.72rem; }
+.binding-ref { color: #5a8a5a; font-size: 0.82rem; }
 
-.history-read-list { margin: 0; padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.history-read-row { font-size: 0.72rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-.history-read-disabled { color: #666; font-size: 0.65rem; }
-.history-read-tag { color: #666; font-size: 0.65rem; }
-.history-read-required { color: #c8a050; font-size: 0.65rem; }
-.inputs-hint { font-size: 0.68rem; color: #666; margin: 0.35rem 0 0; }
+.history-read-list { margin: 0; padding-left: 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.history-read-row { font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.history-read-disabled { color: #666; font-size: 0.75rem; }
+.history-read-tag { color: #666; font-size: 0.75rem; }
+.history-read-required { color: #c8a050; font-size: 0.75rem; }
+.inputs-hint { font-size: 0.78rem; color: #666; margin: 0.4rem 0 0; }
 
-.empty-hint { font-size: 0.68rem; color: #444; margin: 0; }
+.empty-hint { font-size: 0.78rem; color: #444; margin: 0; }
 </style>

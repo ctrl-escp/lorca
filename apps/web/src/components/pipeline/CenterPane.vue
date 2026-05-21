@@ -566,17 +566,17 @@ async function handlePipelineDelete(id: string) {
 .center-pane { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 
 .center-toolbar {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.45rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
+  padding: 0.65rem 1rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
 }
 .pipeline-name {
   flex: 1; background: transparent; border: none; color: #e8e8e8;
-  font-size: 0.88rem; font-weight: 500; min-width: 0;
+  font-size: 1rem; font-weight: 500; min-width: 0;
 }
 .pipeline-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
 
-.run-controls { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
-.btn { border-radius: 4px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; border: 1px solid #333; }
+.run-controls { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+.btn { border-radius: 5px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; border: 1px solid #333; }
 .btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 .btn-run:hover:not(:disabled) { background: #254a62; }
 .btn-run:disabled { opacity: 0.4; cursor: default; }
@@ -584,20 +584,20 @@ async function handlePipelineDelete(id: string) {
 .btn-secondary:hover { background: #222; color: #ccc; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
-.follow-run-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: #888; cursor: pointer; user-select: none; }
+.follow-run-label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: #888; cursor: pointer; user-select: none; }
 .follow-run-label input { cursor: pointer; }
 
 /* More menu */
 .more-menu-wrap { position: relative; }
 .more-menu-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
-  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px;
-  display: flex; flex-direction: column; min-width: 180px;
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 5px;
+  display: flex; flex-direction: column; min-width: 190px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 .more-menu-item {
   background: none; border: none; color: #aaa; text-align: left;
-  padding: 7px 14px; font-size: 0.8rem; cursor: pointer;
+  padding: 9px 16px; font-size: 0.85rem; cursor: pointer;
 }
 .more-menu-item:hover { background: #242424; color: #ccc; }
 
@@ -605,22 +605,27 @@ async function handlePipelineDelete(id: string) {
 .inline-error-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   background: #1a0f0f; border-bottom: 1px solid #4d2222;
-  color: #e07070; font-size: 0.78rem; padding: 0.3rem 0.75rem; flex-shrink: 0;
+  color: #e07070; font-size: 0.82rem; padding: 0.4rem 1rem; flex-shrink: 0;
 }
 .inline-error-close {
-  background: none; border: none; color: #e07070; cursor: pointer; font-size: 1rem; padding: 0;
+  background: none; border: none; color: #e07070; cursor: pointer; font-size: 1.1rem; padding: 0;
 }
 .inline-error-close:hover { color: #ff9090; }
 
 .user-prompt-bar {
-  display: flex; align-items: flex-start; gap: 0.5rem;
-  padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.65rem 1rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
 }
-.prompt-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; padding-top: 0.3rem; flex-shrink: 0; }
+.prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; padding-top: 0.35rem; flex-shrink: 0; }
 .user-prompt-input {
-  flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 4px;
-  color: #ccc; font-size: 0.82rem; padding: 0.35rem 0.5rem; resize: vertical;
+  flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 5px;
+  color: #ccc; font-size: 0.9rem; padding: 0.5rem 0.65rem; resize: vertical;
   font-family: inherit; line-height: 1.4;
 }
 .user-prompt-input:focus { outline: none; border-color: #2a5070; }
+
+@media (max-width: 767px) {
+  .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
+  .run-controls { flex-wrap: wrap; }
+}
 </style>

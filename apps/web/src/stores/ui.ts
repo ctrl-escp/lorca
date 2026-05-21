@@ -19,13 +19,13 @@ const PANE_SIZE_STORAGE_KEY = 'lorca:ui:paneSizes';
 function readPersistedSizes(): {left: number; right: number} {
   try {
     const raw = localStorage.getItem(PANE_SIZE_STORAGE_KEY);
-    if (!raw) return {left: 280, right: 360};
+    if (!raw) return {left: 340, right: 400};
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === 'object') {
       const p = parsed as Record<string, unknown>;
       return {
-        left: typeof p.left === 'number' ? p.left : 280,
-        right: typeof p.right === 'number' ? p.right : 360,
+        left: typeof p.left === 'number' ? p.left : 340,
+        right: typeof p.right === 'number' ? p.right : 400,
       };
     }
   } catch {

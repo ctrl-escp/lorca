@@ -1,6 +1,7 @@
 <template>
   <div class="app">
     <header class="app-header">
+      <button class="mobile-panel-btn" aria-label="Toggle library panel" @click="mobileRightOpen = false; mobileLeftOpen = !mobileLeftOpen">☰</button>
       <h1>Lorca</h1>
       <template v-if="uiStore.editorContext === 'capsule' && activeCapsule">
         <button class="breadcrumb-back" title="Return to pipeline editor" @click="uiStore.closeCapsuleEditor()">← Pipeline</button>
@@ -13,6 +14,7 @@
           {{ runStatus }}
         </span>
         <button type="button" class="btn-help" title="Help — UI overview and workflow" @click="showAppHelp = true">?</button>
+        <button class="mobile-panel-btn" aria-label="Toggle inspector panel" @click="mobileLeftOpen = false; mobileRightOpen = !mobileRightOpen">⊞</button>
       </div>
     </header>
     <HelpDialog :open="showAppHelp" variant="app" @close="showAppHelp = false" />
@@ -23,7 +25,12 @@
       @dismiss="importStore.cancelImport()"
     />
     <main class="app-body">
-      <div class="pane pane-left" :style="{width: `${uiStore.leftPaneWidth}px`}">
+      <div
+        class="panel-overlay"
+        :class="{visible: mobileLeftOpen || mobileRightOpen}"
+        @click="mobileLeftOpen = false; mobileRightOpen = false"
+      />
+      <div class="pane pane-left" :class="{'mobile-open': mobileLeftOpen}" :style="{width: `${uiStore.leftPaneWidth}px`}">
         <LeftPane />
       </div>
       <PaneResizeHandle side="left" @resize="resizeLeftPane" />
@@ -44,7 +51,7 @@
         />
       </div>
       <PaneResizeHandle side="right" @resize="resizeRightPane" />
-      <div class="pane pane-right" :style="{width: `${uiStore.rightPaneWidth}px`}">
+      <div class="pane pane-right" :class="{'mobile-open': mobileRightOpen}" :style="{width: `${uiStore.rightPaneWidth}px`}">
         <RightPane
           v-bind="uiStore.editorContext === 'capsule' && activeCapsule ? {capsule: activeCapsule, onUpdateCapsuleInterface} : {}"
         />
@@ -66,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, onMounted} from 'vue';
+import {ref, computed, onMounted, watch} from 'vue';
 import type {PipelineDefinition, CapsuleInterface} from '@lorca/core';
 import {useActiveRunStore} from './stores/activeRun.js';
 import {useCapsuleRunStore} from './stores/capsuleRun.js';
@@ -88,6 +95,12 @@ import CorsProxyBanner from './components/CorsProxyBanner.vue';
 import type {ModelRemap} from './stores/importExport.js';
 
 const showAppHelp = ref(false);
+const mobileLeftOpen = ref(false);
+const mobileRightOpen = ref(false);
+
+watch([mobileLeftOpen, mobileRightOpen], ([l, r]) => {
+  document.body.style.overflow = l || r ? 'hidden' : '';
+});
 
 const runStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
@@ -158,11 +171,11 @@ async function onConfirmImport(remaps: Record<string, ModelRemap>) {
 }
 
 function resizeLeftPane(delta: number) {
-  uiStore.leftPaneWidth = Math.min(520, Math.max(180, uiStore.leftPaneWidth + delta));
+  uiStore.leftPaneWidth = Math.min(600, Math.max(260, uiStore.leftPaneWidth + delta));
 }
 
 function resizeRightPane(delta: number) {
-  uiStore.rightPaneWidth = Math.min(640, Math.max(260, uiStore.rightPaneWidth + delta));
+  uiStore.rightPaneWidth = Math.min(700, Math.max(300, uiStore.rightPaneWidth + delta));
 }
 
 onMounted(async () => {
@@ -183,33 +196,42 @@ body {
   color: #e8e8e8;
 }
 
-.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 
 .app-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid #2a2a2a;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
-.app-header h1 { margin: 0; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.05em; }
-.app-subtitle { font-size: 0.72rem; color: #555; }
-.breadcrumb-back { background: none; border: none; color: #7ec8e3; font-size: 0.78rem; cursor: pointer; padding: 0; }
+.app-header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; }
+.app-subtitle { font-size: 0.82rem; color: #555; }
+.breadcrumb-back { background: none; border: none; color: #7ec8e3; font-size: 0.88rem; cursor: pointer; padding: 0; }
 .breadcrumb-back:hover { text-decoration: underline; }
-.breadcrumb-sep { color: #444; font-size: 0.78rem; }
-.breadcrumb-label { font-size: 0.78rem; color: #888; }
-.header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
-.run-status { font-size: 0.72rem; padding: 2px 8px; border-radius: 3px; }
+.breadcrumb-sep { color: #444; font-size: 0.88rem; }
+.breadcrumb-label { font-size: 0.88rem; color: #888; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+.run-status { font-size: 0.82rem; padding: 3px 10px; border-radius: 4px; }
 .btn-help {
-  width: 1.4rem; height: 1.4rem; border-radius: 50%;
+  width: 2rem; height: 2rem; border-radius: 50%;
   background: #1a2a3a; border: 1px solid #2a5070; color: #7ec8e3;
-  font-size: 0.78rem; cursor: pointer; line-height: 1;
+  font-size: 0.9rem; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
 }
 .btn-help:hover { background: #254a62; }
 .rs-running { background: #2d2a1e; color: #e8a020; }
 .rs-completed { background: #1e2d1e; color: #5ddb9e; }
 .rs-failed, .rs-cancelled { background: #2d1e1e; color: #e07070; }
+
+/* Mobile-only panel toggle buttons */
+.mobile-panel-btn { display: none; }
+
+/* Mobile overlay */
+.panel-overlay { display: none; }
 
 .app-body { flex: 1; display: flex; min-height: 0; }
 
@@ -217,4 +239,65 @@ body {
 .pane-left { flex-shrink: 0; border-right: none; }
 .pane-center { flex: 1; min-width: 0; }
 .pane-right { flex-shrink: 0; border-left: none; }
+
+/* ── Mobile layout ─────────────────────────────── */
+@media (max-width: 767px) {
+  .mobile-panel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: none;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #888;
+    font-size: 1.2rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .mobile-panel-btn:hover { background: #1a1a1a; color: #ccc; }
+
+  .app-subtitle { display: none; }
+
+  .panel-overlay {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.65);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
+  }
+  .panel-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  .app-body { position: relative; overflow: hidden; }
+
+  .pane-left {
+    position: absolute !important;
+    top: 0; left: 0; bottom: 0;
+    width: min(85vw, 380px) !important;
+    z-index: 101;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    border-right: 1px solid #2a2a2a;
+    background: #0f0f0f;
+  }
+  .pane-left.mobile-open { transform: translateX(0); }
+
+  .pane-right {
+    position: absolute !important;
+    top: 0; right: 0; bottom: 0;
+    width: min(85vw, 380px) !important;
+    z-index: 101;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    border-left: 1px solid #2a2a2a;
+    background: #0f0f0f;
+  }
+  .pane-right.mobile-open { transform: translateX(0); }
+
+  .pane-resize-handle { display: none !important; }
+}
 </style>
