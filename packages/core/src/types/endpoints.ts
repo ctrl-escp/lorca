@@ -42,4 +42,5 @@ export interface DiscoveredModel {
   buckets: ModelUsageBucket[];
   userBuckets?: ModelUsageBucket[];
   source: 'discovered' | 'manual';
+  enabled?: boolean;
 }

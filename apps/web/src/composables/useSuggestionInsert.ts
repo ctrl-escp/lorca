@@ -1,8 +1,9 @@
 import type {ModelUsageBucket, PipelineStep} from '@lorca/core';
-import {BUILTIN_SUGGESTIONS, instantiateSuggestion} from '@lorca/capsules';
+import {ALL_SUGGESTIONS, instantiateSuggestion} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
 import {autoAssignModelsToSteps} from '@lorca/endpoints';
 import {useModelsStore} from '../stores/models.js';
+import {useEndpointsStore} from '../stores/endpoints.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
 
 export type SuggestionInsertMode = 'before' | 'after' | 'append' | 'at-index' | 'new';
@@ -10,12 +11,15 @@ export type SuggestionInsertMode = 'before' | 'after' | 'append' | 'at-index' | 
 export function useSuggestionInsert() {
   const editorStore = usePipelineEditorStore();
   const modelsStore = useModelsStore();
+  const endpointsStore = useEndpointsStore();
 
   function prepareSteps(
     steps: ReturnType<typeof instantiateSuggestion>,
     preferredBucket?: ModelUsageBucket,
   ): PipelineStep[] {
-    return autoAssignModelsToSteps(steps, modelsStore.models, preferredBucket);
+    const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+    const enabledModels = modelsStore.models.filter((m) => m.enabled !== false && !disabledEpIds.has(m.endpointId));
+    return autoAssignModelsToSteps(steps, enabledModels, preferredBucket);
   }
 
   function insertStepsAfterAnchor(anchorId: string | null, newSteps: PipelineStep[]) {
@@ -93,7 +97,7 @@ export function useSuggestionInsert() {
   }
 
   async function insertSuggestionById(suggestionId: string, mode: SuggestionInsertMode, index?: number): Promise<boolean> {
-    const suggestion = BUILTIN_SUGGESTIONS.find((s) => s.id === suggestionId);
+    const suggestion = ALL_SUGGESTIONS.find((s) => s.id === suggestionId);
     if (!suggestion) return false;
     return insertSuggestion(suggestion, mode, index !== undefined ? {index} : undefined);
   }

@@ -1,9 +1,13 @@
 import type {PipelineSuggestion} from './types.js';
 import {BUILTIN_SUGGESTIONS} from './definitions.js';
+import {RETRY_LOOP_SUGGESTIONS} from './retryLoops.js';
 import type {PipelineStep} from '@lorca/core';
 
 export type {PipelineSuggestion, SuggestionCategory} from './types.js';
 export {BUILTIN_SUGGESTIONS} from './definitions.js';
+export {RETRY_LOOP_SUGGESTIONS} from './retryLoops.js';
+
+export const ALL_SUGGESTIONS: PipelineSuggestion[] = [...BUILTIN_SUGGESTIONS, ...RETRY_LOOP_SUGGESTIONS];
 
 let _counter = 0;
 
@@ -16,21 +20,25 @@ export function instantiateSuggestion(
   suggestion: PipelineSuggestion,
   existingNamespaces: ReadonlySet<string>,
 ): PipelineStep[] {
-  return suggestion.insertableSteps.map((step) => {
-    let ns = step.outputNamespace;
+  const ns = new Set(existingNamespaces);
+
+  function cloneOne(step: PipelineStep): PipelineStep {
+    let outputNamespace = step.outputNamespace;
     let attempt = 0;
-    while (existingNamespaces.has(ns)) {
+    while (ns.has(outputNamespace)) {
       attempt++;
-      ns = `${step.outputNamespace}_${attempt}`;
+      outputNamespace = `${step.outputNamespace}_${attempt}`;
     }
+    ns.add(outputNamespace);
 
     const cloned: PipelineStep = {
       ...step,
       id: uniqueId(step.type),
-      outputNamespace: ns,
+      outputNamespace,
       createdFromSuggestionId: suggestion.id,
       lastEditedAt: new Date().toISOString(),
     };
+
     if (step.prompt) {
       cloned.prompt = {
         ...step.prompt,
@@ -40,12 +48,22 @@ export function instantiateSuggestion(
         })),
       };
     }
+
+    if (step.config.type === 'loop-group') {
+      cloned.config = {
+        ...step.config,
+        steps: step.config.steps.map((inner) => cloneOne(inner)),
+      };
+    }
+
     return cloned;
-  });
+  }
+
+  return suggestion.insertableSteps.map(cloneOne);
 }
 
 export function getBuiltinSuggestion(id: string): PipelineSuggestion | undefined {
-  return BUILTIN_SUGGESTIONS.find((s) => s.id === id);
+  return ALL_SUGGESTIONS.find((s) => s.id === id);
 }
 
 export {resolveModelCallSuggestedBuckets} from './modelBuckets.js';

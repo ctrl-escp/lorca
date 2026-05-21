@@ -121,35 +121,13 @@
                 type="number" min="1" max="20" step="1"
                 v-model="localMaxIterations"
                 title="Maximum iterations"
-                @blur="commitLoopGroup"
+                @blur="() => commitLoopGroup()"
               />
             </div>
-            <div class="inspector-field">
-              <FieldLabel label="Exit condition" title="When to stop looping before reaching max iterations" />
-              <select v-model="localExitConditionType" title="Exit condition type" @change="commitLoopGroup">
-                <option value="iterations">Always run max iterations</option>
-                <option value="json-field-equals">JSON field equals value</option>
-              </select>
-            </div>
-            <template v-if="localExitConditionType === 'json-field-equals'">
-              <div class="inspector-field">
-                <FieldLabel label="Field path" title="Dot-path into last inner step's JSON output (e.g. passed)" />
-                <input
-                  v-model="localExitFieldPath"
-                  placeholder="passed"
-                  title="JSON field path to check"
-                  @blur="commitLoopGroup"
-                />
-              </div>
-              <div class="inspector-field">
-                <FieldLabel label="Exit when value" title="Loop exits when the field equals this value" />
-                <select v-model="localExitValue" title="Expected value that triggers loop exit" @change="commitLoopGroup">
-                  <option value="true_bool">true</option>
-                  <option value="false_bool">false</option>
-                  <option value="custom">Custom string…</option>
-                </select>
-              </div>
-            </template>
+            <LoopExitConditionEditor
+              :exit-condition="step.config.exitCondition"
+              @update="onLoopExitUpdate"
+            />
             <LoopInnerChainEditor
               :loop-step-id="step.id"
               :inner-steps="step.config.steps"
@@ -261,7 +239,7 @@
 
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
-import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig} from '@lorca/core';
+import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig, LoopExitCondition} from '@lorca/core';
 import {stepRunUiStateLabel} from '@lorca/pipeline';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
@@ -273,6 +251,7 @@ import {useEndpointsStore} from '../../stores/endpoints.js';
 import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
+import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 
 type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
@@ -353,9 +332,6 @@ const localMaxTokens = ref('');
 const localTemplate = ref('');
 const localSourceRef = ref('');
 const localMaxIterations = ref(3);
-const localExitConditionType = ref<'iterations' | 'json-field-equals'>('json-field-equals');
-const localExitFieldPath = ref('passed');
-const localExitValue = ref<'true_bool' | 'false_bool' | 'custom'>('true_bool');
 
 watch(step, (s) => {
   if (!s) return;
@@ -376,12 +352,6 @@ watch(step, (s) => {
 
   if (cfg.type === 'loop-group') {
     localMaxIterations.value = cfg.maxIterations;
-    const ec = cfg.exitCondition;
-    localExitConditionType.value = ec.type === 'json-field-equals' ? 'json-field-equals' : 'iterations';
-    if (ec.type === 'json-field-equals') {
-      localExitFieldPath.value = ec.fieldPath;
-      localExitValue.value = ec.value === true ? 'true_bool' : ec.value === false ? 'false_bool' : 'custom';
-    }
   }
 }, {immediate: true});
 
@@ -432,19 +402,20 @@ function commitJsonExtract() {
   editorStore.commitStepConfigEdit(s.id, {config: {...s.config, sourceArtifactRef: localSourceRef.value}}, 'Update source');
 }
 
-function commitLoopGroup() {
+function commitLoopGroup(exitCondition?: LoopExitCondition) {
   const s = step.value;
   if (!s || s.config.type !== 'loop-group') return;
-  const exitCondition = localExitConditionType.value === 'iterations'
-    ? {type: 'iterations' as const}
-    : {
-        type: 'json-field-equals' as const,
-        fieldPath: localExitFieldPath.value || 'passed',
-        value: localExitValue.value === 'true_bool' ? true : localExitValue.value === 'false_bool' ? false : 'done',
-      };
   editorStore.commitStepConfigEdit(s.id, {
-    config: {...s.config, maxIterations: localMaxIterations.value, exitCondition},
+    config: {
+      ...s.config,
+      maxIterations: localMaxIterations.value,
+      exitCondition: exitCondition ?? s.config.exitCondition,
+    },
   }, 'Update loop');
+}
+
+function onLoopExitUpdate(exit: LoopExitCondition) {
+  commitLoopGroup(exit);
 }
 
 </script>

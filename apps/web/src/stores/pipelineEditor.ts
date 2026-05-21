@@ -6,6 +6,8 @@ import {
   extractStepsToCapsule,
   extractFullPipelineToCapsule,
   computeCapsuleContentSignature,
+  inferLoopExitCondition,
+  wireRetryFeedbackOnFirstModelCall,
 } from '@lorca/pipeline';
 import type {CapsuleExtractionResult} from '@lorca/pipeline';
 import type {CapsuleDefinition} from '@lorca/core';
@@ -132,6 +134,7 @@ const MAX_UNDO = 30;
 export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   const pipeline = ref<PipelineDefinition>(makeEmptyPipeline('default', 'New Pipeline'));
   const selectedStepId = ref<string | null>(null);
+  const selectedLoopInnerStepId = ref<string | null>(null);
   const selectionAnchorId = ref<string | null>(null);
   const undoStack = ref<UndoEntry[]>([]);
   const redoStack = ref<UndoEntry[]>([]);
@@ -519,6 +522,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
       finishPendingStepEdit();
       selectedStepId.value = null;
       selectionAnchorId.value = null;
+      selectedLoopInnerStepId.value = null;
       return;
     }
     if (options?.extendRange && selectionAnchorId.value) {
@@ -527,6 +531,14 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
       selectionAnchorId.value = stepId;
       selectedStepId.value = stepId;
     }
+    selectedLoopInnerStepId.value = null;
+  }
+
+  function selectLoopInnerStep(loopStepId: string, innerStepId: string) {
+    if (loopStepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
+    selectionAnchorId.value = loopStepId;
+    selectedStepId.value = loopStepId;
+    selectedLoopInnerStepId.value = innerStepId;
   }
 
   function getSelectionRange(): {startIndex: number; endIndex: number} | null {
@@ -569,6 +581,56 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     if (!result.ok) return {ok: false, message: result.error.message};
     applyCapsuleExtraction(result.value, `Extract "${capsuleName}"`);
     return {ok: true, capsule: result.value.capsule};
+  }
+
+  function wrapSelectionInRetryLoop(
+    loopLabel?: string,
+  ): {ok: true; loopStepId: string} | {ok: false; message: string} {
+    const range = getSelectionRange();
+    if (!range) {
+      return {ok: false, message: 'Select two or more steps. Shift+click another step to define a range.'};
+    }
+    const count = range.endIndex - range.startIndex + 1;
+    if (count < 2) {
+      return {ok: false, message: 'Select at least two steps: refine step(s) first, verification step last.'};
+    }
+
+    const selected = pipeline.value.steps.slice(range.startIndex, range.endIndex + 1);
+    if (selected.some((s) => s.config.type === 'loop-group')) {
+      return {ok: false, message: 'Cannot wrap a loop group inside another loop.'};
+    }
+
+    const innerSteps = wireRetryFeedbackOnFirstModelCall(
+      selected.map((s) => JSON.parse(JSON.stringify(toRaw(s))) as PipelineStep),
+    );
+    const lastStep = innerSteps.at(-1)!;
+    const exitCondition = inferLoopExitCondition(lastStep);
+    const loopStep = buildDefaultStep('loop-group', getExistingNamespaces(), {
+      label: loopLabel ?? `Retry: ${lastStep.label}`,
+      config: {
+        type: 'loop-group',
+        maxIterations: 3,
+        exitCondition,
+        steps: innerSteps,
+        outputNames: ['text'],
+      },
+    });
+
+    const before = snapshot();
+    pipeline.value = {
+      ...pipeline.value,
+      steps: [
+        ...pipeline.value.steps.slice(0, range.startIndex),
+        loopStep,
+        ...pipeline.value.steps.slice(range.endIndex + 1),
+      ],
+      updatedAt: new Date().toISOString(),
+    };
+    selectedStepId.value = loopStep.id;
+    selectionAnchorId.value = loopStep.id;
+    selectedLoopInnerStepId.value = innerSteps[0]?.id ?? null;
+    recordUndo(`Wrap retry loop "${loopStep.label}"`, before);
+    return {ok: true, loopStepId: loopStep.id};
   }
 
   function convertPipelineToCapsule(
@@ -623,12 +685,14 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   return {
     pipeline,
     selectedStepId,
+    selectedLoopInnerStepId,
     selectionAnchorId,
     steps,
     selectedStep,
     getSelectionRange,
     applyCapsuleExtraction,
     extractSelectionToCapsule,
+    wrapSelectionInRetryLoop,
     convertPipelineToCapsule,
     contextStepsForLoopInner,
     mutateLoopInnerSteps,
@@ -661,6 +725,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     updateUserPrompt,
     commitUserPrompt,
     selectStep,
+    selectLoopInnerStep,
     updatePipelineName,
     undo,
     redo,

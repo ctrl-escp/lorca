@@ -31,6 +31,7 @@
             <ul>
               <li>Filter models by <strong>usage bucket</strong> to match task type (extract-json, summarize, etc.).</li>
               <li>Drag the <strong>⠿</strong> handle to reorder steps; drag suggestions onto insert zones.</li>
+              <li>Wrap refine + verify steps in a <strong>retry loop</strong> (⋯ More → Wrap in retry loop, or use Step Suggestions).</li>
               <li>Stale badges mean upstream inputs changed since the last run.</li>
               <li>Save reusable flows as <strong>Capsules</strong> and insert them as capsule-instance steps.</li>
             </ul>

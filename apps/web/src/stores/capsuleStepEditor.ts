@@ -29,6 +29,7 @@ function applyGraphSync(capsule: CapsuleDefinition): CapsuleDefinition {
 export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => {
   const capsule = ref<CapsuleDefinition | null>(null);
   const selectedStepId = ref<string | null>(null);
+  const selectedLoopInnerStepId = ref<string | null>(null);
   const undoStack = ref<UndoEntry[]>([]);
   const redoStack = ref<UndoEntry[]>([]);
   let pendingStepEdit: {stepId: string; before: CapsuleEditorSnapshot} | null = null;
@@ -263,6 +264,13 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     if (stepId && stepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
     if (!stepId) finishPendingStepEdit();
     selectedStepId.value = stepId;
+    selectedLoopInnerStepId.value = null;
+  }
+
+  function selectLoopInnerStep(loopStepId: string, innerStepId: string) {
+    if (loopStepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
+    selectedStepId.value = loopStepId;
+    selectedLoopInnerStepId.value = innerStepId;
   }
 
   function updateCapsuleName(name: string) {
@@ -391,6 +399,8 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     updateUserPrompt,
     commitUserPrompt,
     selectStep,
+    selectLoopInnerStep,
+    selectedLoopInnerStepId,
     updateCapsuleName,
     contextStepsForLoopInner,
     mutateLoopInnerSteps,

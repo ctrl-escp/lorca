@@ -58,3 +58,11 @@ export type {
   HistoryReadIssue,
   HistoryReadValidation,
 } from './historyReads.js';
+export {
+  inferLoopExitCondition,
+  formatLoopExitSummary,
+  loopExitPresetLabel,
+  LOOP_EXIT_PRESETS,
+  wireRetryFeedback,
+  wireRetryFeedbackOnFirstModelCall,
+} from './loopHelpers.js';

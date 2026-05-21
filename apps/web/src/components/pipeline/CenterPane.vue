@@ -23,6 +23,7 @@
         <div class="more-menu-wrap" ref="moreMenuRef">
           <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
           <div v-if="moreMenuOpen" class="more-menu-dropdown">
+            <button class="more-menu-item" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
             <button class="more-menu-item" type="button" title="Save selected steps as a draft Capsule" @click="handleExtractSelection">Extract to Capsule</button>
             <button class="more-menu-item" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
             <button class="more-menu-item" type="button" @click="handleExport">Export</button>
@@ -67,6 +68,7 @@
     <ChainEditor
       :steps="editorStore.steps"
       :selected-step-id="editorStore.selectedStepId"
+      :selected-loop-inner-step-id="editorStore.selectedLoopInnerStepId"
       :trace="runStore.trace"
       :step-states="stepStates"
       :run-partial="runStore.partial"
@@ -81,7 +83,9 @@
       :run-snapshots="runStore.snapshots"
       :artifacts="runStore.artifacts"
       :accept-suggestion-drop="true"
+      :disabled-model-step-ids="stepsWithDisabledModel"
       @select="handleSelectStep"
+      @select-loop-inner="handleSelectLoopInner"
       @reorder="handleReorder"
       @drop-suggestion="handleDropSuggestion"
       @append="handleAppend"
@@ -150,6 +154,7 @@ import {usePipelinesStore} from '../../stores/pipelines.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
+import {useEndpointsStore} from '../../stores/endpoints.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
 import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
@@ -169,6 +174,7 @@ const uiStore = useUiStore();
 const importStore = useImportExportStore();
 const editorStore = usePipelineEditorStore();
 const modelsStore = useModelsStore();
+const endpointsStore = useEndpointsStore();
 const suggestionInsert = useSuggestionInsert();
 const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
@@ -184,6 +190,22 @@ const importModalOpen = ref(false);
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
 const hasStepOutputs = computed(() => Object.keys(runStore.artifacts).length > 0);
+
+const stepsWithDisabledModel = computed<Set<string>>(() => {
+  const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+  const disabledModelKeys = new Set(
+    modelsStore.models.filter((m) => m.enabled === false).map((m) => `${m.endpointId}::${m.providerModelName}`),
+  );
+  const result = new Set<string>();
+  for (const step of editorStore.steps) {
+    if (step.config.type !== 'model-call' || step.config.modelRef.kind !== 'fixed') continue;
+    const {endpointId, modelName} = step.config.modelRef;
+    if (disabledEpIds.has(endpointId) || disabledModelKeys.has(`${endpointId}::${modelName}`)) {
+      result.add(step.id);
+    }
+  }
+  return result;
+});
 
 // ── More menu ────────────────────────────────────────────────────────────────
 
@@ -318,6 +340,29 @@ const selectionRange = computed(() => {
 
 function handleSelectStep(stepId: string, extendRange?: boolean) {
   editorStore.selectStep(stepId, extendRange ? {extendRange: true} : undefined);
+}
+
+function handleSelectLoopInner(loopStepId: string, innerStepId: string) {
+  editorStore.selectLoopInnerStep(loopStepId, innerStepId);
+}
+
+function handleWrapInRetryLoop() {
+  moreMenuOpen.value = false;
+  const range = editorStore.getSelectionRange();
+  if (!range) {
+    inlineError.value = 'Select steps to wrap. Shift+click to select a range ending with a verification step.';
+    return;
+  }
+  const stepCount = range.endIndex - range.startIndex + 1;
+  const result = editorStore.wrapSelectionInRetryLoop(
+    stepCount === 2 ? `Retry: ${editorStore.steps[range.endIndex]?.label ?? 'loop'}` : undefined,
+  );
+  if (!result.ok) {
+    inlineError.value = result.message;
+    return;
+  }
+  inlineError.value = null;
+  uiStore.setRightPaneTab('inspector');
 }
 
 async function handleExtractSelection() {
@@ -457,7 +502,7 @@ function handleToggleEnabled(stepId: string) {
 }
 
 function handleUpdateStepComment(stepId: string, comment: string) {
-  editorStore.updateStepConfig(stepId, {description: comment || undefined});
+  editorStore.updateStepConfig(stepId, {description: comment});
 }
 
 async function handleRun() {

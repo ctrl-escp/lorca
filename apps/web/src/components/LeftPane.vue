@@ -184,15 +184,24 @@
             v-for="model in filteredModels"
             :key="model.id"
             class="model-row"
-            :class="{assignable: canAssignModelToStep}"
-            :title="canAssignModelToStep ? `Assign ${model.displayName} to selected step` : model.displayName"
-            @click="onModelClick(model)"
+            :class="{assignable: canAssignModelToStep && model.enabled !== false, disabled: model.enabled === false}"
+            :title="model.enabled === false ? `${model.displayName} (disabled)` : canAssignModelToStep ? `Assign ${model.displayName} to selected step` : model.displayName"
+            @click="model.enabled !== false && onModelClick(model)"
           >
             <div class="model-row-header">
               <span class="model-name">{{ model.displayName }}</span>
-              <span class="model-source" :class="`source-${model.source}`">{{ model.source }}</span>
+              <div class="model-row-badges">
+                <span class="model-badge-disabled" v-if="model.enabled === false">disabled</span>
+                <span class="model-source" :class="`source-${model.source}`">{{ model.source }}</span>
+              </div>
             </div>
             <ModelBucketEditor :model="model" @update="onUpdateBuckets(model.id, $event)" @click.stop />
+            <button
+              class="btn-toggle-model"
+              :class="model.enabled === false ? 'btn-toggle-enable' : 'btn-toggle-disable'"
+              :title="model.enabled === false ? 'Enable this model for auto-assignment' : 'Disable this model (exclude from auto-assignment)'"
+              @click.stop="onToggleModel(model.id)"
+            >{{ model.enabled === false ? 'Enable' : 'Disable' }}</button>
           </div>
           <p v-if="modelsStore.models.length === 0" class="empty-hint">No models. Discover from an endpoint or add manually.</p>
           <p v-else-if="filteredModels.length === 0" class="empty-hint">No models match this filter.</p>
@@ -228,6 +237,7 @@
               @test="epActions.testAccess"
               @discover="epActions.discoverModels"
               @edit="editingEndpointId = ep.id"
+              @toggle="onToggleEndpoint"
               @remove="onRemoveEndpoint"
             />
           </template>
@@ -247,13 +257,24 @@
     @confirm="resolveReplaceConfirm(true)"
     @cancel="resolveReplaceConfirm(false)"
   />
+
+  <!-- Disable warning dialog -->
+  <ConfirmDialog
+    :open="disableWarnOpen"
+    title="Steps will be affected"
+    :message="disableWarnMessage"
+    confirm-label="Disable anyway"
+    :destructive="true"
+    @confirm="resolveDisableWarn(true)"
+    @cancel="resolveDisableWarn(false)"
+  />
 </template>
 
 <script setup lang="ts">
 import {ref, computed, onMounted} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
-import {BUILTIN_SUGGESTIONS} from '@lorca/capsules';
+import {ALL_SUGGESTIONS} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
@@ -314,6 +335,42 @@ function confirmSuggestionReplace(name: string): Promise<boolean> {
   });
 }
 
+// Disable warning dialog
+const disableWarnOpen = ref(false);
+const disableWarnMessage = ref('');
+let disableWarnResolve: ((v: boolean) => void) | null = null;
+
+function resolveDisableWarn(value: boolean) {
+  disableWarnOpen.value = false;
+  disableWarnResolve?.(value);
+  disableWarnResolve = null;
+}
+
+function confirmDisable(entityName: string, affectedLabels: string[]): Promise<boolean> {
+  const list = affectedLabels.map((l) => `• ${l}`).join('\n');
+  disableWarnMessage.value = `Disabling "${entityName}" affects ${affectedLabels.length} step(s) in the current pipeline:\n\n${list}\n\nThese steps will not execute while disabled.`;
+  return new Promise((resolve) => {
+    disableWarnResolve = resolve;
+    disableWarnOpen.value = true;
+  });
+}
+
+function stepsUsingEndpoint(endpointId: string) {
+  return pipelineEditorStore.steps.filter(
+    (s) => s.config.type === 'model-call' && s.config.modelRef.kind === 'fixed' && s.config.modelRef.endpointId === endpointId,
+  );
+}
+
+function stepsUsingModel(endpointId: string, modelName: string) {
+  return pipelineEditorStore.steps.filter(
+    (s) =>
+      s.config.type === 'model-call' &&
+      s.config.modelRef.kind === 'fixed' &&
+      s.config.modelRef.endpointId === endpointId &&
+      s.config.modelRef.modelName === modelName,
+  );
+}
+
 const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
   {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
   {type: 'prompt-wrapper', label: 'Prompt wrapper', description: 'Compose XML prompt blocks without calling a model'},
@@ -335,7 +392,7 @@ const filteredStepTypes = computed(() =>
 );
 
 const filteredSuggestions = computed(() =>
-  BUILTIN_SUGGESTIONS.filter((s) =>
+  ALL_SUGGESTIONS.filter((s) =>
     matchesQuery(suggestionQuery.value, `${s.name} ${s.description} ${s.category} ${s.id}`),
   ),
 );
@@ -402,6 +459,32 @@ async function onRemoveEndpoint(id: string) {
   await modelsStore.removeModelsForEndpoint(id);
 }
 
+async function onToggleEndpoint(id: string) {
+  const ep = endpointsStore.getEndpoint(id);
+  if (!ep) return;
+  if (ep.enabled) {
+    const affected = stepsUsingEndpoint(id);
+    if (affected.length > 0) {
+      const ok = await confirmDisable(ep.name, affected.map((s) => s.label));
+      if (!ok) return;
+    }
+  }
+  await endpointsStore.updateEndpoint(id, {enabled: !ep.enabled});
+}
+
+async function onToggleModel(id: string) {
+  const model = modelsStore.models.find((m) => m.id === id);
+  if (!model) return;
+  if (model.enabled !== false) {
+    const affected = stepsUsingModel(model.endpointId, model.providerModelName);
+    if (affected.length > 0) {
+      const ok = await confirmDisable(model.displayName, affected.map((s) => s.label));
+      if (!ok) return;
+    }
+  }
+  await modelsStore.toggleModel(id);
+}
+
 async function onAddModel(model: DiscoveredModel) {
   await modelsStore.addModel(model);
   showAddModel.value = false;
@@ -433,7 +516,9 @@ function onSuggestionDragEnd() {
 
 function onInsertStepType(type: StepType) {
   let step = editorStore.buildDefaultStep(type);
-  step = autoAssignModelToStep(step, modelsStore.models, type === 'model-call' ? 'general' : undefined);
+  const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+  const enabledModels = modelsStore.models.filter((m) => m.enabled !== false && !disabledEpIds.has(m.endpointId));
+  step = autoAssignModelToStep(step, enabledModels, type === 'model-call' ? 'general' : undefined);
   const anchorId = editorStore.selectedStepId;
   const id = anchorId
     ? editorStore.insertStepAfter(anchorId, step)
@@ -687,9 +772,24 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .empty-hint { font-size: 0.88rem; color: #555; margin: 0; }
 
 .model-row { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 7px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.model-row.disabled { opacity: 0.5; }
 .model-row-header { display: flex; justify-content: space-between; align-items: center; }
+.model-row-badges { display: flex; gap: 0.3rem; align-items: center; }
 .model-name { font-size: 0.95rem; font-weight: 500; }
+.model-badge-disabled { font-size: 0.68rem; padding: 1px 6px; border-radius: 3px; background: #2a2010; color: #b89a50; }
 .model-source { font-size: 0.75rem; padding: 2px 7px; border-radius: 4px; }
 .source-discovered { background: #1e2d1e; color: #6db86d; }
 .source-manual { background: #2d2a1e; color: #c8a85a; }
+.btn-toggle-model {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  background: none;
+}
+.btn-toggle-disable { border: 1px solid #333; color: #666; }
+.btn-toggle-disable:hover { color: #aaa; border-color: #555; }
+.btn-toggle-enable { border: 1px solid #1e4d37; color: #5ddb9e; }
+.btn-toggle-enable:hover { background: #1a2d22; }
 </style>

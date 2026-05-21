@@ -1,6 +1,13 @@
 <template>
   <div class="prompt-composition">
     <div class="pce-toolbar">
+      <button
+        v-if="loopGroupStepId"
+        type="button"
+        class="pce-retry-btn"
+        title="Wire loop.prev and instructions so this step improves on failed verification"
+        @click="addRetryFeedback"
+      >↺ Add retry feedback</button>
       <button type="button" class="pce-help-btn" title="Artifact references and prompt composition help" @click="showPromptHelp = true">? References</button>
     </div>
     <HelpDialog
@@ -243,6 +250,7 @@ import {
   validateHistoryRead,
   historyReadIssueLabel,
 } from '@lorca/pipeline';
+import {wireRetryFeedback} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import HelpDialog from '../help/HelpDialog.vue';
@@ -347,6 +355,16 @@ function commitBlocks(label: string) {
 
 function commitHistoryReads(label: string) {
   applyStepPatch({prompt: buildConfig()}, label);
+}
+
+function addRetryFeedback() {
+  const step = chainSteps.value.find((s) => s.id === props.stepId);
+  if (!step || (step.type !== 'model-call' && step.type !== 'prompt-wrapper')) return;
+  const wired = wireRetryFeedback(step);
+  if (!wired.prompt) return;
+  localHistoryReads.value = wired.prompt.historyReads.map((r) => ({...r}));
+  localBlocks.value = wired.prompt.blocks.map((b) => ({...b}));
+  applyStepPatch({prompt: wired.prompt}, 'Add retry feedback');
 }
 
 function toggleBlock(idx: number) {
@@ -469,8 +487,14 @@ const previewXml = computed(() => previewPromptXml(buildConfig()));
   display: flex; align-items: center; justify-content: space-between;
   border-top: 1px solid #1e1e1e; padding-top: 0.4rem;
 }
-.pce-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.35rem; }
+.pce-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; }
+.pce-retry-btn {
+  font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  background: #1a2430; border: 1px solid #3a5070; color: #8ab8d8;
+}
+.pce-retry-btn:hover { background: #243040; color: #a8d0f0; }
 .pce-help-btn {
+  margin-left: auto;
   font-size: 0.68rem; padding: 2px 8px; background: #1a2430; border: 1px solid #2a5070;
   color: #7ec8e3; border-radius: 3px; cursor: pointer;
 }

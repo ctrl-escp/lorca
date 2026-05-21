@@ -43,6 +43,7 @@
               selected: selectedStepId === step.id,
               'in-selection-range': isInSelectionRange(step.id),
               disabled: !step.enabled,
+              'model-disabled': props.disabledModelStepIds?.has(step.id),
               'drop-target-step': dragOverStepId === step.id && activeDragKind === 'step-reorder',
               dragging: draggingStepId === step.id,
               'output-expanded': Boolean(outputPreviewFor(step)) && !isStepOutputCollapsed(step.id),
@@ -72,6 +73,7 @@
                 <span class="step-type-badge" :class="`badge-${step.type}`">{{ stepTypeLabel(step.type) }}</span>
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
                 <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
+                <span v-if="props.disabledModelStepIds?.has(step.id)" class="step-badge step-badge-model-off" title="This step's model or endpoint is disabled">model off</span>
                 <div class="step-actions">
                   <button
                     v-if="step.enabled"
@@ -131,22 +133,58 @@
               </div>
 
               <div class="step-meta">
-                <span v-if="step.type === 'model-call' && step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed'" class="step-model">
-                  {{ step.config.modelRef.modelName || '— no model —' }}
+                <span v-if="step.type === 'model-call' && step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed'" class="step-meta-item">
+                  <span class="step-meta-label">Model</span>
+                  <span class="step-model">{{ step.config.modelRef.modelName || '— no model —' }}</span>
                 </span>
-                <span class="step-namespace">→ {{ step.outputNamespace }}.*</span>
-                <span v-if="historyReadCount(step) > 0" class="step-history-badge" :title="`${historyReadCount(step)} history read(s)`">
-                  ↩ {{ historyReadCount(step) }}
+                <span class="step-meta-item">
+                  <span class="step-meta-label">Outputs</span>
+                  <span class="step-namespace">{{ step.outputNamespace }}.*</span>
                 </span>
-                <span
-                  v-if="runStateFor(step.id)"
-                  class="step-run-badge"
-                  :class="`run-${runStateFor(step.id)}`"
-                  :title="runStateTitle(step.id)"
-                >
-                  {{ stepRunUiStateLabel(runStateFor(step.id)!) }}
+                <span v-if="historyReadCount(step) > 0" class="step-meta-item">
+                  <span class="step-meta-label">History reads</span>
+                  <span class="step-history-badge" :title="`${historyReadCount(step)} history read(s)`">{{ historyReadCount(step) }}</span>
+                </span>
+                <span v-if="runStateFor(step.id)" class="step-meta-item">
+                  <span class="step-meta-label">Result</span>
+                  <span
+                    class="step-run-badge"
+                    :class="`run-${runStateFor(step.id)}`"
+                    :title="runStateTitle(step.id)"
+                  >{{ stepRunUiStateLabel(runStateFor(step.id)!) }}</span>
                 </span>
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
+              </div>
+
+              <div v-if="step.config.type === 'loop-group'" class="loop-group-body">
+                <div class="loop-group-banner" :title="loopExitSummary(step)">
+                  <span class="loop-group-icon">↺</span>
+                  <span>Up to {{ step.config.maxIterations }}×</span>
+                  <span class="loop-group-dot">·</span>
+                  <span class="loop-group-exit">{{ loopExitSummary(step) }}</span>
+                </div>
+                <div v-if="step.config.steps.length === 0" class="loop-inner-empty">
+                  Empty loop — add inner steps in the Inspector
+                </div>
+                <ol v-else class="loop-inner-list">
+                  <li
+                    v-for="(inner, ii) in step.config.steps"
+                    :key="inner.id"
+                    class="loop-inner-item"
+                    :class="{
+                      'loop-inner-selected': selectedLoopInnerStepId === inner.id && selectedStepId === step.id,
+                      'loop-inner-last': ii === step.config.steps.length - 1,
+                    }"
+                    :title="ii === step.config.steps.length - 1 ? 'Last step — its JSON output controls loop exit' : 'Click to configure inner step'"
+                    @click.stop="$emit('select-loop-inner', step.id, inner.id)"
+                  >
+                    <span class="loop-inner-index">{{ ii + 1 }}</span>
+                    <span class="loop-inner-type">{{ stepTypeLabel(inner.type) }}</span>
+                    <span class="loop-inner-label">{{ inner.label }}</span>
+                    <span v-if="ii === step.config.steps.length - 1" class="loop-inner-exit-badge">exit check</span>
+                  </li>
+                </ol>
+                <p class="loop-prev-hint">On retry: <code>loop.prev.text</code> = previous iteration's verifier output</p>
               </div>
 
               <div v-if="step.description || isCommentExpanded(step.id)" class="step-comment-wrap">
@@ -187,8 +225,14 @@
               </div>
 
               <div v-if="traceFor(step.id)" class="step-trace">
-                <span :class="`status-${traceFor(step.id)!.status}`">{{ traceFor(step.id)!.status }}</span>
-                <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
+                <span class="step-meta-item">
+                  <span class="step-meta-label">Execution status</span>
+                  <span :class="`status-${traceFor(step.id)!.status}`">{{ traceFor(step.id)!.status }}</span>
+                </span>
+                <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-meta-item">
+                  <span class="step-meta-label">Duration</span>
+                  <span class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
+                </span>
               </div>
 
               <div v-if="outputPreviewFor(step)" class="step-output-preview-wrap">
@@ -295,7 +339,7 @@
 <script setup lang="ts">
 import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
 import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
-import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
+import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
   DND_STEP_ID,
@@ -386,6 +430,7 @@ const StepIcon = defineComponent({
 const props = defineProps<{
   steps: PipelineStep[];
   selectedStepId: string | null;
+  selectedLoopInnerStepId?: string | null;
   selectionRange?: {startIndex: number; endIndex: number; stepIds: string[]} | null;
   trace: PipelineTraceEvent[];
   stepStates?: Record<string, StepStaleState>;
@@ -400,6 +445,7 @@ const props = defineProps<{
   runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
   artifacts?: Record<string, PipelineArtifact>;
   acceptSuggestionDrop?: boolean;
+  disabledModelStepIds?: Set<string>;
 }>();
 
 const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() =>
@@ -408,6 +454,7 @@ const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() 
 
 const emit = defineEmits<{
   select: [stepId: string, extendRange?: boolean];
+  'select-loop-inner': [loopStepId: string, innerStepId: string];
   'insert-after': [anchorStepId: string];
   'insert-at': [index: number];
   reorder: [stepId: string, targetIndex: number];
@@ -564,6 +611,11 @@ const TYPE_LABELS: Record<StepType, string> = {
 
 function stepTypeLabel(type: StepType): string {
   return TYPE_LABELS[type] ?? type;
+}
+
+function loopExitSummary(step: PipelineStep): string {
+  if (step.config.type !== 'loop-group') return '';
+  return formatLoopExitSummary(step.config.exitCondition);
 }
 
 function historyReadCount(step: PipelineStep): number {
@@ -1149,13 +1201,17 @@ function runStateTitle(stepId: string): string {
 }
 .step-card:hover .step-actions, .chain-step.selected .step-actions { opacity: 1; }
 
-.step-meta { display: flex; gap: 0.55rem; font-size: clamp(0.9rem, 1.9cqh, 1.2rem); color: #555; flex-wrap: wrap; }
+.step-meta { display: flex; gap: 1.6rem; font-size: clamp(0.9rem, 1.9cqh, 1.2rem); color: #555; flex-wrap: wrap; align-items: center; }
+.step-meta-item { display: inline-flex; align-items: center; gap: 0.28rem; }
+.step-meta-label { font-size: clamp(0.6rem, 1.15cqh, 0.75rem); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #3a3a3a; flex-shrink: 0; }
 .step-model { color: #5a9fd4; }
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
 .step-badge { font-size: clamp(0.74rem, 1.45cqh, 1rem); padding: 1px 6px; border-radius: 2px; }
 .step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
+.step-badge-model-off { background: #2a2010; color: #c8a030; border: 1px solid #4a3a10; }
+.chain-step.model-disabled .step-card { border-left: 3px solid #7a6020; }
 
 .step-run-badge {
   border-radius: 2px; padding: 1px 6px; font-size: clamp(0.74rem, 1.45cqh, 1rem); text-transform: lowercase;
@@ -1443,4 +1499,74 @@ function runStateTitle(stepId: string): string {
 }
 .step-comment-textarea:focus { background: #0c0a00; border-top-color: #4a3d18; }
 .step-comment-textarea::placeholder { color: #4a4010; }
+
+/* Loop group inline visualization */
+.loop-group-body {
+  margin: 0.45rem 0 0.2rem;
+  padding: 0.55rem 0.65rem;
+  background: #101418;
+  border: 1px solid #2a3545;
+  border-left: 3px solid #5a7aa8;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.loop-group-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: clamp(0.72rem, 1.4cqh, 0.88rem);
+  color: #8ab0d8;
+}
+.loop-group-icon { font-size: 1rem; color: #7ec8e3; }
+.loop-group-dot { color: #444; }
+.loop-group-exit { color: #9ab8d0; font-family: monospace; font-size: 0.85em; }
+.loop-inner-empty { font-size: 0.78rem; color: #555; margin: 0; }
+.loop-inner-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.loop-inner-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: #0d1014;
+  border: 1px solid #222830;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: clamp(0.75rem, 1.45cqh, 0.92rem);
+}
+.loop-inner-item:hover { border-color: #3a5068; background: #121820; }
+.loop-inner-selected { border-color: #4a7090; background: #152030; }
+.loop-inner-index { color: #555; min-width: 1.1rem; font-family: monospace; }
+.loop-inner-type {
+  font-size: 0.62rem;
+  padding: 1px 5px;
+  background: #1a2430;
+  color: #7ec8e3;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.loop-inner-label { flex: 1; color: #ccc; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loop-inner-exit-badge {
+  font-size: 0.62rem;
+  padding: 1px 5px;
+  background: #1a2a1a;
+  color: #8ab88a;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.loop-prev-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #555;
+}
+.loop-prev-hint code { color: #6a8ab0; font-size: 0.65rem; }
 </style>

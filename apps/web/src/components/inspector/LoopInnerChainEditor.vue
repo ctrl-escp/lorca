@@ -14,8 +14,8 @@
         v-for="(inner, i) in innerSteps"
         :key="inner.id"
         class="loop-inner-row"
-        :class="{selected: selectedInnerStepId === inner.id}"
-        @click="selectedInnerStepId = inner.id"
+            :class="{selected: editorStore.selectedLoopInnerStepId === inner.id}"
+            @click="editorStore.selectLoopInnerStep(loopStepId, inner.id)"
       >
         <span class="loop-inner-index">{{ i + 1 }}</span>
         <span class="loop-inner-type">{{ typeLabel(inner.type) }}</span>
@@ -100,7 +100,12 @@ const editorStore = useActiveStepEditor();
 const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
 
-const selectedInnerStepId = ref<string | null>(null);
+const selectedInnerStepId = computed({
+  get: () => editorStore.selectedLoopInnerStepId,
+  set: (id: string | null) => {
+    if (id) editorStore.selectLoopInnerStep(props.loopStepId, id);
+  },
+});
 
 const selectedInnerStep = computed(() =>
   props.innerSteps.find((s) => s.id === selectedInnerStepId.value) ?? null,
@@ -134,11 +139,11 @@ watch(selectedInnerStep, (s) => {
 }, {immediate: true});
 
 watch(() => props.innerSteps, (steps) => {
-  if (selectedInnerStepId.value && !steps.some((s) => s.id === selectedInnerStepId.value)) {
-    selectedInnerStepId.value = steps.at(-1)?.id ?? null;
-  }
-  if (!selectedInnerStepId.value && steps.length > 0) {
-    selectedInnerStepId.value = steps[0]!.id;
+  const current = editorStore.selectedLoopInnerStepId;
+  if (current && !steps.some((s) => s.id === current)) {
+    editorStore.selectLoopInnerStep(props.loopStepId, steps.at(-1)?.id ?? steps[0]?.id ?? '');
+  } else if (!current && steps.length > 0 && editorStore.selectedStepId === props.loopStepId) {
+    editorStore.selectLoopInnerStep(props.loopStepId, steps[0]!.id);
   }
 }, {immediate: true});
 
@@ -156,7 +161,7 @@ function typeLabel(type: StepType): string {
 
 function addInner(type: StepType) {
   const id = editorStore.appendLoopInnerStep(props.loopStepId, type);
-  if (id) selectedInnerStepId.value = id;
+  if (id) editorStore.selectLoopInnerStep(props.loopStepId, id);
 }
 
 function modelsForEndpoint(endpointId: string) {

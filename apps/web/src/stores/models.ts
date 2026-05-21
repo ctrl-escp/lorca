@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia';
-import {ref, computed} from 'vue';
+import {ref, computed, toRaw} from 'vue';
 import type {DiscoveredModel, ModelUsageBucket} from '@lorca/core';
 import {getDb} from '@lorca/storage';
 
@@ -42,7 +42,7 @@ export const useModelsStore = defineStore('models', () => {
   async function setUserBuckets(modelId: string, buckets: ModelUsageBucket[]) {
     const model = models.value.find((entry) => entry.id === modelId);
     if (!model) return;
-    const updated = {...model, userBuckets: buckets};
+    const updated = {...toRaw(model), userBuckets: buckets};
     await getDb().models.put(updated);
     const idx = models.value.findIndex((entry) => entry.id === modelId);
     if (idx !== -1) models.value[idx] = updated;
@@ -53,5 +53,14 @@ export const useModelsStore = defineStore('models', () => {
     models.value = models.value.filter((m) => m.endpointId !== endpointId);
   }
 
-  return {models, modelsByEndpoint, load, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint};
+  async function toggleModel(id: string) {
+    const idx = models.value.findIndex((m) => m.id === id);
+    if (idx === -1) return;
+    const model = models.value[idx]!;
+    const updated = {...toRaw(model), enabled: model.enabled === false};
+    await getDb().models.put(updated);
+    models.value[idx] = updated;
+  }
+
+  return {models, modelsByEndpoint, load, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint, toggleModel};
 });

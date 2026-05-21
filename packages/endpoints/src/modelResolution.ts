@@ -38,7 +38,7 @@ export function pickModelRef(
   models: readonly DiscoveredModel[],
   preferredBucket?: ModelUsageBucket,
 ): ModelRef | null {
-  const available = models.filter((m) => m.endpointId);
+  const available = models.filter((m) => m.endpointId && m.enabled !== false);
   if (available.length === 0) return null;
 
   if (preferredBucket) {
@@ -74,5 +74,17 @@ export function autoAssignModelsToSteps(
   models: readonly DiscoveredModel[],
   preferredBucket?: ModelUsageBucket,
 ): PipelineStep[] {
-  return steps.map((s) => autoAssignModelToStep(s, models, preferredBucket));
+  return steps.map((s) => {
+    const assigned = autoAssignModelToStep(s, models, preferredBucket);
+    if (assigned.config.type === 'loop-group') {
+      return {
+        ...assigned,
+        config: {
+          ...assigned.config,
+          steps: autoAssignModelsToSteps(assigned.config.steps, models, preferredBucket),
+        },
+      };
+    }
+    return assigned;
+  });
 }

@@ -241,11 +241,11 @@ export function computeStepStaleStates(
 
 export function stepRunUiStateLabel(state: StepRunUiState): string {
   switch (state) {
-    case 'not-run': return 'Not run';
-    case 'current': return 'Current';
-    case 'stale': return 'Stale';
+    case 'not-run': return 'No result yet';
+    case 'current': return 'Up to date';
+    case 'stale': return 'Outdated';
     case 'failed-current': return 'Failed';
-    case 'failed-stale': return 'Failed (stale)';
+    case 'failed-stale': return 'Failed · outdated';
     case 'disabled': return 'Disabled';
     case 'skipped-partial': return 'Skipped';
     case 'blocked': return 'Blocked';
