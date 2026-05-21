@@ -24,9 +24,36 @@
           </div>
           <select v-model="localRemaps[ref.key]" :title="`Choose a local model to replace ${ref.modelName}`">
             <option value="">— select local model —</option>
-            <option v-for="m in models" :key="m.id" :value="`${m.endpointId}::${m.providerModelName}`">
-              {{ m.displayName }} ({{ endpointName(m.endpointId) }})
-            </option>
+            <template v-if="modelsForRemap(ref).relevant.length > 0">
+              <optgroup :label="suggestedGroupLabel(ref.suggestedBuckets)">
+                <option
+                  v-for="m in modelsForRemap(ref).relevant"
+                  :key="m.id"
+                  class="option-relevant"
+                  :value="`${m.endpointId}::${m.providerModelName}`"
+                >
+                  {{ modelOptionLabel(m) }}
+                </option>
+              </optgroup>
+              <optgroup v-if="modelsForRemap(ref).other.length > 0" label="Other models">
+                <option
+                  v-for="m in modelsForRemap(ref).other"
+                  :key="m.id"
+                  :value="`${m.endpointId}::${m.providerModelName}`"
+                >
+                  {{ modelOptionLabel(m) }}
+                </option>
+              </optgroup>
+            </template>
+            <template v-else>
+              <option
+                v-for="m in models"
+                :key="m.id"
+                :value="`${m.endpointId}::${m.providerModelName}`"
+              >
+                {{ modelOptionLabel(m) }}
+              </option>
+            </template>
           </select>
         </div>
       </div>
@@ -43,7 +70,8 @@
 
 <script setup lang="ts">
 import {computed, reactive, watch} from 'vue';
-import type {DiscoveredModel, AiEndpointConfig} from '@lorca/core';
+import type {DiscoveredModel, AiEndpointConfig, ModelUsageBucket} from '@lorca/core';
+import {partitionModelsByBuckets} from '@lorca/endpoints';
 import type {MissingModelReference, ModelRemap} from '../../stores/importExport.js';
 
 const props = defineProps<{
@@ -80,6 +108,19 @@ const canConfirm = computed(() =>
 
 function endpointName(id: string): string {
   return props.endpoints.find((e) => e.id === id)?.name ?? id;
+}
+
+function modelOptionLabel(m: DiscoveredModel): string {
+  return `${m.displayName} (${endpointName(m.endpointId)})`;
+}
+
+function modelsForRemap(ref: MissingModelReference) {
+  return partitionModelsByBuckets(props.models, ref.suggestedBuckets);
+}
+
+function suggestedGroupLabel(buckets: ModelUsageBucket[]): string {
+  if (buckets.length === 1) return `Suggested for this step (${buckets[0]})`;
+  return `Suggested for this step (${buckets.join(', ')})`;
 }
 
 function confirm() {
@@ -157,6 +198,10 @@ select {
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 0.82rem;
+}
+select option.option-relevant {
+  color: #7ec8e3;
+  background: #0d1e30;
 }
 .dialog-footer {
   display: flex;

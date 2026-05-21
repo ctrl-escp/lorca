@@ -288,6 +288,19 @@ describe('importExport', () => {
     if ('errors' in preview) throw new Error(preview.errors.join(', '));
     expect(preview.missingModels).toHaveLength(1);
     expect(preview.missingModels[0]?.endpointId).toBe('ep-old');
+    expect(preview.missingModels[0]?.suggestedBuckets).toEqual(['general']);
+  });
+
+  it('attaches usage buckets per step for import remap UI', () => {
+    const file = exportPipeline(makeRichPipeline());
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+    const preview = previewPipelineImport(parsed, localCtx);
+    if ('errors' in preview) throw new Error(preview.errors.join(', '));
+    const intent = preview.missingModels.find((m) => m.label.includes('Intent Extraction'));
+    const criteria = preview.missingModels.find((m) => m.label.includes('Acceptance Criteria'));
+    expect(intent?.suggestedBuckets).toEqual(['extract-json']);
+    expect(criteria?.suggestedBuckets).toEqual(['general']);
   });
 
   it('applies model remaps to imported pipeline', () => {

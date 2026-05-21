@@ -31,5 +31,6 @@ export {
   BUILTIN_SUGGESTIONS,
   instantiateSuggestion,
   getBuiltinSuggestion,
+  resolveModelCallSuggestedBuckets,
 } from './suggestions/index.js';
 export type {PipelineSuggestion, SuggestionCategory} from './suggestions/index.js';

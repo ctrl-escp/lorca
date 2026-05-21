@@ -1,5 +1,6 @@
 import type {
   CapsuleDefinition,
+  ModelUsageBucket,
   PipelineDefinition,
   PipelineStep,
   PipelineExportFile,
@@ -8,6 +9,7 @@ import type {
   ModelRef,
   StepOutputsExport,
 } from '@lorca/core';
+import {resolveModelCallSuggestedBuckets} from '@lorca/capsules';
 import {validatePipeline, ensureCapsuleStepChain} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
 
@@ -30,6 +32,8 @@ export interface MissingModelReference {
   endpointId: string;
   modelName: string;
   label: string;
+  /** Models matching any of these usage buckets are shown first in the import remap UI. */
+  suggestedBuckets: ModelUsageBucket[];
 }
 
 export interface MissingCapsuleReference {
@@ -143,13 +147,16 @@ export function previewPipelineImport(
   ctx: ImportContext,
 ): PipelineImportPreview | ImportParseError {
   const includedCapsules = file.includedCapsules ?? [];
-  const missingModels = findMissingModels(collectModelRefsFromSteps(file.pipeline.steps), ctx);
+  const missingModels = findMissingModels(
+    collectModelRefsFromSteps(file.pipeline.steps, includedCapsules),
+    ctx,
+  );
   const missingCapsules = findMissingCapsulesFromSteps(file.pipeline.steps, includedCapsules, ctx);
   return {
     ok: true,
     kind: 'pipeline',
     pipeline: deepClone(file.pipeline),
-    includedCapsules: includedCapsules.map((c) => deepClone(c)),
+    includedCapsules: deepClone(includedCapsules),
     missingModels,
     missingCapsules,
   };
@@ -161,7 +168,7 @@ export function previewCapsuleImport(
 ): CapsuleImportPreview | ImportParseError {
   const cap = file.capsule;
   const modelRefs = cap.steps
-    ? collectModelRefsFromSteps(cap.steps)
+    ? collectModelRefsFromSteps(cap.steps, [cap])
     : collectModelRefs(cap.nodes ?? []);
   return {
     ok: true,
@@ -288,7 +295,21 @@ export function collectPipelineCapsuleRefs(
   return result;
 }
 
-function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference[] {
+function capsuleSlotBuckets(
+  includedCapsules: readonly CapsuleDefinition[],
+  capsuleId: string,
+  capsuleVersion: string,
+  slotName: string,
+): ModelUsageBucket[] {
+  const cap = includedCapsules.find((c) => c.id === capsuleId && c.version === capsuleVersion);
+  const slot = cap?.interface.modelSlots.find((s) => s.name === slotName);
+  return slot?.suggestedBuckets?.length ? [...slot.suggestedBuckets] : ['general'];
+}
+
+function collectModelRefsFromSteps(
+  steps: PipelineStep[],
+  includedCapsules: readonly CapsuleDefinition[] = [],
+): MissingModelReference[] {
   const refs: MissingModelReference[] = [];
   const visit = (step: PipelineStep) => {
     if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
@@ -300,9 +321,11 @@ function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference
         endpointId,
         modelName,
         label: `Model call ${step.label || step.id}`,
+        suggestedBuckets: resolveModelCallSuggestedBuckets(step),
       });
     }
     if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+      const {capsuleId, capsuleVersion} = step.config;
       for (const [slotName, ref] of Object.entries(step.config.modelSlotBindings)) {
         if (ref.kind !== 'fixed') continue;
         if (!ref.endpointId && !ref.modelName) continue;
@@ -312,6 +335,9 @@ function collectModelRefsFromSteps(steps: PipelineStep[]): MissingModelReference
           endpointId: ref.endpointId,
           modelName: ref.modelName,
           label: `Capsule slot ${slotName} (${step.label || step.id})`,
+          suggestedBuckets: capsuleId && capsuleVersion
+            ? capsuleSlotBuckets(includedCapsules, capsuleId, capsuleVersion, slotName)
+            : ['general'],
         });
       }
     }
@@ -335,6 +361,7 @@ function collectModelRefs(nodes: PipelineNode[]): MissingModelReference[] {
         endpointId,
         modelName,
         label: `Model call ${node.title ?? node.id}`,
+        suggestedBuckets: ['general'],
       });
     }
     if (node.type === 'capsule-instance') {
@@ -346,6 +373,7 @@ function collectModelRefs(nodes: PipelineNode[]): MissingModelReference[] {
           endpointId: assignment.endpointId,
           modelName: assignment.modelName,
           label: `Capsule slot ${slotName} (${node.title ?? node.id})`,
+          suggestedBuckets: ['general'],
         });
       }
     }

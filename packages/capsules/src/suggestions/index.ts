@@ -47,3 +47,5 @@ export function instantiateSuggestion(
 export function getBuiltinSuggestion(id: string): PipelineSuggestion | undefined {
   return BUILTIN_SUGGESTIONS.find((s) => s.id === id);
 }
+
+export {resolveModelCallSuggestedBuckets} from './modelBuckets.js';

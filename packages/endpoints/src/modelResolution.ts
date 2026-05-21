@@ -8,6 +8,27 @@ export function modelMatchesBucket(model: DiscoveredModel, bucket: ModelUsageBuc
   return effectiveBuckets(model).includes(bucket);
 }
 
+export function modelMatchesAnyBucket(
+  model: DiscoveredModel,
+  buckets: readonly ModelUsageBucket[],
+): boolean {
+  return buckets.some((b) => modelMatchesBucket(model, b));
+}
+
+/** Relevant models (matching any bucket) first, then the rest; stable order within each group. */
+export function partitionModelsByBuckets(
+  models: readonly DiscoveredModel[],
+  buckets: readonly ModelUsageBucket[],
+): {relevant: DiscoveredModel[]; other: DiscoveredModel[]} {
+  const relevant: DiscoveredModel[] = [];
+  const other: DiscoveredModel[] = [];
+  for (const model of models) {
+    if (modelMatchesAnyBucket(model, buckets)) relevant.push(model);
+    else other.push(model);
+  }
+  return {relevant, other};
+}
+
 export function isModelRefConfigured(ref: ModelRef): boolean {
   return ref.kind === 'fixed' && Boolean(ref.endpointId && ref.modelName);
 }

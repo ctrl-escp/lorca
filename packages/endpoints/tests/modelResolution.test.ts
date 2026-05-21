@@ -1,7 +1,13 @@
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
 import type {DiscoveredModel, PipelineStep} from '@lorca/core';
-import {pickModelRef, autoAssignModelToStep, modelMatchesBucket} from '../src/modelResolution.js';
+import {
+  pickModelRef,
+  autoAssignModelToStep,
+  modelMatchesBucket,
+  modelMatchesAnyBucket,
+  partitionModelsByBuckets,
+} from '../src/modelResolution.js';
 
 const models: DiscoveredModel[] = [
   {
@@ -34,6 +40,13 @@ describe('modelResolution', () => {
       endpointId: 'ep-1',
       modelName: 'extract:latest',
     });
+  });
+
+  it('partitionModelsByBuckets puts matching models first', () => {
+    const {relevant, other} = partitionModelsByBuckets(models, ['extract-json']);
+    expect(relevant.map((m) => m.id)).toEqual(['m2']);
+    expect(other.map((m) => m.id)).toEqual(['m1']);
+    expect(modelMatchesAnyBucket(models[1]!, ['extract-json', 'verify'])).toBe(true);
   });
 
   it('autoAssignModelToStep fills empty model refs', () => {

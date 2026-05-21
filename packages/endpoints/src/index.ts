@@ -3,6 +3,8 @@ export {assignBuckets} from './buckets.js';
 export {
   effectiveBuckets,
   modelMatchesBucket,
+  modelMatchesAnyBucket,
+  partitionModelsByBuckets,
   isModelRefConfigured,
   pickModelRef,
   applyModelRefToStep,
