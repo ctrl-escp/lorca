@@ -197,6 +197,72 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     });
   }
 
+  async function runFromStep(def: PipelineDefinition, userPromptRaw: string, stepId: string) {
+    const endpointsStore = useEndpointsStore();
+    const capsulesStore = useCapsulesStore();
+
+    const prevSnapshots = {...snapshots.value};
+    const prevExecutedStepIds = [...executedStepIds.value];
+    const prevArtifacts = {...artifacts.value};
+    const prevFinalOutputKey = finalOutputKey.value;
+
+    status.value = 'running';
+    trace.value = [];
+    error.value = null;
+    rerunSingleStepId.value = null;
+    const controller = new AbortController();
+    abortController.value = controller;
+    runId.value = `run-${crypto.randomUUID().slice(0, 8)}`;
+
+    const result = await executeStepChain(
+      def,
+      userPromptRaw,
+      {
+        abortSignal: controller.signal,
+        startAtStepId: stepId,
+        seedArtifacts: prevArtifacts,
+      },
+      (endpointId) => endpointsStore.getEndpoint(endpointId),
+      {
+        onTraceEvent(event) { trace.value = [...trace.value, event]; },
+        onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
+      },
+      (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
+    );
+
+    abortController.value = null;
+
+    if (result.ok) {
+      snapshots.value = {...prevSnapshots, ...result.value.snapshots};
+      executedStepIds.value = [...new Set([...prevExecutedStepIds, ...result.value.executedStepIds])];
+      userPromptSignature.value = result.value.userPromptSignature;
+      finalOutputKey.value = result.value.finalOutputKey ?? prevFinalOutputKey;
+      partial.value = true;
+      status.value = 'completed';
+    } else {
+      snapshots.value = prevSnapshots;
+      executedStepIds.value = prevExecutedStepIds;
+      artifacts.value = prevArtifacts;
+      finalOutputKey.value = prevFinalOutputKey;
+      error.value = result.error;
+      status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
+    }
+
+    saveRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
+  }
+
   function restoreForPipeline(pipelineId: string) {
     const saved = loadRunState(pipelineId);
     if (!saved) return;
@@ -234,6 +300,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     cancel,
     run,
     runOnlyStep,
+    runFromStep,
     restoreForPipeline,
   };
 });

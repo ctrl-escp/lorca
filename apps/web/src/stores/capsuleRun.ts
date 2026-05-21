@@ -199,6 +199,80 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     });
   }
 
+  async function runFromStep(
+    def: CapsuleDefinition,
+    userPromptRaw: string,
+    inputValues: Record<string, unknown>,
+    paramValues: Record<string, unknown>,
+    slotAssignments: Record<string, {endpointId: string; modelName: string}>,
+    stepId: string,
+  ) {
+    const endpointsStore = useEndpointsStore();
+
+    const prevSnapshots = {...snapshots.value};
+    const prevExecutedStepIds = [...executedStepIds.value];
+    const prevArtifacts = {...artifacts.value};
+    const prevFinalOutputKey = finalOutputKey.value;
+
+    status.value = 'running';
+    trace.value = [];
+    error.value = null;
+    rerunSingleStepId.value = null;
+    const controller = new AbortController();
+    abortController.value = controller;
+    runId.value = `capsule-run-${crypto.randomUUID().slice(0, 8)}`;
+
+    const result = await executeCapsuleTestRun(
+      def,
+      {
+        userPromptRaw,
+        inputValues,
+        paramValues,
+        slotAssignments,
+        abortSignal: controller.signal,
+        startAtStepId: stepId,
+        seedArtifacts: prevArtifacts,
+      },
+      (endpointId) => endpointsStore.getEndpoint(endpointId),
+      {
+        onTraceEvent(event) { trace.value = [...trace.value, event]; },
+        onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
+      },
+    );
+
+    abortController.value = null;
+
+    if (result.ok) {
+      snapshots.value = {...prevSnapshots, ...result.value.snapshots};
+      executedStepIds.value = [...new Set([...prevExecutedStepIds, ...result.value.executedStepIds])];
+      userPromptSignature.value = result.value.userPromptSignature;
+      finalOutputKey.value = result.value.finalOutputKey ?? prevFinalOutputKey;
+      partial.value = true;
+      status.value = 'completed';
+    } else {
+      snapshots.value = prevSnapshots;
+      executedStepIds.value = prevExecutedStepIds;
+      artifacts.value = prevArtifacts;
+      finalOutputKey.value = prevFinalOutputKey;
+      error.value = result.error;
+      status.value = result.error.code === 'run_cancelled' ? 'cancelled' : 'failed';
+    }
+
+    saveCapsuleRunState(def.id, {
+      status: status.value as Exclude<typeof status.value, 'idle' | 'running'>,
+      runId: runId.value,
+      artifacts: artifacts.value,
+      trace: trace.value,
+      finalOutputKey: finalOutputKey.value,
+      error: error.value,
+      snapshots: snapshots.value,
+      userPromptSignature: userPromptSignature.value,
+      partial: partial.value,
+      executedStepIds: executedStepIds.value,
+      rerunSingleStepId: rerunSingleStepId.value,
+    });
+  }
+
   function restoreForCapsule(capsuleId: string) {
     const saved = loadCapsuleRunState(capsuleId);
     if (!saved) return;
@@ -235,6 +309,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     cancel,
     run,
     runOnlyStep,
+    runFromStep,
     restoreForCapsule,
   };
 });

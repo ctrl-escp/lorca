@@ -86,6 +86,16 @@
                   <button
                     v-if="step.enabled"
                     type="button"
+                    class="btn-run-from icon-btn"
+                    aria-label="Run from here"
+                    @click.stop="$emit('run-from', step.id)"
+                    title="Run from this step to the end (reuses previous outputs for earlier steps)"
+                  >
+                    <StepIcon name="play-from" />
+                  </button>
+                  <button
+                    v-if="step.enabled"
+                    type="button"
                     class="btn-run-only-step icon-btn"
                     aria-label="Re-run only this step"
                     @click.stop="$emit('run-only-step', step.id)"
@@ -312,6 +322,7 @@ const ICON_PATHS: Record<string, string[]> = {
   'eye-off': ['M3 3l18 18', 'M10.6 10.6a3 3 0 0 0 4.2 4.2', 'M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.2', 'M6.6 6.6C3.6 8.5 2 12 2 12s3.5 8 10 8c1.4 0 2.6-.3 3.8-.8'],
   trash: ['M3 6h18', 'M8 6V4h8v2', 'M6 6l1 14h10l1-14', 'M10 11v5', 'M14 11v5'],
   play: ['M7 5v14l12-7z'],
+  'play-from': ['M6 5v14', 'M10 5l10 7-10 7z'],
   refresh: ['M20 12a8 8 0 0 1-13.7 5.6', 'M4 12A8 8 0 0 1 17.7 6.4', 'M17 2v5h-5', 'M7 22v-5h5'],
 };
 
@@ -374,6 +385,7 @@ const emit = defineEmits<{
   delete: [stepId: string];
   append: [type: StepType];
   'run-up-to': [stepId: string];
+  'run-from': [stepId: string];
   'run-only-step': [stepId: string];
   undo: [];
   redo: [];
@@ -1203,6 +1215,13 @@ function runStateTitle(stepId: string): string {
   border-radius: 5px; cursor: pointer;
 }
 .btn-run-up-to:hover { background: #1e381e; color: #8dda8d; }
+.btn-run-from {
+  width: clamp(2.75rem, 5.4cqh, 3.35rem);
+  height: clamp(2.75rem, 5.4cqh, 3.35rem);
+  background: #2e1e0a; border: 1px solid #4d3810; color: #c89030;
+  border-radius: 5px; cursor: pointer;
+}
+.btn-run-from:hover { background: #3a2810; color: #e8b050; }
 .btn-run-only-step {
   width: clamp(2.75rem, 5.4cqh, 3.35rem);
   height: clamp(2.75rem, 5.4cqh, 3.35rem);

@@ -55,6 +55,7 @@
       @toggle-enabled="handleToggleEnabled"
       @delete="editor.deleteStep"
       @run-up-to="handleRunUpTo"
+      @run-from="handleRunFromStep"
       @run-only-step="handleRunOnlyStep"
       @undo="editor.undo"
       @redo="editor.redo"
@@ -262,6 +263,15 @@ async function handleTestRun() {
 async function handleRunUpTo(stepId: string) {
   editor.updateUserPrompt(testPrompt.value.trim());
   await runCapsule(stepId);
+}
+
+async function handleRunFromStep(stepId: string) {
+  editor.updateUserPrompt(testPrompt.value.trim());
+  const c = editor.getCapsule();
+  if (!c) return;
+  const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
+  uiStore.setRightPaneTab('trace');
+  await capsuleRunStore.runFromStep(c, testPrompt.value, inputValues, paramValues, slotAssignments, stepId);
 }
 
 async function handleRunOnlyStep(stepId: string) {
