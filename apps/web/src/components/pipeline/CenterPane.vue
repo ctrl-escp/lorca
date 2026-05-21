@@ -613,7 +613,7 @@ async function handlePipelineDelete(id: string) {
 </script>
 
 <style scoped>
-.center-pane { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.center-pane { display: flex; flex-direction: column; height: 100%; overflow: hidden; container-type: inline-size; }
 
 .center-toolbar {
   display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
@@ -625,7 +625,7 @@ async function handlePipelineDelete(id: string) {
 }
 .pipeline-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
 
-.run-controls { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+.run-controls { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; min-width: 0; }
 .btn { border-radius: 5px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; border: 1px solid #333; }
 .btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 .btn-run:hover:not(:disabled) { background: #254a62; }
@@ -677,5 +677,33 @@ async function handlePipelineDelete(id: string) {
 @media (max-width: 767px) {
   .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
   .run-controls { flex-wrap: wrap; }
+}
+
+@container (max-width: 620px) {
+  .center-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .run-controls {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding-inline: 10px;
+  }
+
+  .user-prompt-bar {
+    padding: 0.55rem 0.7rem;
+  }
+}
+
+@container (max-width: 430px) {
+  .prompt-label {
+    display: none;
+  }
 }
 </style>

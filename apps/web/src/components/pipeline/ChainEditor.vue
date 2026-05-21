@@ -867,6 +867,8 @@ function runStateTitle(stepId: string): string {
 .chain-editor {
   --chain-card-max-width: clamp(760px, 72vw, 1040px);
   --chain-card-target-height: clamp(10rem, calc(76vh / var(--chain-visible-step-count)), 50vh);
+  --step-action-size: 2.35rem;
+  --step-action-icon-size: 1.2rem;
 
   flex: 1;
   min-height: 0;
@@ -874,6 +876,7 @@ function runStateTitle(stepId: string): string {
   flex-direction: column;
   overflow: hidden;
   background: #0c0c0c;
+  container-type: inline-size;
 }
 
 .chain-viewport {
@@ -915,7 +918,7 @@ function runStateTitle(stepId: string): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 1.4rem;
+  padding: 0 clamp(0.55rem, 2cqw, 1.4rem);
 }
 
 .chain-scroll-spacer {
@@ -927,6 +930,7 @@ function runStateTitle(stepId: string): string {
 .chain-step {
   width: 100%;
   max-width: var(--chain-card-max-width);
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -937,6 +941,7 @@ function runStateTitle(stepId: string): string {
 
 .step-card {
   width: 100%;
+  min-width: 0;
   min-height: var(--chain-card-target-height);
   max-height: 50cqh;
   display: flex;
@@ -963,7 +968,7 @@ function runStateTitle(stepId: string): string {
   flex-direction: column;
   justify-content: flex-start;
   gap: clamp(0.45rem, 1.3cqh, 0.9rem);
-  padding: clamp(1.15rem, 2.6cqh, 2rem) clamp(1.1rem, 2vw, 1.6rem) clamp(1rem, 2cqh, 1.6rem) clamp(0.85rem, 1.5vw, 1.15rem);
+  padding: clamp(0.8rem, 2.2cqh, 1.6rem) clamp(0.7rem, 2cqw, 1.35rem) clamp(0.75rem, 1.8cqh, 1.35rem) clamp(0.6rem, 1.4cqw, 1rem);
 }
 .chain-step.output-expanded .step-card-content { overflow: hidden; }
 .chain-step:not(.selected) .step-card { opacity: 0.82; transform: scale(0.98); }
@@ -993,6 +998,7 @@ function runStateTitle(stepId: string): string {
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 .step-drag-handle {
   flex-shrink: 0;
@@ -1186,25 +1192,35 @@ function runStateTitle(stepId: string): string {
 .badge-capsule-instance { background: #2a1e3d; color: #9d6db8; }
 
 .step-title {
-  flex: 1; font-size: clamp(1.15rem, 2.8cqh, 1.75rem); font-weight: 650;
+  flex: 1 1 10rem; min-width: 0; font-size: clamp(1.05rem, 2.3cqh, 1.45rem); font-weight: 650;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .step-title.disabled { text-decoration: line-through; color: #555; }
 
 .step-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--step-action-size), var(--step-action-size)));
   gap: 0.35rem;
-  justify-content: flex-end;
+  justify-content: start;
   width: 100%;
+  min-width: 0;
   opacity: 0.55;
   transition: opacity 0.1s;
 }
 .step-card:hover .step-actions, .chain-step.selected .step-actions { opacity: 1; }
 
-.step-meta { display: flex; gap: 1.6rem; font-size: clamp(0.9rem, 1.9cqh, 1.2rem); color: #555; flex-wrap: wrap; align-items: center; }
-.step-meta-item { display: inline-flex; align-items: center; gap: 0.28rem; }
+.step-meta { display: flex; gap: 0.55rem 1.25rem; font-size: clamp(0.86rem, 1.7cqh, 1.05rem); color: #555; flex-wrap: wrap; align-items: center; }
+.step-meta-item { display: inline-flex; align-items: center; gap: 0.28rem; min-width: 0; max-width: 100%; }
 .step-meta-label { font-size: clamp(0.6rem, 1.15cqh, 0.75rem); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #3a3a3a; flex-shrink: 0; }
 .step-model { color: #5a9fd4; }
+.step-model,
+.step-namespace {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
@@ -1230,6 +1246,7 @@ function runStateTitle(stepId: string): string {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.45rem;
+  min-width: 0;
 }
 .step-source-label {
   font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
@@ -1265,6 +1282,7 @@ function runStateTitle(stepId: string): string {
 
 .step-output-preview-wrap {
   max-width: 100%;
+  min-width: 0;
   background: #0d0d0d;
   border-radius: 5px;
   border: 1px solid #242424;
@@ -1322,22 +1340,22 @@ function runStateTitle(stepId: string): string {
   padding: 0.65rem 0.75rem;
 }
 .btn-run-up-to {
-  width: clamp(2.75rem, 5.4cqh, 3.35rem);
-  height: clamp(2.75rem, 5.4cqh, 3.35rem);
+  width: var(--step-action-size);
+  height: var(--step-action-size);
   background: #1a2e1a; border: 1px solid #2a4d2a; color: #6db86d;
   border-radius: 5px; cursor: pointer;
 }
 .btn-run-up-to:hover { background: #1e381e; color: #8dda8d; }
 .btn-run-from {
-  width: clamp(2.75rem, 5.4cqh, 3.35rem);
-  height: clamp(2.75rem, 5.4cqh, 3.35rem);
+  width: var(--step-action-size);
+  height: var(--step-action-size);
   background: #2e1e0a; border: 1px solid #4d3810; color: #c89030;
   border-radius: 5px; cursor: pointer;
 }
 .btn-run-from:hover { background: #3a2810; color: #e8b050; }
 .btn-run-only-step {
-  width: clamp(2.75rem, 5.4cqh, 3.35rem);
-  height: clamp(2.75rem, 5.4cqh, 3.35rem);
+  width: var(--step-action-size);
+  height: var(--step-action-size);
   background: #1a1a2e; border: 1px solid #2a2a4d; color: #6d6db8;
   border-radius: 5px; cursor: pointer;
 }
@@ -1414,8 +1432,8 @@ function runStateTitle(stepId: string): string {
 .btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: #888; border-color: #333; }
 
 .icon-btn {
-  width: clamp(2.45rem, 5cqh, 3rem);
-  height: clamp(2.45rem, 5cqh, 3rem);
+  width: var(--step-action-size);
+  height: var(--step-action-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1430,8 +1448,8 @@ function runStateTitle(stepId: string): string {
 .icon-btn:disabled { opacity: 0.2; cursor: default; }
 .icon-btn.danger:hover:not(:disabled) { border-color: #5a3030; color: #e07070; background: #241616; }
 .step-action-icon {
-  width: clamp(1.35rem, 2.8cqh, 1.8rem);
-  height: clamp(1.35rem, 2.8cqh, 1.8rem);
+  width: var(--step-action-icon-size);
+  height: var(--step-action-icon-size);
   flex-shrink: 0;
 }
 
@@ -1569,4 +1587,109 @@ function runStateTitle(stepId: string): string {
   color: #555;
 }
 .loop-prev-hint code { color: #6a8ab0; font-size: 0.65rem; }
+
+@container (max-width: 620px) {
+  .chain-scroll {
+    padding-inline: 0.65rem;
+  }
+
+  .step-card,
+  .chain-step.output-expanded .step-card {
+    min-height: auto;
+    max-height: none;
+  }
+
+  .step-card-content {
+    --step-action-size: 2rem;
+    --step-action-icon-size: 1.05rem;
+
+    gap: 0.55rem;
+    padding: 0.8rem 0.7rem 0.85rem 0.6rem;
+  }
+
+  .step-drag-handle {
+    width: 1.45rem;
+  }
+
+  .step-card-header {
+    gap: 0.35rem;
+  }
+
+  .step-title {
+    flex-basis: 12rem;
+    font-size: 1.05rem;
+  }
+
+  .step-type-badge,
+  .step-badge,
+  .step-run-badge {
+    font-size: 0.68rem;
+  }
+
+  .step-actions {
+    gap: 0.25rem;
+  }
+
+  .step-meta,
+  .step-trace {
+    gap: 0.35rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .step-source-badge {
+    max-width: 100%;
+    font-size: 0.78rem;
+  }
+
+  .chain-add-bar {
+    padding-inline: 0.65rem;
+  }
+
+  .chain-add-bar-header {
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .undo-redo-controls {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .chain-add-bar-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  }
+}
+
+@container (max-width: 430px) {
+  .step-card-content {
+    --step-action-size: 1.9rem;
+    --step-action-icon-size: 1rem;
+
+    padding: 0.7rem 0.55rem 0.75rem;
+  }
+
+  .step-title {
+    flex-basis: 100%;
+  }
+
+  .step-meta,
+  .step-trace {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chain-output-ref {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .output-key {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 </style>
