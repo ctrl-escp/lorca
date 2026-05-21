@@ -9,7 +9,7 @@ import type {
 } from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
 import {executePipeline, executeStepChain} from '@lorca/pipeline';
-import type {ExecutorCallbacks, EndpointResolver, StepChainRunResult} from '@lorca/pipeline';
+import type {ExecutorCallbacks, EndpointResolver, ModelEndpointResolver, StepChainRunResult} from '@lorca/pipeline';
 import type {PipelineDefinition} from '@lorca/core';
 import {validateCapsule} from './validate.js';
 
@@ -31,12 +31,13 @@ export async function executeCapsuleTestRun(
   testInput: CapsuleTestInput,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<CapsuleTestRunResult, PipelineError>> {
   const validation = validateCapsule(def);
   if (!validation.ok) return validation;
 
   if (def.steps && def.steps.length > 0) {
-    return executeCapsuleStepChainTestRun(def, testInput, resolveEndpoint, callbacks);
+    return executeCapsuleStepChainTestRun(def, testInput, resolveEndpoint, callbacks, resolveEndpointForModel);
   }
 
   // Resolve slot model refs → fixed refs using provided slot assignments
@@ -82,7 +83,7 @@ export async function executeCapsuleTestRun(
     }
   }
 
-  const graphResult = await executePipeline(syntheticDef, ctx, resolveEndpoint, callbacks);
+  const graphResult = await executePipeline(syntheticDef, ctx, resolveEndpoint, callbacks, undefined, resolveEndpointForModel);
   if (!graphResult.ok) return graphResult;
   return {
     ok: true,
@@ -101,6 +102,7 @@ async function executeCapsuleStepChainTestRun(
   testInput: CapsuleTestInput,
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<CapsuleTestRunResult, PipelineError>> {
   const {raw, xml} = buildUserPromptArtifacts(testInput.userPromptRaw);
   const seedArtifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
@@ -138,6 +140,8 @@ async function executeCapsuleStepChainTestRun(
     },
     resolveEndpoint,
     callbacks,
+    undefined,
+    resolveEndpointForModel,
   );
 }
 

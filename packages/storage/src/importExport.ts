@@ -23,6 +23,7 @@ function deepClone<T>(value: T): T {
 export interface ImportContext {
   knownEndpointIds: ReadonlySet<string>;
   knownModelKeys: ReadonlySet<string>;
+  knownModelNames: ReadonlySet<string>;
   knownCapsuleKeys: ReadonlySet<string>;
 }
 
@@ -184,7 +185,7 @@ export function applyModelRemapsToNodes(
   remaps: Record<string, ModelRemap>,
 ): PipelineNode[] {
   return nodes.map((node) => {
-    if (node.type === 'model-call' && node.config.modelRef.kind === 'fixed') {
+    if (node.type === 'model-call' && node.config.modelRef.kind !== 'slot') {
       const remap = remaps[node.id];
       if (remap) {
         return {
@@ -220,7 +221,7 @@ export function applyModelRemapsToSteps(
   remaps: Record<string, ModelRemap>,
 ): PipelineStep[] {
   return steps.map((step) => {
-    if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
+    if (step.config.type === 'model-call' && step.config.modelRef.kind !== 'slot') {
       const remap = remaps[step.id];
       if (remap) {
         return {
@@ -312,8 +313,9 @@ function collectModelRefsFromSteps(
 ): MissingModelReference[] {
   const refs: MissingModelReference[] = [];
   const visit = (step: PipelineStep) => {
-    if (step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed') {
-      const {endpointId, modelName} = step.config.modelRef;
+    if (step.config.type === 'model-call' && step.config.modelRef.kind !== 'slot') {
+      const {modelName} = step.config.modelRef;
+      const endpointId = step.config.modelRef.kind === 'fixed' ? step.config.modelRef.endpointId : '';
       if (!endpointId && !modelName) return;
       refs.push({
         key: step.id,
@@ -327,12 +329,13 @@ function collectModelRefsFromSteps(
     if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
       const {capsuleId, capsuleVersion} = step.config;
       for (const [slotName, ref] of Object.entries(step.config.modelSlotBindings)) {
-        if (ref.kind !== 'fixed') continue;
-        if (!ref.endpointId && !ref.modelName) continue;
+        if (ref.kind === 'slot') continue;
+        const endpointId = ref.kind === 'fixed' ? ref.endpointId : '';
+        if (!endpointId && !ref.modelName) continue;
         refs.push({
           key: `${step.id}::${slotName}`,
           nodeId: step.id,
-          endpointId: ref.endpointId,
+          endpointId,
           modelName: ref.modelName,
           label: `Capsule slot ${slotName} (${step.label || step.id})`,
           suggestedBuckets: capsuleId && capsuleVersion
@@ -352,8 +355,9 @@ function collectModelRefsFromSteps(
 function collectModelRefs(nodes: PipelineNode[]): MissingModelReference[] {
   const refs: MissingModelReference[] = [];
   for (const node of nodes) {
-    if (node.type === 'model-call' && node.config.modelRef.kind === 'fixed') {
-      const {endpointId, modelName} = node.config.modelRef;
+    if (node.type === 'model-call' && node.config.modelRef.kind !== 'slot') {
+      const {modelName} = node.config.modelRef;
+      const endpointId = node.config.modelRef.kind === 'fixed' ? node.config.modelRef.endpointId : '';
       if (!endpointId && !modelName) continue;
       refs.push({
         key: node.id,
@@ -386,7 +390,8 @@ function findMissingModels(
   ctx: ImportContext,
 ): MissingModelReference[] {
   return refs.filter((ref) => {
-    if (!ref.endpointId || !ref.modelName) return false;
+    if (!ref.modelName) return false;
+    if (!ref.endpointId) return !ctx.knownModelNames.has(ref.modelName);
     if (!ctx.knownEndpointIds.has(ref.endpointId)) return true;
     return !ctx.knownModelKeys.has(modelLookupKey(ref.endpointId, ref.modelName));
   });

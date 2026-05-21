@@ -82,14 +82,14 @@ export function wireRetryFeedback(step: PipelineStep): PipelineStep {
   const historyReads = hasLoopPrev
     ? prompt.historyReads
     : [
-        ...prompt.historyReads,
-        {
-          sourceStepId: 'loop.prev',
-          sourceArtifactRef: LOOP_PREV_ARTIFACT_REF,
-          tagName: RETRY_FEEDBACK_TAG,
-          required: false,
-        },
-      ];
+      ...prompt.historyReads,
+      {
+        sourceStepId: 'loop.prev',
+        sourceArtifactRef: LOOP_PREV_ARTIFACT_REF,
+        tagName: RETRY_FEEDBACK_TAG,
+        required: false,
+      },
+    ];
 
   const hasFeedbackBlock = prompt.blocks.some((b) =>
     b.body.includes(RETRY_FEEDBACK_TAG) || b.body.includes('previous attempt'),

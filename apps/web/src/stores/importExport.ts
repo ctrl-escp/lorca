@@ -47,6 +47,7 @@ export const useImportExportStore = defineStore('importExport', () => {
     return {
       knownEndpointIds: new Set(endpoints.map((e) => e.id)),
       knownModelKeys: new Set(models.map((m) => `${m.endpointId}::${m.providerModelName}`)),
+      knownModelNames: new Set(models.map((m) => m.providerModelName)),
       knownCapsuleKeys: new Set(capsules.map((c) => `${c.id}::${c.version}`)),
     };
   }

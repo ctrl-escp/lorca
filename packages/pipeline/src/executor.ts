@@ -20,6 +20,7 @@ import {topologicalOrder} from './order.js';
 import {outputKey, resolveOutputRef} from './artifacts.js';
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
+export type ModelEndpointResolver = (modelName: string) => AiEndpointConfig | undefined;
 export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
 
 export interface ExecutorCallbacks {
@@ -82,6 +83,7 @@ export async function executePipeline(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<string, PipelineError>> {
   // Validate first
   const validation = validateLegacyPipeline(def);
@@ -111,7 +113,7 @@ export async function executePipeline(
     const startMs = Date.now();
     callbacks.onTraceEvent(traceStarted(ctx.runId, nodeId));
 
-    const result = await executeNode(node, ctx, resolveEndpoint, callbacks, resolveCapsule);
+    const result = await executeNode(node, ctx, resolveEndpoint, callbacks, resolveCapsule, resolveEndpointForModel);
 
     if (!result.ok) {
       callbacks.onTraceEvent(traceFailed(ctx.runId, nodeId, startMs, result.error));
@@ -150,6 +152,7 @@ async function executeNode(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   switch (node.type) {
     case 'input':
@@ -211,10 +214,10 @@ async function executeNode(
     }
 
     case 'model-call':
-      return executeModelCallNode(node, ctx, resolveEndpoint);
+      return executeModelCallNode(node, ctx, resolveEndpoint, resolveEndpointForModel);
 
     case 'capsule-instance':
-      return executeCapsuleInstance(node, ctx, resolveEndpoint, callbacks, resolveCapsule);
+      return executeCapsuleInstance(node, ctx, resolveEndpoint, callbacks, resolveCapsule, resolveEndpointForModel);
     default: {
       const _exhaustive: never = node;
       throw new Error(`Unknown node type: ${String(_exhaustive)}`);
@@ -226,6 +229,7 @@ async function executeModelCallNode(
   node: ModelCallNode,
   ctx: PipelineRunContext,
   resolveEndpoint: EndpointResolver,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   const {modelRef, mode, systemPrompt, inputArtifactRef, temperature, topP, maxTokens, expectedOutput} = node.config;
 
@@ -233,9 +237,14 @@ async function executeModelCallNode(
     return {ok: false, error: {code: 'invalid_capsule_interface', message: 'ModelRef kind \'slot\' is only valid inside a Capsule', nodeId: node.id}};
   }
 
-  const endpointConfig = resolveEndpoint(modelRef.endpointId);
+  const endpointConfig = modelRef.kind === 'any-enabled-endpoint'
+    ? resolveEndpointForModel?.(modelRef.modelName)
+    : resolveEndpoint(modelRef.endpointId);
   if (!endpointConfig) {
-    return {ok: false, error: {code: 'missing_endpoint', message: `Endpoint not found: ${modelRef.endpointId}`, nodeId: node.id}};
+    const message = modelRef.kind === 'any-enabled-endpoint'
+      ? `No enabled endpoint has model: ${modelRef.modelName}`
+      : `Endpoint not found: ${modelRef.endpointId}`;
+    return {ok: false, error: {code: 'missing_endpoint', message, nodeId: node.id}};
   }
 
   const inputArtifact = ctx.artifacts[inputArtifactRef];
@@ -255,7 +264,7 @@ async function executeModelCallNode(
 
   const request: ModelCallRequest = {
     mode,
-    endpointId: modelRef.endpointId,
+    endpointId: endpointConfig.id,
     modelName: modelRef.modelName,
     userContent,
     abortSignal: signal,
@@ -291,6 +300,7 @@ async function executeCapsuleInstance(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   if (!resolveCapsule) {
     return {ok: false, error: {code: 'missing_capsule', message: 'No capsule resolver provided', nodeId: node.id}};
@@ -307,7 +317,7 @@ async function executeCapsuleInstance(
   const resolvedNodes = resolveCapsuleSlots(capsule.nodes ?? [], modelSlotAssignments);
 
   if (node.config.loop?.enabled) {
-    return executeCapsuleInstanceLooped(node, capsule, resolvedNodes, ctx, resolveEndpoint, callbacks, resolveCapsule);
+    return executeCapsuleInstanceLooped(node, capsule, resolvedNodes, ctx, resolveEndpoint, callbacks, resolveCapsule, resolveEndpointForModel);
   }
 
   // Pre-seed internal artifacts from parent via inputBindings
@@ -366,7 +376,7 @@ async function executeCapsuleInstance(
     const startMs = Date.now();
     callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, status: 'started', timestamp: new Date().toISOString()});
 
-    const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule);
+    const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule, resolveEndpointForModel);
 
     if (!result.ok) {
       const nodeErr: PipelineError = {...result.error, capsuleInstanceId: node.id};
@@ -427,6 +437,7 @@ async function executeCapsuleInstanceLooped(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule: CapsuleResolver | undefined,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   const {inputBindings, outputBindings, parameterValues} = node.config;
   const loop = node.config.loop!;
@@ -488,7 +499,7 @@ async function executeCapsuleInstanceLooped(
       const startMs = Date.now();
       callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'started', timestamp: new Date().toISOString()});
 
-      const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule);
+      const result = await executeNode(n, internalCtx, resolveEndpoint, callbacks, resolveCapsule, resolveEndpointForModel);
       if (!result.ok) {
         const nodeErr: PipelineError = {...result.error, capsuleInstanceId: node.id};
         callbacks.onTraceEvent({runId: ctx.runId, nodeId, capsuleInstanceId: node.id, capsuleIteration: iteration, status: 'failed', timestamp: new Date().toISOString(), durationMs: Date.now() - startMs, error: nodeErr});

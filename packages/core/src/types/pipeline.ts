@@ -85,6 +85,7 @@ export interface PromptCompositionConfig {
 
 export type ModelRef =
   | { kind: 'fixed'; endpointId: string; modelName: string }
+  | { kind: 'any-enabled-endpoint'; modelName: string }
   | { kind: 'slot'; slotName: string };
 
 export interface ModelCallStepConfig {

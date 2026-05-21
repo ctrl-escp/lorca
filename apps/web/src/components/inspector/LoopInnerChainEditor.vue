@@ -67,6 +67,10 @@
                 >{{ m.displayName }}</option>
               </optgroup>
             </select>
+            <label class="checkbox-row" title="Run this model on the first enabled endpoint that has it">
+              <input type="checkbox" v-model="localUseAnyEndpoint" @change="commitModelCall" />
+              <span>Use this model on any enabled endpoint</span>
+            </label>
           </div>
         </template>
 
@@ -126,15 +130,19 @@ const hasPromptBlocks = computed(() => {
 const localTemplate = ref('');
 const localSourceRef = ref('');
 const localModelKey = ref('');
+const localUseAnyEndpoint = ref(false);
 
 watch(selectedInnerStep, (s) => {
   if (!s) return;
   if (s.config.type === 'presentation') localTemplate.value = s.config.text;
   if (s.config.type === 'json-extract') localSourceRef.value = s.config.sourceArtifactRef;
-  if (s.config.type === 'model-call' && s.config.modelRef.kind === 'fixed') {
-    localModelKey.value = `${s.config.modelRef.endpointId}::${s.config.modelRef.modelName}`;
-  } else {
-    localModelKey.value = '';
+  if (s.config.type === 'model-call') {
+    localUseAnyEndpoint.value = s.config.modelRef.kind === 'any-enabled-endpoint';
+    localModelKey.value = s.config.modelRef.kind === 'fixed'
+      ? `${s.config.modelRef.endpointId}::${s.config.modelRef.modelName}`
+      : s.config.modelRef.kind === 'any-enabled-endpoint'
+        ? modelKeyForName(s.config.modelRef.modelName)
+        : '';
   }
 }, {immediate: true});
 
@@ -168,6 +176,15 @@ function modelsForEndpoint(endpointId: string) {
   return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
 }
 
+function modelKeyForName(modelName: string): string {
+  const model = modelsStore.models.find((m) => m.providerModelName === modelName);
+  return model ? `${model.endpointId}::${model.providerModelName}` : '';
+}
+
+function modelNameFromKey(key: string): string {
+  return key ? key.split('::').slice(1).join('::') : '';
+}
+
 function commitTemplate() {
   const s = selectedInnerStep.value;
   if (!s || s.config.type !== 'presentation') return;
@@ -194,8 +211,11 @@ function commitModelCall() {
   const s = selectedInnerStep.value;
   if (!s || s.config.type !== 'model-call') return;
   const parts = localModelKey.value.split('::');
-  const modelRef = localModelKey.value
-    ? {kind: 'fixed' as const, endpointId: parts[0] ?? '', modelName: parts.slice(1).join('::')}
+  const modelName = modelNameFromKey(localModelKey.value);
+  const modelRef = modelName
+    ? localUseAnyEndpoint.value
+      ? {kind: 'any-enabled-endpoint' as const, modelName}
+      : {kind: 'fixed' as const, endpointId: parts[0] ?? '', modelName}
     : s.config.modelRef;
   editorStore.commitLoopInnerStepEdit(
     props.loopStepId,
@@ -257,6 +277,8 @@ function commitModelCall() {
 }
 .loop-inner-inspector-header { font-size: 0.8rem; font-weight: 500; color: #ccc; }
 .inspector-field { display: flex; flex-direction: column; gap: 0.2rem; }
+.checkbox-row { display: flex; align-items: center; gap: 0.4rem; color: #aaa; font-size: 0.72rem; }
+.checkbox-row input { width: auto; margin: 0; }
 .inspector-field input,
 .inspector-field select,
 .inspector-field textarea {

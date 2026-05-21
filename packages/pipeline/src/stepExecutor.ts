@@ -45,6 +45,7 @@ function stepOk(artifacts: PipelineArtifact[], traceExtras?: Partial<PipelineTra
 }
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
+export type ModelEndpointResolver = (modelName: string) => AiEndpointConfig | undefined;
 export type CapsuleResolver = (id: string, version: string) => CapsuleDefinition | undefined;
 
 export interface ExecutorCallbacks {
@@ -107,6 +108,7 @@ export async function executeStepChain(
   resolveEndpoint: EndpointResolver,
   callbacks: ExecutorCallbacks,
   resolveCapsule?: CapsuleResolver,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<StepChainRunResult, PipelineError>> {
   const plan = compileStepChainToExecutionPlan(pipeline, options);
   const userPromptSignature = computeUserPromptSignature(userPromptRaw);
@@ -189,6 +191,7 @@ export async function executeStepChain(
       resolveCapsule,
       pipeline,
       abortSignal,
+      resolveEndpointForModel,
     );
 
     if (!result.ok) {
@@ -271,6 +274,7 @@ export async function executeStepInternal(
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
   abortSignal?: AbortSignal,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
   const inputArtifactNames = compiledStep.inputArtifactRefs;
@@ -301,17 +305,17 @@ export async function executeStepInternal(
 
     case 'prompt-wrapper':
     case 'model-call': {
-      return executePromptStep(step, compiledStep, artifacts, resolveEndpoint, abortSignal);
+      return executePromptStep(step, compiledStep, artifacts, resolveEndpoint, abortSignal, resolveEndpointForModel);
     }
 
     case 'capsule-instance': {
-      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline);
+      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
       if (!capResult.ok) return capResult;
       return stepOk(capResult.value, {inputArtifactNames});
     }
 
     case 'loop-group': {
-      const loopResult = await executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal);
+      const loopResult = await executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal, resolveEndpointForModel);
       if (!loopResult.ok) return loopResult;
       return stepOk(loopResult.value, {inputArtifactNames});
     }
@@ -331,6 +335,7 @@ async function executeLoopGroupStep(
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
   abortSignal?: AbortSignal,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   if (step.config.type !== 'loop-group') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeLoopGroupStep called on non-loop step', nodeId: step.id}};
@@ -393,6 +398,7 @@ async function executeLoopGroupStep(
         resolveCapsule,
         pipeline,
         abortSignal,
+        resolveEndpointForModel,
       );
 
       if (!result.ok) {
@@ -434,6 +440,7 @@ async function executePromptStep(
   artifacts: Record<string, PipelineArtifact>,
   resolveEndpoint: EndpointResolver,
   abortSignal?: AbortSignal,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
 
@@ -492,9 +499,14 @@ async function executePromptStep(
     return {ok: false, error: {code: 'invalid_capsule_interface', message: "ModelRef kind 'slot' is only valid inside a Capsule", nodeId: step.id}};
   }
 
-  const endpointConfig = resolveEndpoint(config.modelRef.endpointId);
+  const endpointConfig = config.modelRef.kind === 'any-enabled-endpoint'
+    ? resolveEndpointForModel?.(config.modelRef.modelName)
+    : resolveEndpoint(config.modelRef.endpointId);
   if (!endpointConfig) {
-    return {ok: false, error: {code: 'missing_endpoint', message: `Endpoint not found: ${config.modelRef.endpointId}`, nodeId: step.id}};
+    const message = config.modelRef.kind === 'any-enabled-endpoint'
+      ? `No enabled endpoint has model: ${config.modelRef.modelName}`
+      : `Endpoint not found: ${config.modelRef.endpointId}`;
+    return {ok: false, error: {code: 'missing_endpoint', message, nodeId: step.id}};
   }
 
   const timeoutSignal = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
@@ -504,7 +516,7 @@ async function executePromptStep(
 
   const request: ModelCallRequest = {
     mode: config.mode,
-    endpointId: config.modelRef.endpointId,
+    endpointId: endpointConfig.id,
     modelName: config.modelRef.modelName,
     prompt: renderedPrompt,
     abortSignal: combinedSignal,
@@ -537,6 +549,7 @@ async function executeCapsuleStep(
   resolveEndpoint: EndpointResolver,
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeCapsuleStep called on non-capsule step', nodeId: step.id}};
@@ -553,13 +566,19 @@ async function executeCapsuleStep(
   }
 
   if (capsule.steps && capsule.steps.length > 0) {
-    return executeCapsuleStepChain(step, capsule, artifacts, resolveEndpoint, resolveCapsule, pipeline);
+    return executeCapsuleStepChain(step, capsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
   }
 
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
   for (const [slotName, ref] of Object.entries(modelSlotBindings ?? {})) {
     if (ref.kind === 'fixed') {
       modelSlotAssignments[slotName] = {endpointId: ref.endpointId, modelName: ref.modelName};
+    } else if (ref.kind === 'any-enabled-endpoint') {
+      const endpoint = resolveEndpointForModel?.(ref.modelName);
+      if (!endpoint) {
+        return {ok: false, error: {code: 'missing_endpoint', message: `No enabled endpoint has model: ${ref.modelName}`, nodeId: step.id}};
+      }
+      modelSlotAssignments[slotName] = {endpointId: endpoint.id, modelName: ref.modelName};
     }
   }
 
@@ -613,7 +632,7 @@ async function executeCapsuleStep(
     updatedAt: capsule.updatedAt,
   };
 
-  const result = await executePipeline(legacyDef, ctx, resolveEndpoint, collectedCallbacks, resolveCapsule);
+  const result = await executePipeline(legacyDef, ctx, resolveEndpoint, collectedCallbacks, resolveCapsule, resolveEndpointForModel);
   if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
 
   return {ok: true, value: produced};
@@ -626,6 +645,7 @@ async function executeCapsuleStepChain(
   resolveEndpoint: EndpointResolver,
   resolveCapsule: CapsuleResolver | undefined,
   parentPipeline: PipelineDefinition,
+  resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Not a capsule step', nodeId: step.id}};
@@ -688,6 +708,7 @@ async function executeCapsuleStepChain(
     resolveEndpoint,
     innerCallbacks,
     resolveCapsule,
+    resolveEndpointForModel,
   );
   if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
 
@@ -730,12 +751,12 @@ function applyCapsuleModelSlotBindings(
   return steps.map((s) => {
     if (s.config.type !== 'model-call' || s.config.modelRef.kind !== 'slot') return s;
     const bound = bindings[s.config.modelRef.slotName];
-    if (!bound || bound.kind !== 'fixed') return s;
+    if (!bound || (bound.kind !== 'fixed' && bound.kind !== 'any-enabled-endpoint')) return s;
     return {
       ...s,
       config: {
         ...s.config,
-        modelRef: {kind: 'fixed', endpointId: bound.endpointId, modelName: bound.modelName},
+        modelRef: bound,
       },
     };
   });

@@ -133,9 +133,9 @@
               </div>
 
               <div class="step-meta">
-                <span v-if="step.type === 'model-call' && step.config.type === 'model-call' && step.config.modelRef.kind === 'fixed'" class="step-meta-item">
+                <span v-if="step.type === 'model-call' && step.config.type === 'model-call' && step.config.modelRef.kind !== 'slot'" class="step-meta-item">
                   <span class="step-meta-label">Model</span>
-                  <span class="step-model">{{ step.config.modelRef.modelName || '— no model —' }}</span>
+                  <span class="step-model">{{ step.config.modelRef.modelName || '— no model —' }}{{ step.config.modelRef.kind === 'any-enabled-endpoint' ? ' (any enabled endpoint)' : '' }}</span>
                 </span>
                 <span class="step-meta-item">
                   <span class="step-meta-label">Outputs</span>
@@ -710,7 +710,9 @@ function sourceLabelForArtifactRef(artifactRef: string): string {
 function stepHasModelError(step: PipelineStep): boolean {
   if (step.type !== 'model-call' || step.config.type !== 'model-call') return false;
   const modelRef = step.config.modelRef;
-  return modelRef.kind === 'fixed' && (!modelRef.endpointId || !modelRef.modelName);
+  if (modelRef.kind === 'fixed') return !modelRef.endpointId || !modelRef.modelName;
+  if (modelRef.kind === 'any-enabled-endpoint') return !modelRef.modelName;
+  return false;
 }
 
 function runStateFor(stepId: string) {

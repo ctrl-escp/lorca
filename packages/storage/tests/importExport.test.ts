@@ -219,6 +219,7 @@ function makeCapsule(): CapsuleDefinition {
 const localCtx = {
   knownEndpointIds: new Set(['ep-local']),
   knownModelKeys: new Set(['ep-local::llama3:latest']),
+  knownModelNames: new Set(['llama3:latest']),
   knownCapsuleKeys: new Set(['cap-1::v1']),
 };
 

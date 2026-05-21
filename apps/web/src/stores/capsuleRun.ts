@@ -4,6 +4,7 @@ import type {CapsuleDefinition, PipelineArtifact, PipelineTraceEvent, PipelineEr
 import type {RunSnapshotContext} from '@lorca/pipeline';
 import {executeCapsuleTestRun} from '@lorca/capsules';
 import {useEndpointsStore} from './endpoints.js';
+import {useModelsStore} from './models.js';
 import {saveCapsuleRunState, loadCapsuleRunState} from '../utils/runPersistence.js';
 
 export type RunStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -58,6 +59,18 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     status.value = 'cancelled';
   }
 
+  function resolveEndpointForModel(modelName: string) {
+    const endpointsStore = useEndpointsStore();
+    const modelsStore = useModelsStore();
+    const disabledEndpointIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+    const model = modelsStore.models.find((m) =>
+      m.providerModelName === modelName &&
+      m.enabled !== false &&
+      !disabledEndpointIds.has(m.endpointId),
+    );
+    return model ? endpointsStore.getEndpoint(model.endpointId) : undefined;
+  }
+
   async function run(
     def: CapsuleDefinition,
     userPromptRaw: string,
@@ -92,6 +105,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
           artifacts.value = {...artifacts.value, [artifact.name]: artifact};
         },
       },
+      resolveEndpointForModel,
     );
 
     abortController.value = null;
@@ -163,6 +177,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
         onTraceEvent(event) { trace.value = [...trace.value, event]; },
         onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
+      resolveEndpointForModel,
     );
 
     abortController.value = null;
@@ -238,6 +253,7 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
         onTraceEvent(event) { trace.value = [...trace.value, event]; },
         onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
+      resolveEndpointForModel,
     );
 
     abortController.value = null;

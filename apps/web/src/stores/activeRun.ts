@@ -4,6 +4,7 @@ import type {PipelineDefinition, PipelineArtifact, PipelineTraceEvent, PipelineE
 import {executeStepChain} from '@lorca/pipeline';
 import type {RunSnapshotContext} from '@lorca/pipeline';
 import {useEndpointsStore} from './endpoints.js';
+import {useModelsStore} from './models.js';
 import {useCapsulesStore} from './capsules.js';
 import {saveRunState, loadRunState} from '../utils/runPersistence.js';
 
@@ -60,6 +61,18 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     status.value = 'cancelled';
   }
 
+  function resolveEndpointForModel(modelName: string) {
+    const endpointsStore = useEndpointsStore();
+    const modelsStore = useModelsStore();
+    const disabledEndpointIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+    const model = modelsStore.models.find((m) =>
+      m.providerModelName === modelName &&
+      m.enabled !== false &&
+      !disabledEndpointIds.has(m.endpointId),
+    );
+    return model ? endpointsStore.getEndpoint(model.endpointId) : undefined;
+  }
+
   async function run(
     def: PipelineDefinition,
     userPromptRaw: string,
@@ -92,6 +105,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
         onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
       (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
+      resolveEndpointForModel,
     );
 
     abortController.value = null;
@@ -157,6 +171,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
         onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
       (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
+      resolveEndpointForModel,
     );
 
     abortController.value = null;
@@ -228,6 +243,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
         onArtifact(artifact) { artifacts.value = {...artifacts.value, [artifact.name]: artifact}; },
       },
       (capsuleId, version) => capsulesStore.getCapsule(capsuleId, version),
+      resolveEndpointForModel,
     );
 
     abortController.value = null;

@@ -14,7 +14,7 @@ export {
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
 export {executeStepChain} from './stepExecutor.js';
-export type {StepChainRunResult} from './stepExecutor.js';
+export type {ModelEndpointResolver, StepChainRunResult} from './stepExecutor.js';
 export {
   computeUserPromptSignature,
   computeStepConfigSignature,

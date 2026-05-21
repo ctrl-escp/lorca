@@ -198,15 +198,26 @@ const stepsWithDisabledModel = computed<Set<string>>(() => {
   );
   const result = new Set<string>();
   for (const step of editorStore.steps) {
-    if (step.config.type !== 'model-call' || step.config.modelRef.kind !== 'fixed') continue;
-    const {endpointId, modelName} = step.config.modelRef;
-    if (disabledEpIds.has(endpointId) || disabledModelKeys.has(`${endpointId}::${modelName}`)) {
-      result.add(step.id);
+    if (step.config.type !== 'model-call') continue;
+    const {modelRef} = step.config;
+    if (modelRef.kind === 'fixed') {
+      const {endpointId, modelName} = modelRef;
+      if (disabledEpIds.has(endpointId) || disabledModelKeys.has(`${endpointId}::${modelName}`)) {
+        result.add(step.id);
+      }
+    } else if (modelRef.kind === 'any-enabled-endpoint') {
+      const hasEnabledMatch = modelsStore.models.some((m) =>
+        m.providerModelName === modelRef.modelName &&
+        m.enabled !== false &&
+        !disabledEpIds.has(m.endpointId),
+      );
+      if (!hasEnabledMatch) {
+        result.add(step.id);
+      }
     }
   }
   return result;
 });
-
 // ── More menu ────────────────────────────────────────────────────────────────
 
 const moreMenuOpen = ref(false);

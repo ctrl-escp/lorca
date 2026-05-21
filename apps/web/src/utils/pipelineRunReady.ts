@@ -4,6 +4,9 @@ export function isModelRefConfigured(ref: ModelRef): boolean {
   if (ref.kind === 'fixed') {
     return Boolean(ref.endpointId.trim() && ref.modelName.trim());
   }
+  if (ref.kind === 'any-enabled-endpoint') {
+    return Boolean(ref.modelName.trim());
+  }
   return Boolean(ref.slotName.trim());
 }
 

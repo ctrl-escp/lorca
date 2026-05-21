@@ -30,7 +30,9 @@ export function partitionModelsByBuckets(
 }
 
 export function isModelRefConfigured(ref: ModelRef): boolean {
-  return ref.kind === 'fixed' && Boolean(ref.endpointId && ref.modelName);
+  if (ref.kind === 'fixed') return Boolean(ref.endpointId && ref.modelName);
+  if (ref.kind === 'any-enabled-endpoint') return Boolean(ref.modelName);
+  return false;
 }
 
 /** Pick the first model matching preferredBucket, else the first available model. */

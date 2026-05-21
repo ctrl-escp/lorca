@@ -53,6 +53,10 @@
                   </option>
                 </optgroup>
               </select>
+              <label class="checkbox-row" title="Run this model on the first enabled endpoint that has it">
+                <input type="checkbox" v-model="localUseAnyEndpoint" @change="commitModelCall" />
+                <span>Use this model on any enabled endpoint</span>
+              </label>
             </div>
             <div class="inspector-field">
               <FieldLabel label="Mode" title="Generate: single prompt → single response. Chat: system + user message roles." />
@@ -326,6 +330,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const localLabel = ref('');
 const localModelKey = ref('');
+const localUseAnyEndpoint = ref(false);
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
 const localMaxTokens = ref('');
@@ -339,9 +344,12 @@ watch(step, (s) => {
   const cfg = s.config;
 
   if (cfg.type === 'model-call') {
+    localUseAnyEndpoint.value = cfg.modelRef.kind === 'any-enabled-endpoint';
     localModelKey.value = cfg.modelRef.kind === 'fixed'
       ? `${cfg.modelRef.endpointId}::${cfg.modelRef.modelName}`
-      : '';
+      : cfg.modelRef.kind === 'any-enabled-endpoint'
+        ? modelKeyForName(cfg.modelRef.modelName)
+        : '';
     localMode.value = cfg.mode;
     localTemperature.value = cfg.temperature !== undefined ? String(cfg.temperature) : '';
     localMaxTokens.value = cfg.maxTokens !== undefined ? String(cfg.maxTokens) : '';
@@ -357,6 +365,15 @@ watch(step, (s) => {
 
 function modelsForEndpoint(endpointId: string) {
   return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
+}
+
+function modelKeyForName(modelName: string): string {
+  const model = modelsStore.models.find((m) => m.providerModelName === modelName);
+  return model ? `${model.endpointId}::${model.providerModelName}` : '';
+}
+
+function modelNameFromKey(key: string): string {
+  return key ? key.split('::').slice(1).join('::') : '';
 }
 
 function onLabelFocus() {
@@ -379,8 +396,11 @@ function commitModelCall() {
   const s = step.value;
   if (!s || s.config.type !== 'model-call') return;
   const parts = localModelKey.value.split('::');
-  const modelRef = localModelKey.value
-    ? {kind: 'fixed' as const, endpointId: parts[0] ?? '', modelName: parts.slice(1).join('::')}
+  const modelName = modelNameFromKey(localModelKey.value);
+  const modelRef = modelName
+    ? localUseAnyEndpoint.value
+      ? {kind: 'any-enabled-endpoint' as const, modelName}
+      : {kind: 'fixed' as const, endpointId: parts[0] ?? '', modelName}
     : s.config.modelRef;
   const patch: Partial<ModelCallStepConfig> = {modelRef, mode: localMode.value};
   const temp = parseFloat(localTemperature.value);
@@ -483,6 +503,8 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 }
 
 .inspector-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.checkbox-row { display: flex; align-items: center; gap: 0.45rem; color: #aaa; font-size: 0.78rem; }
+.checkbox-row input { width: auto; margin: 0; }
 
 input, select, textarea {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
