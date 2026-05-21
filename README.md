@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/web/public/lorca-pipeline-sigil.svg" alt="Lorca logo" width="72" height="72" />
+  <img src="apps/web/public/lorca-pipeline-sigil.svg" alt="Lorca logo" width="172" height="172" />
 </p>
 
 # Lorca
@@ -7,6 +7,8 @@
 **Local AI Orchestrator** — a browser-first workbench for designing, executing, and iterating on local AI pipelines.
 
 Lorca lets you register local model endpoints (for example [Ollama](https://ollama.com)), discover models, wrap prompts in structured tags, chain preprocessing and model calls, reuse flows as **Capsules**, and inspect every intermediate artifact from a single run. Execution, validation, and persistence run in the browser; there is no required backend.
+
+Try it now [online](https://ctrl-escp.github.io/lorca/) or clone and run it locally.
 
 ---
 
