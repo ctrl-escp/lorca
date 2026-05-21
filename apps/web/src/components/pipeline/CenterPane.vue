@@ -95,6 +95,7 @@
       @run-up-to="handleRunUpTo"
       @run-from="handleRunFromStep"
       @run-only-step="handleRunOnlyStep"
+      @update-step-comment="handleUpdateStepComment"
       @undo="editorStore.undo"
       @redo="editorStore.redo"
     />
@@ -453,6 +454,10 @@ function handleDuplicate(stepId: string) {
 function handleToggleEnabled(stepId: string) {
   const step = editorStore.steps.find((s) => s.id === stepId);
   if (step) editorStore.setStepEnabled(stepId, !step.enabled);
+}
+
+function handleUpdateStepComment(stepId: string, comment: string) {
+  editorStore.updateStepConfig(stepId, {description: comment || undefined});
 }
 
 async function handleRun() {

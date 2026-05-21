@@ -118,6 +118,15 @@
                   <button class="icon-btn danger" @click.stop="$emit('delete', step.id)" title="Delete step" aria-label="Delete step">
                     <StepIcon name="trash" />
                   </button>
+                  <button
+                    class="icon-btn"
+                    :class="{'comment-has-content': step.description}"
+                    @click.stop="toggleComment(step)"
+                    :title="step.description ? 'Edit comment' : 'Add comment'"
+                    :aria-label="step.description ? 'Edit comment' : 'Add comment'"
+                  >
+                    <StepIcon name="message-square" />
+                  </button>
                 </div>
               </div>
 
@@ -138,6 +147,30 @@
                   {{ stepRunUiStateLabel(runStateFor(step.id)!) }}
                 </span>
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
+              </div>
+
+              <div v-if="step.description || isCommentExpanded(step.id)" class="step-comment-wrap">
+                <button
+                  type="button"
+                  class="step-comment-header"
+                  :aria-expanded="isCommentExpanded(step.id)"
+                  @click.stop="toggleComment(step)"
+                >
+                  <span class="step-comment-toggle">{{ isCommentExpanded(step.id) ? '−' : '+' }}</span>
+                  <span v-if="!isCommentExpanded(step.id) && step.description" class="step-comment-preview">{{ step.description }}</span>
+                  <span v-else class="step-comment-label">Comment</span>
+                </button>
+                <textarea
+                  v-if="isCommentExpanded(step.id)"
+                  class="step-comment-textarea"
+                  :value="commentDrafts[step.id] ?? ''"
+                  placeholder="Add a comment…"
+                  rows="3"
+                  @input="commentDrafts[step.id] = ($event.target as HTMLTextAreaElement).value"
+                  @blur="onCommentBlur(step.id)"
+                  @click.stop
+                  @keydown.stop
+                />
               </div>
 
               <div v-if="sourceBadgesByStepId[step.id]?.length" class="step-source-badges" aria-label="Step data sources">
@@ -260,7 +293,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
+import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
 import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
 import {getStepHistoryReads, stepRunUiStateLabel} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
@@ -324,6 +357,7 @@ const ICON_PATHS: Record<string, string[]> = {
   play: ['M4 5l10 7-10 7z', 'M18 5v14'],
   'play-from': ['M6 5v14', 'M10 5l10 7-10 7z'],
   refresh: ['M20 12a8 8 0 0 1-13.7 5.6', 'M4 12A8 8 0 0 1 17.7 6.4', 'M17 2v5h-5', 'M7 22v-5h5'],
+  'message-square': ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
 };
 
 const StepIcon = defineComponent({
@@ -387,6 +421,7 @@ const emit = defineEmits<{
   'run-up-to': [stepId: string];
   'run-from': [stepId: string];
   'run-only-step': [stepId: string];
+  'update-step-comment': [stepId: string, comment: string];
   undo: [];
   redo: [];
 }>();
@@ -398,6 +433,8 @@ const dropTargetIndex = ref<number | null>(null);
 const activeDragKind = ref<DragKind | null>(null);
 const chainDndHover = ref(false);
 const expandedOutputStepIds = ref<Set<string>>(new Set());
+const expandedCommentStepIds = ref<Set<string>>(new Set());
+const commentDrafts = reactive<Record<string, string>>({});
 
 const isDndActive = computed(() =>
   chainDndHover.value
@@ -647,6 +684,26 @@ function toggleStepOutput(stepId: string) {
   if (next.has(stepId)) next.delete(stepId);
   else next.add(stepId);
   expandedOutputStepIds.value = next;
+}
+
+function isCommentExpanded(stepId: string): boolean {
+  return expandedCommentStepIds.value.has(stepId);
+}
+
+function toggleComment(step: PipelineStep) {
+  const next = new Set(expandedCommentStepIds.value);
+  if (next.has(step.id)) {
+    emit('update-step-comment', step.id, commentDrafts[step.id] ?? '');
+    next.delete(step.id);
+  } else {
+    commentDrafts[step.id] = step.description ?? '';
+    next.add(step.id);
+  }
+  expandedCommentStepIds.value = next;
+}
+
+function onCommentBlur(stepId: string) {
+  emit('update-step-comment', stepId, commentDrafts[stepId] ?? '');
 }
 
 function onStepDragStart(stepId: string, event: DragEvent) {
@@ -1321,4 +1378,69 @@ function runStateTitle(stepId: string): string {
   height: clamp(1.35rem, 2.8cqh, 1.8rem);
   flex-shrink: 0;
 }
+
+.icon-btn.comment-has-content { color: #b8960a; border-color: #3a3010; }
+.icon-btn.comment-has-content:hover:not(:disabled) { background: #201800; border-color: #5a4820; color: #e8c040; }
+
+.step-comment-wrap {
+  background: #0e0d08;
+  border: 1px solid #2a2510;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.step-comment-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.step-comment-header:hover { background: #141208; }
+.step-comment-toggle {
+  width: 1ch;
+  color: #6a5f20;
+  font-family: monospace;
+  font-size: clamp(0.86rem, 1.7cqh, 1.1rem);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.step-comment-label {
+  color: #6a5f20;
+  font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.step-comment-preview {
+  flex: 1;
+  color: #a89040;
+  font-size: clamp(0.82rem, 1.65cqh, 1.05rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-comment-header:hover .step-comment-label,
+.step-comment-header:hover .step-comment-toggle,
+.step-comment-header:hover .step-comment-preview { color: #d4b050; }
+.step-comment-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: #0a0900;
+  border: none;
+  border-top: 1px solid #2a2510;
+  color: #c8a840;
+  font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
+  font-family: inherit;
+  line-height: 1.5;
+  padding: 0.55rem 0.65rem;
+  resize: vertical;
+  outline: none;
+}
+.step-comment-textarea:focus { background: #0c0a00; border-top-color: #4a3d18; }
+.step-comment-textarea::placeholder { color: #4a4010; }
 </style>
