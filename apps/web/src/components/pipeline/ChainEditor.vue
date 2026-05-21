@@ -525,8 +525,8 @@ function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadg
   const badges: StepDataSourceBadge[] = [];
   const seenRefs = new Set<string>();
 
-  function addSource(ref: string, kind: StepDataSourceKind, detail: string) {
-    const cleaned = ref.trim();
+  function addSource(artifactRef: string, kind: StepDataSourceKind, detail: string) {
+    const cleaned = artifactRef.trim();
     if (!cleaned || seenRefs.has(cleaned)) return;
     seenRefs.add(cleaned);
     const source = sourceLabelForArtifactRef(cleaned);
@@ -551,14 +551,14 @@ function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadg
   }
 
   if (step.config.type === 'presentation') {
-    for (const ref of artifactRefsInTemplate(step.config.text)) {
-      addSource(ref, 'template', 'Template reference');
+    for (const templateRef of artifactRefsInTemplate(step.config.text)) {
+      addSource(templateRef, 'template', 'Template reference');
     }
   }
 
   if (step.config.type === 'capsule-instance') {
-    for (const [port, ref] of Object.entries(step.config.inputBindings)) {
-      addSource(ref, 'binding', `Capsule input "${port}"`);
+    for (const [port, bindingRef] of Object.entries(step.config.inputBindings)) {
+      addSource(bindingRef, 'binding', `Capsule input "${port}"`);
     }
   }
 
@@ -594,16 +594,16 @@ function artifactRefsInTemplate(text: string): string[] {
   return refs;
 }
 
-function sourceLabelForArtifactRef(ref: string): string {
-  if (ref.startsWith('user_prompt.')) return 'Pipeline Input';
+function sourceLabelForArtifactRef(artifactRef: string): string {
+  if (artifactRef.startsWith('user_prompt.')) return 'Pipeline Input';
   const step = props.steps.find((s) =>
-    ref === `${s.outputNamespace}.${s.primaryOutputName}`
-    || ref.startsWith(`${s.outputNamespace}.`)
-    || (s.config.type === 'capsule-instance' && Object.values(s.config.outputBindings).includes(ref)),
+    artifactRef === `${s.outputNamespace}.${s.primaryOutputName}`
+    || artifactRef.startsWith(`${s.outputNamespace}.`)
+    || (s.config.type === 'capsule-instance' && Object.values(s.config.outputBindings).includes(artifactRef)),
   );
   if (step) return step.label;
-  if (ref === PIPELINE_INPUT_STEP_ID) return 'Pipeline Input';
-  return ref;
+  if (artifactRef === PIPELINE_INPUT_STEP_ID) return 'Pipeline Input';
+  return artifactRef;
 }
 
 function stepHasModelError(step: PipelineStep): boolean {
