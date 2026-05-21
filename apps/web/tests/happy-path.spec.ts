@@ -157,6 +157,9 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   const previewBefore = page.locator('.pce-preview');
   await expect(previewBefore).toBeVisible();
   const xmlBefore = await previewBefore.textContent() ?? '';
+  expect(xmlBefore).toContain('model output #1');
+  expect(xmlBefore).toContain('model output #2');
+  expect(xmlBefore).not.toContain('…');
   const closePrev = xmlBefore.indexOf('</previous_output>');
   const tagAfterPrev = xmlBefore.indexOf('<', closePrev + 1);
   expect(closePrev).toBeGreaterThanOrEqual(0);

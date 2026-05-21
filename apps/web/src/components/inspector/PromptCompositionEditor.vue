@@ -240,7 +240,8 @@
 import {ref, computed, watch} from 'vue';
 import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig, PipelineStep} from '@lorca/core';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
-import {isValidTag, previewPromptXml} from '@lorca/prompt';
+import {buildUserPromptArtifacts, isValidTag, renderPromptComposition} from '@lorca/prompt';
+import type {ResolvedHistoryRead} from '@lorca/prompt';
 import {
   getPriorSourceSteps,
   listStepOutputArtifacts,
@@ -296,6 +297,10 @@ const promptArtifactRefs = computed(() => {
   }
   return [...new Set(refs)];
 });
+
+const currentUserPromptArtifacts = computed(() =>
+  buildUserPromptArtifacts(editorStore.pipeline.input.raw.trim()),
+);
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
   const c = cfg ?? EMPTY_CONFIG;
@@ -464,10 +469,7 @@ function historyReadStatusTitle(read: StepHistoryReadConfig) {
 }
 
 function previewForRead(read: StepHistoryReadConfig): string | null {
-  const artifact = runStore.artifacts[read.sourceArtifactRef];
-  if (!artifact) return null;
-  if (typeof artifact.value === 'string') return artifact.value;
-  return JSON.stringify(artifact.value, null, 2);
+  return artifactValue(read.sourceArtifactRef);
 }
 
 function truncatePreview(text: string, max = 120): string {
@@ -475,7 +477,35 @@ function truncatePreview(text: string, max = 120): string {
   return oneLine.length <= max ? oneLine : `${oneLine.slice(0, max)}…`;
 }
 
-const previewXml = computed(() => previewPromptXml(buildConfig()));
+function artifactValue(artifactRef: string): string | null {
+  if (artifactRef === 'user_prompt.raw') return currentUserPromptArtifacts.value.raw;
+  if (artifactRef === 'user_prompt.xml') return currentUserPromptArtifacts.value.xml;
+  const artifact = runStore.artifacts[artifactRef];
+  if (!artifact) return null;
+  if (typeof artifact.value === 'string') return artifact.value;
+  return JSON.stringify(artifact.value, null, 2);
+}
+
+function resolvedPreviousOutput(): string | undefined {
+  if (!localPrevEnabled.value) return undefined;
+  const currentIdx = chainSteps.value.findIndex((s) => s.id === props.stepId);
+  const priorSteps = currentIdx >= 0 ? chainSteps.value.slice(0, currentIdx) : chainSteps.value;
+  const prevStep = [...priorSteps].reverse().find((s) => s.enabled);
+  if (!prevStep) return currentUserPromptArtifacts.value.xml;
+  return artifactValue(`${prevStep.outputNamespace}.${prevStep.primaryOutputName}`) ?? undefined;
+}
+
+const resolvedHistoryReads = computed<ResolvedHistoryRead[]>(() =>
+  localHistoryReads.value.map((read) => {
+    const value = artifactValue(read.sourceArtifactRef);
+    if (value !== null) return {sourceArtifactRef: read.sourceArtifactRef, value};
+    return {sourceArtifactRef: read.sourceArtifactRef, omitted: !read.required};
+  }),
+);
+
+const previewXml = computed(() =>
+  renderPromptComposition(buildConfig(), resolvedPreviousOutput(), resolvedHistoryReads.value).xmlText,
+);
 </script>
 
 <style scoped>

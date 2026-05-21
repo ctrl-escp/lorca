@@ -61,6 +61,7 @@
         placeholder="Enter your prompt…"
         rows="2"
         @focus="editorStore.beginInputEdit()"
+        @input="onUserPromptInput(($event.target as HTMLTextAreaElement).value)"
         @blur="editorStore.commitUserPrompt(userPrompt)"
       />
     </div>
@@ -514,6 +515,11 @@ function handleToggleEnabled(stepId: string) {
 
 function handleUpdateStepComment(stepId: string, comment: string) {
   editorStore.updateStepConfig(stepId, {description: comment});
+}
+
+function onUserPromptInput(raw: string) {
+  userPrompt.value = raw;
+  editorStore.updateUserPromptDuringEdit(raw);
 }
 
 async function handleRun() {

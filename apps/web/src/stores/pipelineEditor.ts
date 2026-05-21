@@ -379,6 +379,14 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     persistPipeline();
   }
 
+  function updateUserPromptDuringEdit(raw: string) {
+    pipeline.value = {
+      ...pipeline.value,
+      input: {...pipeline.value.input, raw},
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   function commitUserPrompt(raw: string) {
     updateUserPrompt(raw);
     if (pendingInputEdit) {
@@ -722,6 +730,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     updateStepDuringEdit,
     commitStepEdit,
     beginInputEdit,
+    updateUserPromptDuringEdit,
     updateUserPrompt,
     commitUserPrompt,
     selectStep,
