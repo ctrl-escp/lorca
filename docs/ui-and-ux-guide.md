@@ -338,8 +338,8 @@ user_prompt
   → constraint_extraction
   → prompt_rewrite
   ┌─ retry loop ─────────────────────────┐
-  │  prompt_rewrite → drift_check      │  exit when drifted = false
-  └────────────────────────────────────┘
+  │  prompt_rewrite → drift_check        │  exit when drifted = false
+  └──────────────────────────────────────┘
   → candidate_answer
   ┌─ retry loop ───────────────────────────────┐
   │  candidate_answer → answer_verification    │  exit when passed = true
