@@ -154,6 +154,8 @@ export interface PipelineStep {
   enabled: boolean;
   collapsed?: boolean;
   createdFromSuggestionId?: string;
+  /** Template step ID this was cloned from; used for historyRead remapping on insertion. */
+  createdFromTemplateStepId?: string;
   outputNamespace: string;
   primaryOutputName: string;
   config: StepConfig;

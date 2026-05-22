@@ -66,7 +66,8 @@ export function useSuggestionInsert() {
     options?: {index?: number; confirmReplace?: () => Promise<boolean>},
   ): Promise<boolean> {
     const existingNamespaces = new Set(editorStore.steps.map((s) => s.outputNamespace));
-    const rawSteps = instantiateSuggestion(suggestion, existingNamespaces);
+    const existingSteps = mode === 'new' ? undefined : editorStore.steps;
+    const rawSteps = instantiateSuggestion(suggestion, existingNamespaces, existingSteps);
     const newSteps = prepareSteps(rawSteps, suggestion.preferredModelBucket);
 
     if (mode === 'new') {

@@ -19,6 +19,7 @@ function uniqueId(prefix: string): string {
 export function instantiateSuggestion(
   suggestion: PipelineSuggestion,
   existingNamespaces: ReadonlySet<string>,
+  existingSteps?: PipelineStep[],
 ): PipelineStep[] {
   const ns = new Set(existingNamespaces);
 
@@ -31,17 +32,21 @@ export function instantiateSuggestion(
     }
     ns.add(outputNamespace);
 
+    const templateStepId = step.id;
+
     const cloned: PipelineStep = {
       ...step,
       id: uniqueId(step.type),
       outputNamespace,
       createdFromSuggestionId: suggestion.id,
+      createdFromTemplateStepId: templateStepId,
       lastEditedAt: new Date().toISOString(),
     };
 
     if (step.prompt) {
       cloned.prompt = {
         ...step.prompt,
+        historyReads: step.prompt.historyReads.map((hr) => ({...hr})),
         blocks: step.prompt.blocks.map((b) => ({
           ...b,
           id: uniqueId('block'),
@@ -59,7 +64,35 @@ export function instantiateSuggestion(
     return cloned;
   }
 
-  return suggestion.insertableSteps.map(cloneOne);
+  const cloned = suggestion.insertableSteps.map(cloneOne);
+
+  // Remap historyRead sourceStepIds that reference template step IDs.
+  // Priority: intra-suggestion batch first, then existingSteps, then leave as-is.
+  function remapSteps(steps: PipelineStep[]): void {
+    for (const step of steps) {
+      if (step.prompt?.historyReads) {
+        for (const hr of step.prompt.historyReads) {
+          const templateId = hr.sourceStepId;
+          const intra = cloned.find((s) => s.createdFromTemplateStepId === templateId);
+          if (intra) {
+            hr.sourceStepId = intra.id;
+            continue;
+          }
+          const cross = existingSteps?.find((s) => s.createdFromTemplateStepId === templateId);
+          if (cross) {
+            hr.sourceStepId = cross.id;
+          }
+        }
+      }
+      if (step.config.type === 'loop-group') {
+        remapSteps(step.config.steps);
+      }
+    }
+  }
+
+  remapSteps(cloned);
+
+  return cloned;
 }
 
 export function getBuiltinSuggestion(id: string): PipelineSuggestion | undefined {
