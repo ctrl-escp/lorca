@@ -47,6 +47,7 @@
               'drop-target-step': dragOverStepId === step.id && activeDragKind === 'step-reorder',
               dragging: draggingStepId === step.id,
               'output-expanded': Boolean(outputPreviewFor(step)) && !isStepOutputCollapsed(step.id),
+              'partial-run-target': step.id === props.partialRunTargetStepId,
               [traceStatusClass(step.id)]: true,
             }"
             @click="onStepClick(step.id, $event)"
@@ -446,6 +447,7 @@ const props = defineProps<{
   artifacts?: Record<string, PipelineArtifact>;
   acceptSuggestionDrop?: boolean;
   disabledModelStepIds?: Set<string>;
+  partialRunTargetStepId?: string | null;
 }>();
 
 const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() =>
@@ -994,6 +996,19 @@ function runStateTitle(stepId: string): string {
 .trace-running .step-card, .trace-started .step-card { border-left: 3px solid #e8a020; }
 .trace-skipped .step-card { opacity: 0.4; }
 .trace-cancelled .step-card { border-left: 3px solid #666; }
+
+.chain-step.partial-run-target {
+  border-bottom: 2px solid var(--color-run-accent, #4a9eff);
+}
+.chain-step.partial-run-target .step-card::after {
+  content: '▲ partial run boundary';
+  font-size: 0.65rem;
+  color: var(--color-run-accent, #4a9eff);
+  display: block;
+  text-align: right;
+  padding: 0.25rem 0.5rem;
+  opacity: 0.8;
+}
 
 .step-card-header {
   display: flex;

@@ -24,6 +24,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
   const executedStepIds = ref<string[]>([]);
 
   const rerunSingleStepId = ref<string | null>(null);
+  const partialRunTargetStepId = ref<string | null>(null);
 
   const isRunning = computed(() => status.value === 'running');
   const canCancel = computed(() => isRunning.value);
@@ -54,6 +55,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     partial.value = false;
     executedStepIds.value = [];
     rerunSingleStepId.value = null;
+    partialRunTargetStepId.value = null;
   }
 
   function cancel() {
@@ -83,6 +85,8 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     const endpointsStore = useEndpointsStore();
     const capsulesStore = useCapsulesStore();
     reset();
+
+    partialRunTargetStepId.value = stopAtStepId ?? null;
 
     const id = `run-${crypto.randomUUID().slice(0, 8)}`;
     runId.value = id;
@@ -134,6 +138,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
       partial: partial.value,
       executedStepIds: executedStepIds.value,
       rerunSingleStepId: rerunSingleStepId.value,
+      partialRunTargetStepId: partialRunTargetStepId.value,
     });
   }
 
@@ -209,6 +214,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
       partial: partial.value,
       executedStepIds: executedStepIds.value,
       rerunSingleStepId: rerunSingleStepId.value,
+      partialRunTargetStepId: partialRunTargetStepId.value,
     });
   }
 
@@ -276,6 +282,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
       partial: partial.value,
       executedStepIds: executedStepIds.value,
       rerunSingleStepId: rerunSingleStepId.value,
+      partialRunTargetStepId: partialRunTargetStepId.value,
     });
   }
 
@@ -293,6 +300,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     partial.value = saved.partial;
     executedStepIds.value = saved.executedStepIds;
     rerunSingleStepId.value = saved.rerunSingleStepId;
+    partialRunTargetStepId.value = saved.partialRunTargetStepId ?? null;
     abortController.value = null;
   }
 
@@ -311,6 +319,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     partial,
     executedStepIds,
     rerunSingleStepId,
+    partialRunTargetStepId,
     runSnapshotContext,
     reset,
     cancel,

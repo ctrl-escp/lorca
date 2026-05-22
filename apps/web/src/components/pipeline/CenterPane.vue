@@ -85,6 +85,7 @@
       :artifacts="runStore.artifacts"
       :accept-suggestion-drop="true"
       :disabled-model-step-ids="stepsWithDisabledModel"
+      :partial-run-target-step-id="runStore.partialRunTargetStepId"
       @select="handleSelectStep"
       @select-loop-inner="handleSelectLoopInner"
       @reorder="handleReorder"

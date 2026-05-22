@@ -3,6 +3,7 @@ import type {RunStatus} from '../stores/activeRun.js';
 
 export interface PersistedRunState extends StepOutputsExport {
   status: Exclude<RunStatus, 'idle' | 'running'>;
+  partialRunTargetStepId?: string | null;
 }
 
 const RUN_KEY_PREFIX = 'lorca:run:';
