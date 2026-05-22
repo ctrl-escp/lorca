@@ -126,7 +126,7 @@ interface UndoEntry {
   after: PipelineEditorSnapshot;
 }
 
-/** Measured ~80–120KB per snapshot with long prompts; cap depth to limit memory. */
+/** Measured ~80-120KB per snapshot with long prompts; cap depth to limit memory. */
 const MAX_UNDO = 30;
 
 // ── Store ────────────────────────────────────────────────────────────────────

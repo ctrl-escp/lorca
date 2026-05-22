@@ -20,7 +20,7 @@
       </div>
       <template v-if="localLoopEnabled">
         <div class="ci-field">
-          <label title="How many times to run the Capsule (1–10)">Iterations (1–10)</label>
+          <label title="How many times to run the Capsule (1-10)">Iterations (1-10)</label>
           <input type="number" v-model.number="localLoopCount" min="1" max="10" title="Number of loop iterations" @change="emitConfig" />
         </div>
         <div class="ci-field">

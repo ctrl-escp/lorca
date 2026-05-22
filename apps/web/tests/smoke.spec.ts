@@ -182,7 +182,7 @@ test('smoke: execute pipeline and inspect trace', async ({page}) => {
   await expect(page.locator('.output-text')).toContainText('smoke test output', {timeout: 5000});
 });
 
-// Persistence: pipeline and capsule definitions survive reload (Phase 11 deliverable 8–9)
+// Persistence: pipeline and capsule definitions survive reload (Phase 11 deliverable 8-9)
 test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await page.getByPlaceholder('Pipeline name').fill('Persisted Pipeline');
   await page.getByPlaceholder('Pipeline name').blur();
