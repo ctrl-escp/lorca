@@ -9,7 +9,7 @@
 | N1 | ~~**Improve built-in step suggestion prompts**~~ ✅ | Shipped: semantic XML tag names, self-contained system prompts, pre-wired historyReads for cross-step context, and `createdFromTemplateStepId` remapping on insertion. |
 | N2 | ~~**Polish live prompt preview: truncation + full-prompt modal**~~ ✅ | Shipped: 400-char truncation + `«not yet run»` placeholders in embedded preview; "Full prompt" modal with copy button and unresolved-slots banner; `promptPreview.ts` utility extracted and tested; no-trim contract enforced end-to-end. |
 | N3 | ~~**"Run up to here" — visual boundary indicator**~~ ✅ | Shipped: `partialRunTargetStepId` in store (set on partial run, cleared on full execute, persisted); blue bottom-border + "▲ partial run boundary" label on the target step card. |
-| N4 | **Comment editing UX** — save/cancel + cursor fix | Commits silently on blur; wrong cursor. |
+| N4 | ~~**Comment editing UX** — save/cancel + cursor fix~~ ✅ | Shipped: explicit Save/Cancel controls, no silent blur commit, Cancel restores the saved description, and comment header/textarea cursors match their interaction. |
 | N5 | **JSON syntax highlighting + raw/pretty toggle** | Output areas render raw JSON strings. |
 
 ### 🟡 SOON
@@ -1653,7 +1653,7 @@ When checked, the step card gains a `JSON` badge alongside any existing source b
 NOW   N1  Improve suggestion prompts + semantic tags  ✅ done
       N2  Live preview polish + full-prompt modal      ✅ done
       N3  Run-to visual indicator                      ✅ done
-      N4  Comment save/cancel + cursor                 ChainEditor.vue
+      N4  Comment save/cancel + cursor                 ✅ done
       N5  JSON highlighting + raw/pretty toggle        new JsonViewer.vue, OutputPanel, TracePanel
 
 SOON  S1a AI prompt improver (undo-tracked)           new usePromptImprover.ts + PCE.vue

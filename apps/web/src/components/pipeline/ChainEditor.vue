@@ -206,10 +206,13 @@
                   placeholder="Add a comment…"
                   rows="3"
                   @input="commentDrafts[step.id] = ($event.target as HTMLTextAreaElement).value"
-                  @blur="onCommentBlur(step.id)"
                   @click.stop
                   @keydown.stop
                 />
+                <div v-if="isCommentExpanded(step.id)" class="step-comment-actions">
+                  <button class="btn btn-sm btn-primary" type="button" @click.stop="saveComment(step.id)">Save</button>
+                  <button class="btn btn-sm btn-ghost" type="button" @click.stop="cancelComment(step)">Cancel</button>
+                </div>
               </div>
 
               <div v-if="sourceBadgesByStepId[step.id]?.length" class="step-source-badges" aria-label="Step data sources">
@@ -749,7 +752,6 @@ function isCommentExpanded(stepId: string): boolean {
 function toggleComment(step: PipelineStep) {
   const next = new Set(expandedCommentStepIds.value);
   if (next.has(step.id)) {
-    emit('update-step-comment', step.id, commentDrafts[step.id] ?? '');
     next.delete(step.id);
   } else {
     commentDrafts[step.id] = step.description ?? '';
@@ -758,8 +760,18 @@ function toggleComment(step: PipelineStep) {
   expandedCommentStepIds.value = next;
 }
 
-function onCommentBlur(stepId: string) {
+function saveComment(stepId: string) {
   emit('update-step-comment', stepId, commentDrafts[stepId] ?? '');
+  const next = new Set(expandedCommentStepIds.value);
+  next.delete(stepId);
+  expandedCommentStepIds.value = next;
+}
+
+function cancelComment(step: PipelineStep) {
+  commentDrafts[step.id] = step.description ?? '';
+  const next = new Set(expandedCommentStepIds.value);
+  next.delete(step.id);
+  expandedCommentStepIds.value = next;
 }
 
 function onStepDragStart(stepId: string, event: DragEvent) {
@@ -1445,6 +1457,8 @@ function runStateTitle(stepId: string): string {
 .btn-accent:hover:not(:disabled) { background: #254a62; color: #a8dff5; }
 .btn-capsule { border-color: #2a3d52; color: #5a9fd4; }
 .btn-capsule:hover:not(:disabled) { background: #1a2a3a; }
+.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
+.btn-primary:hover:not(:disabled) { background: #254a62; color: #a8dff5; }
 .btn-ghost { background: none; border-color: transparent; color: #555; }
 .btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: #888; border-color: #333; }
 
@@ -1531,9 +1545,19 @@ function runStateTitle(stepId: string): string {
   padding: 0.55rem 0.65rem;
   resize: vertical;
   outline: none;
+  cursor: text;
 }
+.step-card-content .step-comment-textarea { cursor: text; }
 .step-comment-textarea:focus { background: #0c0a00; border-top-color: #4a3d18; }
 .step-comment-textarea::placeholder { color: #4a4010; }
+.step-comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  padding: 0.45rem 0.55rem 0.5rem;
+  border-top: 1px solid #2a2510;
+  background: #0b0a03;
+}
 
 /* Loop group inline visualization */
 .loop-group-body {
