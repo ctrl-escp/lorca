@@ -215,7 +215,11 @@
                 {{ formatTime(lastSnapshot.completedAt) }}
               </span>
             </div>
-            <pre v-if="lastSnapshot?.primaryOutputPreview" class="inspector-output-preview">{{ lastSnapshot.primaryOutputPreview }}</pre>
+            <JsonViewer
+              v-if="lastRunOutputValue !== null"
+              class="inspector-output-preview"
+              :value="lastRunOutputValue"
+            />
             <p v-else-if="stepStatus.state === 'not-run'" class="empty-hint">This step has not been executed yet.</p>
           </div>
           <p v-else class="empty-hint">No run data.</p>
@@ -252,7 +256,7 @@ import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
-import {FieldLabel} from '@lorca/ui-kit';
+import {FieldLabel, JsonViewer} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
@@ -283,6 +287,15 @@ const lastSnapshot = computed(() => {
   const s = step.value;
   if (!s) return null;
   return runStore.value.snapshots[s.id] ?? null;
+});
+
+const lastRunOutputValue = computed((): unknown | null => {
+  const s = step.value;
+  const snapshot = lastSnapshot.value;
+  if (!s || !snapshot?.primaryOutputPreview) return null;
+  const key = `${s.outputNamespace}.${s.primaryOutputName}`;
+  const artifact = runStore.value.artifacts[key];
+  return artifact ? artifact.value : snapshot.primaryOutputPreview;
 });
 
 const hasPromptBlocks = computed(() =>
@@ -490,16 +503,12 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .inspector-artifact-ref { color: #5a8a5a; font-size: 0.75rem; }
 .inspector-output-preview {
   margin: 0.4rem 0 0;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.78rem;
-  color: #999;
-  background: #0d0d0d;
-  border: 1px solid #1e1e1e;
-  border-radius: 5px;
-  white-space: pre-wrap;
-  word-break: break-word;
   max-height: 12rem;
   overflow-y: auto;
+}
+.inspector-output-preview :deep(.jv-raw),
+.inspector-output-preview :deep(.jv-pretty) {
+  font-size: 0.78rem;
 }
 
 .inspector-field { display: flex; flex-direction: column; gap: 0.25rem; }

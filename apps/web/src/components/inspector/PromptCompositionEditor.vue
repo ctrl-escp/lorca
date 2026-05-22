@@ -237,7 +237,7 @@
           {{ showPreview ? 'Hide' : 'Show' }}
         </button>
       </div>
-      <pre v-if="showPreview" class="pce-preview">{{ previewXml }}</pre>
+      <XmlPreview v-if="showPreview" class="pce-preview" :value="previewXml" />
     </div>
 
   </div>
@@ -262,6 +262,7 @@ import {wireRetryFeedback} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import HelpDialog from '../help/HelpDialog.vue';
+import XmlPreview from '../shared/XmlPreview.vue';
 import FullPromptModal from './FullPromptModal.vue';
 import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
 
@@ -672,7 +673,7 @@ const previewXml = computed(() =>
 
 .pce-preview {
   background: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 3px;
-  padding: 0.5rem; font-size: 0.7rem; color: #8ab48a; white-space: pre-wrap;
+  padding: 0.5rem; font-size: 0.7rem; white-space: pre-wrap;
   word-break: break-all; margin: 0; font-family: monospace; line-height: 1.5;
   max-height: 200px; overflow-y: auto;
 }

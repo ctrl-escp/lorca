@@ -10,7 +10,7 @@
 | N2 | ~~**Polish live prompt preview: truncation + full-prompt modal**~~ ✅ | Shipped: 400-char truncation + `«not yet run»` placeholders in embedded preview; "Full prompt" modal with copy button and unresolved-slots banner; `promptPreview.ts` utility extracted and tested; no-trim contract enforced end-to-end. |
 | N3 | ~~**"Run up to here" — visual boundary indicator**~~ ✅ | Shipped: `partialRunTargetStepId` in store (set on partial run, cleared on full execute, persisted); blue bottom-border + "▲ partial run boundary" label on the target step card. |
 | N4 | ~~**Comment editing UX** — save/cancel + cursor fix~~ ✅ | Shipped: explicit Save/Cancel controls, no silent blur commit, Cancel restores the saved description, and comment header/textarea cursors match their interaction. |
-| N5 | **JSON syntax highlighting + raw/pretty toggle** | Output areas render raw JSON strings. |
+| N5 | ~~**JSON syntax highlighting + raw/pretty toggle**~~ ✅ | Shipped: shared `JsonViewer` with pretty/raw modes, collapsible highlighted JSON, raw copy, fenced-JSON parsing, compact highlighted output previews, and XML preview highlighting. |
 
 ### 🟡 SOON
 
@@ -544,7 +544,7 @@ Class binding: `'partial-run-target': step.id === props.partialRunTargetStepId`
 
 ---
 
-### N5 — JSON syntax highlighting + raw/pretty toggle
+### N5 — JSON syntax highlighting + raw/pretty toggle ✅
 
 **New file:** `packages/ui-kit/src/JsonViewer.vue`
 
@@ -571,6 +571,8 @@ initialMode?: 'pretty' | 'raw'   // default: 'pretty'
 ```
 
 Replace raw `<pre>` / `formatArtifact` renders in `OutputPanel.vue`, `TracePanel.vue`, `StepInspector.vue`.
+
+**Shipped:** `JsonViewer` is wired into final output, trace artifacts/model responses, last-run output, and compact chain output previews. JSON strings and whole-value ```json fences are parsed before display. XML previews are highlighted via `XmlPreview.vue`.
 
 ---
 
@@ -1654,7 +1656,7 @@ NOW   N1  Improve suggestion prompts + semantic tags  ✅ done
       N2  Live preview polish + full-prompt modal      ✅ done
       N3  Run-to visual indicator                      ✅ done
       N4  Comment save/cancel + cursor                 ✅ done
-      N5  JSON highlighting + raw/pretty toggle        new JsonViewer.vue, OutputPanel, TracePanel
+      N5  JSON highlighting + raw/pretty toggle        ✅ done
 
 SOON  S1a AI prompt improver (undo-tracked)           new usePromptImprover.ts + PCE.vue
       S1b AI next-step advisor                        new useStepAdvisor.ts + LeftPane.vue

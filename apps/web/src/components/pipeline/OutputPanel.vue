@@ -20,14 +20,8 @@
             {{ outputStale ? 'Last run output (stale)' : 'Current output' }}
           </span>
           <span v-if="outputKey" class="output-key">{{ outputKey }}</span>
-          <button
-            class="btn-copy"
-            type="button"
-            :title="copied ? 'Copied!' : 'Copy output to clipboard'"
-            @click="copyOutput"
-          >{{ copied ? '✓' : 'Copy' }}</button>
         </div>
-        <pre class="output-text">{{ displayValue }}</pre>
+        <JsonViewer :value="output.value" />
       </div>
     </template>
     <div v-else class="output-idle">No output.</div>
@@ -35,10 +29,10 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue';
 import type {PipelineArtifact, PipelineError} from '@lorca/core';
+import {JsonViewer} from '@lorca/ui-kit';
 
-const props = defineProps<{
+defineProps<{
   status: string;
   output: PipelineArtifact | null;
   outputKey: string | null;
@@ -46,23 +40,6 @@ const props = defineProps<{
   outputStale?: boolean;
   partialRun?: boolean;
 }>();
-
-const displayValue = computed(() => {
-  if (!props.output) return '';
-  if (typeof props.output.value === 'string') return props.output.value;
-  return JSON.stringify(props.output.value, null, 2);
-});
-
-const copied = ref(false);
-let copyTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function copyOutput() {
-  if (!displayValue.value) return;
-  await navigator.clipboard.writeText(displayValue.value);
-  copied.value = true;
-  if (copyTimer) clearTimeout(copyTimer);
-  copyTimer = setTimeout(() => { copied.value = false; }, 1800);
-}
 </script>
 
 <style scoped>
@@ -82,22 +59,12 @@ async function copyOutput() {
 .error-msg { color: #c88; font-size: 0.82rem; }
 .error-node { color: #666; font-size: 0.75rem; }
 .output-value { display: flex; flex-direction: column; gap: 0.4rem; }
-.output-value.stale .output-text { border-color: #4a4020; opacity: 0.85; }
+.output-value.stale :deep(.json-viewer) { opacity: 0.85; }
+.output-value.stale :deep(.jv-raw),
+.output-value.stale :deep(.jv-pretty) { border-color: #4a4020; }
 .output-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; }
 .output-state-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .output-state-label.current { color: #5a9d6e; }
 .output-state-label.stale { color: #c8a050; }
 .output-key { font-family: monospace; font-size: 0.72rem; color: #7ec8e3; }
-.output-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; color: #ddd; background: #111; border: 1px solid #222; border-radius: 4px; padding: 0.6rem; }
-.btn-copy {
-  margin-left: auto;
-  font-size: 0.65rem;
-  padding: 2px 8px;
-  background: #1a2a1a;
-  border: 1px solid #2a4d2a;
-  color: #6db86d;
-  border-radius: 3px;
-  cursor: pointer;
-}
-.btn-copy:hover { background: #1e381e; color: #8dda8d; }
 </style>

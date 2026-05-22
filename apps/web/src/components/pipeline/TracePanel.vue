@@ -49,7 +49,11 @@
 
       <div v-if="expandedArtifactForEvent(event)" class="ev-detail">
         <div class="ev-detail-title">Artifact: {{ expandedArtifactForEvent(event) }}</div>
-        <pre v-if="artifactBody(expandedArtifactForEvent(event)!)" class="ev-preview">{{ artifactBody(expandedArtifactForEvent(event)!) }}</pre>
+        <JsonViewer
+          v-if="artifactFor(expandedArtifactForEvent(event)!)"
+          class="ev-json"
+          :value="artifactFor(expandedArtifactForEvent(event)!)!.value"
+        />
         <p v-else class="ev-missing-artifact">Body not available for this artifact in the current run.</p>
       </div>
 
@@ -64,11 +68,11 @@
         </div>
         <div v-if="event.renderedPromptXml" class="ev-detail">
           <div class="ev-detail-title">Rendered prompt</div>
-          <pre class="ev-prompt">{{ event.renderedPromptXml }}</pre>
+          <XmlPreview class="ev-prompt" :value="event.renderedPromptXml" />
         </div>
-        <div v-if="rawResponseFor(event)" class="ev-detail">
+        <div v-if="rawResponseValueFor(event) !== null" class="ev-detail">
           <div class="ev-detail-title">Model response</div>
-          <pre class="ev-preview ev-preview-full">{{ rawResponseFor(event) }}</pre>
+          <JsonViewer class="ev-json ev-json-full" :value="rawResponseValueFor(event)" />
         </div>
       </template>
 
@@ -83,9 +87,8 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
-import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
-
-const ARTIFACT_PREVIEW_MAX = 12000;
+import {JsonViewer} from '@lorca/ui-kit';
+import XmlPreview from '../shared/XmlPreview.vue';
 
 const props = defineProps<{
   trace: PipelineTraceEvent[];
@@ -122,17 +125,14 @@ function stepLabel(event: PipelineTraceEvent): string {
 function hasDetails(event: PipelineTraceEvent): boolean {
   return Boolean(
     event.renderedPromptXml
-    || rawResponseFor(event)
+    || rawResponseValueFor(event) !== null
     || (event.historyReadInputs && event.historyReadInputs.length > 0),
   );
 }
 
-function rawResponseFor(event: PipelineTraceEvent): string | null {
+function rawResponseValueFor(event: PipelineTraceEvent): unknown | null {
   const rawKey = event.outputArtifactNames?.find((n) => n.endsWith('.rawResponse'));
-  if (rawKey) {
-    const full = artifactBody(rawKey);
-    if (full) return full;
-  }
+  if (rawKey && artifactFor(rawKey)) return artifactFor(rawKey)!.value;
   return event.rawModelResponsePreview ?? null;
 }
 
@@ -159,13 +159,8 @@ function expandedArtifactForEvent(event: PipelineTraceEvent): string | null {
   return expandedArtifact.value.slice(prefix.length);
 }
 
-function artifactBody(name: string): string | null {
-  const art = props.artifacts?.[name];
-  if (!art) return null;
-  const formatted = formatArtifactDisplay(art.value);
-  return formatted.length > ARTIFACT_PREVIEW_MAX
-    ? `${formatted.slice(0, ARTIFACT_PREVIEW_MAX)}\n… (truncated)`
-    : formatted;
+function artifactFor(name: string): PipelineArtifact | null {
+  return props.artifacts?.[name] ?? null;
 }
 </script>
 
@@ -219,6 +214,15 @@ function artifactBody(name: string): string | null {
   white-space: pre-wrap; word-break: break-word; max-height: 12rem; overflow-y: auto;
 }
 .ev-preview-full { max-height: 28rem; }
+.ev-json :deep(.jv-raw),
+.ev-json :deep(.jv-pretty) {
+  max-height: 12rem;
+  font-size: 0.72rem;
+}
+.ev-json-full :deep(.jv-raw),
+.ev-json-full :deep(.jv-pretty) {
+  max-height: 28rem;
+}
 .ev-error { margin-top: 0.25rem; font-size: 0.75rem; }
 .ev-error-code { color: #e07070; margin-right: 0.4rem; font-family: monospace; }
 .ev-error-msg { color: #c88; }

@@ -9,7 +9,7 @@
         <div v-if="hasUnresolved" class="fpm-banner">
           Some values not yet available — run the pipeline first
         </div>
-        <pre class="fpm-xml">{{ xmlText || '(empty prompt)' }}</pre>
+        <XmlPreview class="fpm-xml" :value="xmlText" />
         <div class="fpm-footer">
           <button class="fpm-copy-btn" type="button" @click="handleCopy">{{ copyLabel }}</button>
           <button class="fpm-close-btn" type="button" @click="emit('close')">Close</button>
@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import {ref} from 'vue';
+import XmlPreview from '../shared/XmlPreview.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -106,7 +107,6 @@ async function handleCopy() {
   font-size: 0.72rem;
   font-family: monospace;
   line-height: 1.5;
-  color: #8ab48a;
   white-space: pre-wrap;
   word-break: break-all;
 }

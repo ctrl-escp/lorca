@@ -1,11 +1,13 @@
+const JSON_FENCE_RE = /^```[ \t]*json[^\n\r]*\r?\n([\s\S]*?)\r?\n?```[ \t]*$/i;
+
 /** Format artifact values for display; pretty-print JSON when parseable. */
 export function formatArtifactDisplay(value: unknown, maxLen?: number): string {
   let text: string;
   if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    const jsonText = jsonTextFromString(value);
+    if (jsonText !== null) {
       try {
-        text = JSON.stringify(JSON.parse(trimmed), null, 2);
+        text = JSON.stringify(JSON.parse(jsonText), null, 2);
       } catch {
         text = value;
       }
@@ -23,11 +25,19 @@ export function formatArtifactDisplay(value: unknown, maxLen?: number): string {
 
 export function tryParseJsonValue(value: unknown): unknown | null {
   if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+  const jsonText = jsonTextFromString(value);
+  if (jsonText === null) return null;
   try {
-    return JSON.parse(trimmed);
+    return JSON.parse(jsonText);
   } catch {
     return null;
   }
+}
+
+function jsonTextFromString(value: string): string | null {
+  const trimmed = value.trim();
+  const fenced = JSON_FENCE_RE.exec(trimmed);
+  if (fenced?.[1] !== undefined) return fenced[1].trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return value;
+  return null;
 }

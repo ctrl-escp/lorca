@@ -46,7 +46,7 @@
               'model-disabled': props.disabledModelStepIds?.has(step.id),
               'drop-target-step': dragOverStepId === step.id && activeDragKind === 'step-reorder',
               dragging: draggingStepId === step.id,
-              'output-expanded': Boolean(outputPreviewFor(step)) && !isStepOutputCollapsed(step.id),
+              'output-expanded': outputPreviewValueFor(step) !== null && !isStepOutputCollapsed(step.id),
               'partial-run-target': step.id === props.partialRunTargetStepId,
               [traceStatusClass(step.id)]: true,
             }"
@@ -239,7 +239,7 @@
                 </span>
               </div>
 
-              <div v-if="outputPreviewFor(step)" class="step-output-preview-wrap">
+              <div v-if="outputPreviewValueFor(step) !== null" class="step-output-preview-wrap">
                 <button
                   type="button"
                   class="step-output-preview-header"
@@ -250,10 +250,12 @@
                   <span class="step-output-toggle-indicator">{{ isStepOutputCollapsed(step.id) ? '+' : '-' }}</span>
                   <span class="step-output-preview-label">Output preview</span>
                 </button>
-                <pre
+                <JsonViewer
                   v-if="!isStepOutputCollapsed(step.id)"
                   class="step-output-preview"
-                >{{ outputPreviewFor(step) }}</pre>
+                  :value="outputPreviewValueFor(step)"
+                  :show-header="false"
+                />
               </div>
 
               <div
@@ -351,6 +353,7 @@ import {
   readDragStepId,
   readDragSuggestionId,
 } from '../../utils/dragDrop.js';
+import {JsonViewer} from '@lorca/ui-kit';
 import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
 
 type DragKind = 'step-reorder' | 'suggestion';
@@ -724,10 +727,10 @@ function runStateFor(stepId: string) {
   return props.stepStates?.[stepId]?.state;
 }
 
-function outputPreviewFor(step: PipelineStep): string | null {
+function outputPreviewValueFor(step: PipelineStep): unknown | null {
   const key = `${step.outputNamespace}.${step.primaryOutputName}`;
   const artifact = props.artifacts?.[key];
-  if (artifact) return formatArtifactDisplay(artifact.value);
+  if (artifact) return artifact.value;
 
   const preview = props.runSnapshots?.[step.id]?.primaryOutputPreview;
   if (!preview) return null;
@@ -1358,15 +1361,19 @@ function runStateTitle(stepId: string): string {
 .step-output-preview {
   flex: 1 1 auto;
   min-height: 0;
-  font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
-  color: #888;
-  font-family: monospace;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  margin: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  margin: 0;
+}
+.step-output-preview :deep(.jv-raw),
+.step-output-preview :deep(.jv-pretty) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   padding: 0.65rem 0.75rem;
+  font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
+  color: #888;
+  max-height: none;
 }
 .btn-run-up-to {
   width: var(--step-action-size);
