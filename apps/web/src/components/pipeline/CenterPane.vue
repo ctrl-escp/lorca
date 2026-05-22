@@ -523,28 +523,28 @@ function onUserPromptInput(raw: string) {
 }
 
 async function handleRun() {
-  editorStore.updateUserPrompt(userPrompt.value.trim());
-  await runStore.run(editorStore.pipeline, userPrompt.value.trim());
+  editorStore.updateUserPrompt(userPrompt.value);
+  await runStore.run(editorStore.pipeline, userPrompt.value);
 }
 
 async function handleRunUpTo(stepId: string) {
-  editorStore.updateUserPrompt(userPrompt.value.trim());
-  await runStore.run(editorStore.pipeline, userPrompt.value.trim(), stepId);
+  editorStore.updateUserPrompt(userPrompt.value);
+  await runStore.run(editorStore.pipeline, userPrompt.value, stepId);
 }
 
 async function handleRunFromStep(stepId: string) {
-  editorStore.updateUserPrompt(userPrompt.value.trim());
-  await runStore.runFromStep(editorStore.pipeline, userPrompt.value.trim(), stepId);
+  editorStore.updateUserPrompt(userPrompt.value);
+  await runStore.runFromStep(editorStore.pipeline, userPrompt.value, stepId);
 }
 
 async function handleRunOnlyStep(stepId: string) {
-  editorStore.updateUserPrompt(userPrompt.value.trim());
-  await runStore.runOnlyStep(editorStore.pipeline, userPrompt.value.trim(), stepId);
+  editorStore.updateUserPrompt(userPrompt.value);
+  await runStore.runOnlyStep(editorStore.pipeline, userPrompt.value, stepId);
 }
 
 function handleExport() {
   moreMenuOpen.value = false;
-  editorStore.updateUserPrompt(userPrompt.value.trim());
+  editorStore.updateUserPrompt(userPrompt.value);
   refreshExportModal(false);
 }
 

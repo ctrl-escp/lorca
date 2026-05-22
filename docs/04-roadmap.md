@@ -6,8 +6,8 @@
 
 | # | Item | Rationale |
 |---|------|-----------|
-| N1 | **Improve built-in step suggestion prompts** | Explicitly flagged high priority. Prompts are minimal one-liners with no format enforcement, generic tag names, and no cross-step wiring. |
-| N2 | **Polish live prompt preview: truncation + full-prompt modal** | Live preview is shipped but `artifactValue()` doesn't truncate; also needs a "View full prompt" button for complete untruncated review. |
+| N1 | ~~**Improve built-in step suggestion prompts**~~ ✅ | Shipped: semantic XML tag names, self-contained system prompts, pre-wired historyReads for cross-step context, and `createdFromTemplateStepId` remapping on insertion. |
+| N2 | ~~**Polish live prompt preview: truncation + full-prompt modal**~~ ✅ | Shipped: 400-char truncation + `«not yet run»` placeholders in embedded preview; "Full prompt" modal with copy button and unresolved-slots banner; `promptPreview.ts` utility extracted and tested; no-trim contract enforced end-to-end. |
 | N3 | **"Run up to here" — visual boundary indicator** | No marker shows where a partial run stopped. |
 | N4 | **Comment editing UX** — save/cancel + cursor fix | Commits silently on blur; wrong cursor. |
 | N5 | **JSON syntax highlighting + raw/pretty toggle** | Output areas render raw JSON strings. |
@@ -1650,8 +1650,8 @@ When checked, the step card gains a `JSON` badge alongside any existing source b
 ## Quick reference
 
 ```
-NOW   N1  Improve suggestion prompts + semantic tags  packages/capsules/src/suggestions/definitions.ts
-      N2  Live preview polish + full-prompt modal      PromptCompositionEditor.vue + promptPreview.ts
+NOW   N1  Improve suggestion prompts + semantic tags  ✅ done
+      N2  Live preview polish + full-prompt modal      ✅ done
       N3  Run-to visual indicator                      ChainEditor.vue + activeRun.ts
       N4  Comment save/cancel + cursor                 ChainEditor.vue
       N5  JSON highlighting + raw/pretty toggle        new JsonViewer.vue, OutputPanel, TracePanel

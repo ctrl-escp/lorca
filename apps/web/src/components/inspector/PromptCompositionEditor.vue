@@ -8,6 +8,7 @@
         title="Wire loop.prev and instructions so this step improves on failed verification"
         @click="addRetryFeedback"
       >↺ Add retry feedback</button>
+      <button type="button" class="pce-full-prompt-btn" title="View the fully resolved prompt that will be sent to the model" @click="showFullPromptModal = true">Full prompt</button>
       <button type="button" class="pce-help-btn" title="Artifact references and prompt composition help" @click="showPromptHelp = true">? References</button>
     </div>
     <HelpDialog
@@ -15,6 +16,12 @@
       variant="prompt"
       :artifact-refs="promptArtifactRefs"
       @close="showPromptHelp = false"
+    />
+    <FullPromptModal
+      :open="showFullPromptModal"
+      :xml-text="fullPromptXml"
+      :has-unresolved="hasUnresolved"
+      @close="showFullPromptModal = false"
     />
 
     <!-- Previous output -->
@@ -255,6 +262,8 @@ import {wireRetryFeedback} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import HelpDialog from '../help/HelpDialog.vue';
+import FullPromptModal from './FullPromptModal.vue';
+import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
 
 const props = defineProps<{
   stepId: string;
@@ -280,6 +289,7 @@ const localHistoryReads = ref<StepHistoryReadConfig[]>([]);
 const localBlocks = ref<PromptBlock[]>([]);
 const showPreview = ref(false);
 const showPromptHelp = ref(false);
+const showFullPromptModal = ref(false);
 
 const chainSteps = computed(() => props.contextSteps ?? editorStore.steps);
 
@@ -299,7 +309,7 @@ const promptArtifactRefs = computed(() => {
 });
 
 const currentUserPromptArtifacts = computed(() =>
-  buildUserPromptArtifacts(editorStore.pipeline.input.raw.trim()),
+  buildUserPromptArtifacts(editorStore.pipeline.input.raw),
 );
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
@@ -478,33 +488,71 @@ function truncatePreview(text: string, max = 120): string {
 }
 
 function artifactValue(artifactRef: string): string | null {
-  if (artifactRef === 'user_prompt.raw') return currentUserPromptArtifacts.value.raw;
-  if (artifactRef === 'user_prompt.xml') return currentUserPromptArtifacts.value.xml;
-  const artifact = runStore.artifacts[artifactRef];
-  if (!artifact) return null;
-  if (typeof artifact.value === 'string') return artifact.value;
-  return JSON.stringify(artifact.value, null, 2);
+  return resolveArtifactValue(artifactRef, runStore.artifacts, currentUserPromptArtifacts.value);
 }
 
-function resolvedPreviousOutput(): string | undefined {
-  if (!localPrevEnabled.value) return undefined;
-  const currentIdx = chainSteps.value.findIndex((s) => s.id === props.stepId);
-  const priorSteps = currentIdx >= 0 ? chainSteps.value.slice(0, currentIdx) : chainSteps.value;
-  const prevStep = [...priorSteps].reverse().find((s) => s.enabled);
-  if (!prevStep) return currentUserPromptArtifacts.value.xml;
-  return artifactValue(`${prevStep.outputNamespace}.${prevStep.primaryOutputName}`) ?? undefined;
-}
-
-const resolvedHistoryReads = computed<ResolvedHistoryRead[]>(() =>
+// Embedded XML preview: truncated values + «not yet run» placeholders to show structure.
+const embeddedResolvedHistoryReads = computed<ResolvedHistoryRead[]>(() =>
   localHistoryReads.value.map((read) => {
-    const value = artifactValue(read.sourceArtifactRef);
+    const value = resolveArtifactValue(
+      read.sourceArtifactRef,
+      runStore.artifacts,
+      currentUserPromptArtifacts.value,
+      PREVIEW_TRUNCATE_CHARS,
+    );
+    if (value !== null) return {sourceArtifactRef: read.sourceArtifactRef, value};
+    return {sourceArtifactRef: read.sourceArtifactRef, value: '«not yet run»'};
+  }),
+);
+
+const embeddedResolvedPrevOutput = computed((): string | undefined => {
+  if (!localPrevEnabled.value) return undefined;
+  const val = resolvePreviousOutput(
+    props.stepId,
+    chainSteps.value,
+    runStore.artifacts,
+    currentUserPromptArtifacts.value,
+  );
+  if (val === undefined) return '«not yet run»';
+  return val.length > PREVIEW_TRUNCATE_CHARS
+    ? val.slice(0, PREVIEW_TRUNCATE_CHARS) + '\n…(truncated)'
+    : val;
+});
+
+// Full prompt modal: untruncated values, optional reads omitted when missing.
+const fullResolvedHistoryReads = computed<ResolvedHistoryRead[]>(() =>
+  localHistoryReads.value.map((read) => {
+    const value = resolveArtifactValue(
+      read.sourceArtifactRef,
+      runStore.artifacts,
+      currentUserPromptArtifacts.value,
+    );
     if (value !== null) return {sourceArtifactRef: read.sourceArtifactRef, value};
     return {sourceArtifactRef: read.sourceArtifactRef, omitted: !read.required};
   }),
 );
 
+const fullPromptPrevOutput = computed((): string | undefined => {
+  if (!localPrevEnabled.value) return undefined;
+  return resolvePreviousOutput(
+    props.stepId,
+    chainSteps.value,
+    runStore.artifacts,
+    currentUserPromptArtifacts.value,
+  );
+});
+
+const fullPromptXml = computed(() =>
+  renderPromptComposition(buildConfig(), fullPromptPrevOutput.value, fullResolvedHistoryReads.value).xmlText,
+);
+
+const hasUnresolved = computed(() => {
+  if (localPrevEnabled.value && fullPromptPrevOutput.value === undefined) return true;
+  return fullResolvedHistoryReads.value.some((r) => r.value === undefined && r.omitted === false);
+});
+
 const previewXml = computed(() =>
-  renderPromptComposition(buildConfig(), resolvedPreviousOutput(), resolvedHistoryReads.value).xmlText,
+  renderPromptComposition(buildConfig(), embeddedResolvedPrevOutput.value, embeddedResolvedHistoryReads.value).xmlText,
 );
 </script>
 
@@ -523,8 +571,13 @@ const previewXml = computed(() =>
   background: #1a2430; border: 1px solid #3a5070; color: #8ab8d8;
 }
 .pce-retry-btn:hover { background: #243040; color: #a8d0f0; }
-.pce-help-btn {
+.pce-full-prompt-btn {
   margin-left: auto;
+  font-size: 0.68rem; padding: 2px 8px; background: #1a1a2a; border: 1px solid #303060;
+  color: #9898d8; border-radius: 3px; cursor: pointer;
+}
+.pce-full-prompt-btn:hover { background: #222240; color: #b0b0f0; }
+.pce-help-btn {
   font-size: 0.68rem; padding: 2px 8px; background: #1a2430; border: 1px solid #2a5070;
   color: #7ec8e3; border-radius: 3px; cursor: pointer;
 }
