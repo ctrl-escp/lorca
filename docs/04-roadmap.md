@@ -17,7 +17,7 @@
 | # | Item | Rationale |
 |---|------|-----------|
 | S1a | ~~**AI prompt improver**~~ ✅ | Shipped: per-block Improve button with local-model rewrite modal, prose-rewrite model preference, editable per-step improvement prompt, global model selection, current-block/previous-suggestion context controls, preview/approve apply flow, no-op/JSON-output guards, and undo-tracked apply. |
-| S1b | **AI next-step advisor** | After a run, suggests 2-3 next steps with reasoning. Independent from S1a. |
+| S1b | ~~**AI next-step advisor**~~ ✅ | Shipped: post-run "Suggest" in Step Suggestions with `general`-bucket model selection, pipeline/artifact context, JSON parse with unknown-ID filtering, error banner with raw fallback, and one-click append insert. |
 | S1c | **NL pipeline generator (Capsule-based)** | "Describe it, build it." The generator logic lives in a user-editable built-in Capsule, revertible to the original. Depends on S1a + S1b validated. |
 | S2a | **True dependency model for the compiler** | `compileActiveStepsToExecutionPlan` unconditionally adds the previous step as an input. Must fix before S2b. |
 | S2b | **Concurrent step execution** | Once S2a correctly identifies independent steps, run them in parallel. |
@@ -597,7 +597,7 @@ Replace raw `<pre>` / `formatArtifact` renders in `OutputPanel.vue`, `TracePanel
 
 ---
 
-### S1a — AI prompt improver
+### S1a — AI prompt improver ✅
 
 **Depends on:** N1.
 
@@ -638,9 +638,11 @@ Inline suggestion panel below the textarea:
 
 **Undo integration:** "Use this" applies the block body update through the existing undo-tracked mutation path in `pipelineEditor` store — the same path used for any other block edit. This means ⌘Z immediately reverts an AI-applied suggestion, same as a manual edit.
 
+**Shipped:** Per-block Improve button with local-model rewrite modal, prose-rewrite model preference, editable per-step improvement prompt, global model selection, current-block/previous-suggestion context controls, preview/approve apply flow, no-op/JSON-output guards, and undo-tracked apply.
+
 ---
 
-### S1b — AI next-step advisor
+### S1b — AI next-step advisor ✅
 
 **Depends on:** Nothing from S1a — parallel track.
 
@@ -664,6 +666,8 @@ Suggest 2-3 most useful next steps. Respond JSON only:
 ```
 
 **UI:** "✨ AI suggestions" sub-section at the bottom of the Step Suggestions accordion in `LeftPane.vue`. Spinner while loading; suggestion cards with reason line and ↓ Insert button.
+
+**Shipped:** Post-run "Suggest" in Step Suggestions with `general`-bucket model selection, pipeline/artifact context, JSON parse with unknown-ID filtering, error banner with raw fallback, and one-click append insert.
 
 ---
 
@@ -1658,8 +1662,8 @@ NOW   N1  Improve suggestion prompts + semantic tags  ✅ done
       N4  Comment save/cancel + cursor                 ✅ done
       N5  JSON highlighting + raw/pretty toggle        ✅ done
 
-SOON  S1a AI prompt improver (undo-tracked)           new usePromptImprover.ts + PCE.vue
-      S1b AI next-step advisor                        new useStepAdvisor.ts + LeftPane.vue
+SOON  S1a AI prompt improver (undo-tracked)           new usePromptImprover.ts + PCE.vue  ✅ done
+      S1b AI next-step advisor                        new useStepAdvisor.ts + LeftPane.vue  ✅ done
       S1c NL generator (built-in Capsule)             new lorca-pipeline-generator + modal
       S2a Dependency model fix                        chainCompiler.ts + new chainCompiler.test.ts
       S2b Concurrent step execution                   stepExecutor.ts (requires S2a)
