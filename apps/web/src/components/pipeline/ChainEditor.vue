@@ -1440,7 +1440,6 @@ function runStateTitle(stepId: string): string {
 .output-label { font-size: 0.65rem; color: #555; }
 .output-key { font-size: 0.72rem; color: #7ec8e3; font-family: monospace; }
 
-
 .btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 4px; cursor: pointer; }
 .btn-sm { padding: 3px 9px; font-size: 0.72rem; }
 .btn:hover:not(:disabled) { background: #222; color: #ccc; border-color: #3a3a3a; }
