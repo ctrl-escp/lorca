@@ -1,117 +1,113 @@
 <template>
   <aside class="left-pane">
 
-    <!-- Step types (insert primitives) -->
-    <section class="pane-section" :class="{expanded: isExpanded('stepTypes')}">
-      <div class="section-header" @click="toggleSection('stepTypes')">
-        <button type="button" class="section-toggle" :aria-expanded="isExpanded('stepTypes')" title="Basic step types to insert into the pipeline">
-          <span class="chevron" :class="{open: isExpanded('stepTypes')}">›</span>
-          <span class="section-title">Step types <span class="section-count">({{ filteredStepTypes.length }})</span></span>
+    <!-- Step library (types + suggestions unified) -->
+    <section class="pane-section" :class="{expanded: isExpanded('stepLibrary')}">
+      <div class="section-header" @click="toggleSection('stepLibrary')">
+        <button type="button" class="section-toggle" :aria-expanded="isExpanded('stepLibrary')" title="Step types and pre-built suggestion templates">
+          <span class="chevron" :class="{open: isExpanded('stepLibrary')}">›</span>
+          <span class="section-title">Step library</span>
         </button>
       </div>
-      <div v-if="isExpanded('stepTypes')" class="section-body">
+      <div v-if="isExpanded('stepLibrary')" class="section-body">
         <input
-          v-model="stepTypeQuery"
+          v-model="stepLibraryQuery"
           class="palette-search"
           type="search"
-          placeholder="Filter palette…"
-          aria-label="Filter step types"
+          placeholder="Filter…"
+          aria-label="Filter step types and suggestions"
         />
-        <div class="step-type-list">
+        <div class="step-library-list">
           <div
-            v-for="entry in filteredStepTypes"
-            :key="entry.type"
-            class="step-type-row"
-            :title="entry.description"
+            v-for="group in filteredStepGroups"
+            :key="group.type"
+            class="type-group"
+            :class="{expanded: isTypeGroupExpanded(group.type)}"
           >
-            <div class="step-type-row-main">
-              <span class="step-type-row-name">{{ entry.label }}</span>
-              <span class="step-type-row-desc">{{ entry.description }}</span>
+            <div class="type-group-header">
+              <div class="type-group-info">
+                <span class="type-group-name">{{ group.label }}</span>
+                <span class="type-group-desc">{{ group.description }}</span>
+              </div>
+              <div class="type-group-actions">
+                <button
+                  class="btn-insert-suggestion"
+                  type="button"
+                  title="Insert a blank step of this type"
+                  @click.stop="onInsertStepType(group.type)"
+                >↓ Insert</button>
+                <button
+                  v-if="group.suggestions.length > 0"
+                  type="button"
+                  class="type-group-expand"
+                  :aria-expanded="isTypeGroupExpanded(group.type)"
+                  :title="isTypeGroupExpanded(group.type) ? 'Collapse templates' : `Show ${group.suggestions.length} template(s)`"
+                  @click.stop="toggleTypeGroup(group.type)"
+                >
+                  <span class="type-expand-chevron" :class="{open: isTypeGroupExpanded(group.type)}">›</span>
+                  <span class="type-expand-count">{{ group.suggestions.length }}</span>
+                </button>
+              </div>
             </div>
-            <button
-              class="btn-insert-suggestion"
-              type="button"
-              title="Insert after selected step (or append)"
-              @click.stop="onInsertStepType(entry.type)"
-            >↓ Insert</button>
-          </div>
-          <p v-if="filteredStepTypes.length === 0" class="empty-hint">No step types match your filter.</p>
-        </div>
-      </div>
-    </section>
 
-    <!-- Step Suggestions (replaces destructive Examples) -->
-    <section class="pane-section" :class="{expanded: isExpanded('suggestions')}">
-      <div class="section-header" @click="toggleSection('suggestions')">
-        <button type="button" class="section-toggle" :aria-expanded="isExpanded('suggestions')" title="Insertable step recipes — click to insert into the current pipeline">
-          <span class="chevron" :class="{open: isExpanded('suggestions')}">›</span>
-          <span class="section-title">Step Suggestions <span class="section-count">({{ filteredSuggestions.length }})</span></span>
-        </button>
-      </div>
-      <div v-if="isExpanded('suggestions')" class="section-body">
-        <input
-          v-model="suggestionQuery"
-          class="palette-search"
-          type="search"
-          placeholder="Filter suggestions…"
-          aria-label="Filter step suggestions"
-        />
-        <div class="suggestion-list">
-          <div
-            v-for="suggestion in filteredSuggestions"
-            :key="suggestion.id"
-            class="suggestion-row"
-            :title="isPipelineContext ? `${suggestion.description} — drag into the pipeline` : suggestion.description"
-          >
-            <button
-              v-if="isPipelineContext"
-              type="button"
-              class="row-drag-handle"
-              draggable="true"
-              title="Drag into pipeline"
-              aria-label="Drag suggestion into pipeline"
-              @dragstart="onSuggestionDragStart(suggestion.id, $event)"
-              @dragend="onSuggestionDragEnd"
-              @click.stop
-            ><span class="row-drag-grip" aria-hidden="true">⠿</span></button>
-            <div class="suggestion-row-main">
-              <div class="suggestion-row-info">
-                <span class="suggestion-row-name">{{ suggestion.name }}</span>
-                <span class="suggestion-row-category">{{ suggestion.category }}</span>
-              </div>
-              <span class="suggestion-row-desc">{{ suggestion.description }}</span>
-              <span v-if="suggestion.preferredModelBucket" class="suggestion-row-bucket" :title="`Preferred model bucket: ${suggestion.preferredModelBucket}`">{{ suggestion.preferredModelBucket }}</span>
-              <div class="suggestion-row-actions">
+            <div v-if="isTypeGroupExpanded(group.type)" class="type-group-suggestions">
+              <div
+                v-for="suggestion in group.suggestions"
+                :key="suggestion.id"
+                class="suggestion-row"
+                :title="isPipelineContext ? `${suggestion.description} — drag into the pipeline` : suggestion.description"
+              >
                 <button
-                  class="btn-insert-suggestion"
+                  v-if="isPipelineContext"
                   type="button"
-                  title="Insert before selected step"
-                  :disabled="!isPipelineContext || !editorStore.selectedStepId"
-                  @click.stop="onInsertSuggestion(suggestion, 'before')"
-                >↑ Before</button>
-                <button
-                  class="btn-insert-suggestion"
-                  type="button"
-                  title="Insert after selected step (or append)"
-                  @click.stop="onInsertSuggestion(suggestion, 'after')"
-                >↓ After</button>
-                <button
-                  class="btn-insert-suggestion"
-                  type="button"
-                  title="Append to end of pipeline"
-                  @click.stop="onInsertSuggestion(suggestion, 'append')"
-                >+ Append</button>
-                <button
-                  class="btn-insert-suggestion btn-insert-new"
-                  type="button"
-                  title="Replace current pipeline with this suggestion"
-                  @click.stop="onInsertSuggestion(suggestion, 'new')"
-                >New</button>
+                  class="row-drag-handle"
+                  draggable="true"
+                  title="Drag into pipeline"
+                  aria-label="Drag suggestion into pipeline"
+                  @dragstart="onSuggestionDragStart(suggestion.id, $event)"
+                  @dragend="onSuggestionDragEnd"
+                  @click.stop
+                ><span class="row-drag-grip" aria-hidden="true">⠿</span></button>
+                <div class="suggestion-row-main">
+                  <div class="suggestion-row-info">
+                    <span class="suggestion-row-name">{{ suggestion.name }}</span>
+                    <span class="suggestion-row-category">{{ suggestion.category }}</span>
+                  </div>
+                  <span class="suggestion-row-desc">{{ suggestion.description }}</span>
+                  <div class="suggestion-row-actions">
+                    <button
+                      class="btn-insert-suggestion"
+                      type="button"
+                      title="Insert before selected step"
+                      :disabled="!isPipelineContext || !editorStore.selectedStepId"
+                      @click.stop="onInsertSuggestion(suggestion, 'before')"
+                    >↑ Before</button>
+                    <button
+                      class="btn-insert-suggestion"
+                      type="button"
+                      title="Insert after selected step (or append)"
+                      @click.stop="onInsertSuggestion(suggestion, 'after')"
+                    >↓ After</button>
+                    <button
+                      class="btn-insert-suggestion"
+                      type="button"
+                      title="Append to end of pipeline"
+                      @click.stop="onInsertSuggestion(suggestion, 'append')"
+                    >+ Append</button>
+                    <button
+                      class="btn-insert-suggestion btn-insert-new"
+                      type="button"
+                      title="Replace current pipeline with this suggestion"
+                      @click.stop="onInsertSuggestion(suggestion, 'new')"
+                    >New</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <p v-if="filteredSuggestions.length === 0" class="empty-hint">No suggestions match your filter.</p>
+          <p v-if="filteredStepGroups.length === 0" class="empty-hint">No step types match your filter.</p>
         </div>
+
         <div v-if="isPipelineContext" class="ai-suggestions">
           <div class="ai-suggestions-header">
             <span class="ai-suggestions-title">AI suggestions</span>
@@ -348,8 +344,8 @@ const isPipelineContext = computed(() => uiStore.editorContext === 'pipeline');
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
 const editingEndpointId = ref<string | null>(null);
-const stepTypeQuery = ref('');
-const suggestionQuery = ref('');
+const stepLibraryQuery = ref('');
+const expandedTypeGroups = ref<Set<StepType>>(new Set());
 const modelBucketFilter = ref<ModelUsageBucket | ''>('');
 const advisorLoading = ref(false);
 const advisorSuggestions = ref<{suggestionId: string; reason: string}[]>([]);
@@ -416,7 +412,7 @@ const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] 
   {type: 'prompt-wrapper', label: 'Prompt wrapper', description: 'Compose XML prompt blocks without calling a model'},
   {type: 'presentation', label: 'Text', description: 'Free-form text with optional {{artifact.key}} interpolation'},
   {type: 'json-extract', label: 'JSON extract', description: 'Parse JSON from a prior artifact'},
-  {type: 'loop-group', label: 'Loop group', description: 'Repeat an inner step chain until exit condition'},
+  {type: 'loop-group', label: 'Loop', description: 'Repeat an inner step chain until exit condition'},
 ];
 
 function matchesQuery(query: string, text: string): boolean {
@@ -425,17 +421,54 @@ function matchesQuery(query: string, text: string): boolean {
   return text.toLowerCase().includes(q);
 }
 
-const filteredStepTypes = computed(() =>
-  STEP_TYPE_ENTRIES.filter((e) =>
-    matchesQuery(stepTypeQuery.value, `${e.label} ${e.description} ${e.type}`),
-  ),
-);
+interface StepTypeGroup {
+  type: StepType;
+  label: string;
+  description: string;
+  suggestions: PipelineSuggestion[];
+  typeMatches: boolean;
+}
 
-const filteredSuggestions = computed(() =>
-  ALL_SUGGESTIONS.filter((s) =>
-    matchesQuery(suggestionQuery.value, `${s.name} ${s.description} ${s.category} ${s.id}`),
-  ),
-);
+const suggestionsByType = computed(() => {
+  const map = new Map<StepType, PipelineSuggestion[]>();
+  for (const s of ALL_SUGGESTIONS) {
+    const type = s.insertableSteps[0]?.type ?? 'model-call';
+    if (!map.has(type)) map.set(type, []);
+    map.get(type)!.push(s);
+  }
+  return map;
+});
+
+const filteredStepGroups = computed((): StepTypeGroup[] => {
+  const query = stepLibraryQuery.value.trim().toLowerCase();
+  return STEP_TYPE_ENTRIES.flatMap((entry) => {
+    const allSuggestions = suggestionsByType.value.get(entry.type) ?? [];
+    if (!query) {
+      return [{...entry, suggestions: allSuggestions, typeMatches: true}];
+    }
+    const typeMatches = matchesQuery(query, `${entry.label} ${entry.description} ${entry.type}`);
+    const matchedSuggestions = allSuggestions.filter((s) =>
+      matchesQuery(query, `${s.name} ${s.description} ${s.category} ${s.id}`),
+    );
+    if (!typeMatches && matchedSuggestions.length === 0) return [];
+    return [{...entry, suggestions: typeMatches ? allSuggestions : matchedSuggestions, typeMatches}];
+  });
+});
+
+function isTypeGroupExpanded(type: StepType): boolean {
+  if (stepLibraryQuery.value.trim()) {
+    const group = filteredStepGroups.value.find((g) => g.type === type);
+    if (group && !group.typeMatches && group.suggestions.length > 0) return true;
+  }
+  return expandedTypeGroups.value.has(type);
+}
+
+function toggleTypeGroup(type: StepType) {
+  const next = new Set(expandedTypeGroups.value);
+  if (next.has(type)) next.delete(type);
+  else next.add(type);
+  expandedTypeGroups.value = next;
+}
 
 const advisorArtifactKeys = computed(() => Object.keys(runStore.artifacts).sort());
 
@@ -480,7 +513,7 @@ onMounted(async () => {
   await endpointsStore.load();
   await modelsStore.load();
   uiStore.expandLeftPaneSection(
-    modelsStore.models.length === 0 ? 'endpoints' : 'stepTypes',
+    modelsStore.models.length === 0 ? 'endpoints' : 'stepLibrary',
   );
 });
 
@@ -787,18 +820,85 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 }
 .palette-search:focus { outline: none; border-color: #2a5070; }
 
-.step-type-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.step-type-row {
-  display: flex; align-items: flex-start; gap: 0.5rem;
-  padding: 0.7rem 0.85rem; border-radius: 6px; border: 1px solid #222; background: #161616;
-}
-.step-type-row:hover { border-color: #2a3a4a; background: #181c22; }
-.step-type-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
-.step-type-row-name { font-size: 1rem; font-weight: 500; }
-.step-type-row-desc { font-size: 0.78rem; color: #666; line-height: 1.35; }
+/* Step library */
+.step-library-list { display: flex; flex-direction: column; gap: 0.35rem; }
 
-/* Suggestions */
-.suggestion-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.type-group {
+  border: 1px solid #222;
+  border-radius: 6px;
+  background: #161616;
+  overflow: hidden;
+}
+.type-group.expanded { border-color: #2a3d4a; }
+
+.type-group-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+}
+.type-group:hover .type-group-header { background: #181c22; }
+.type-group.expanded .type-group-header { background: #0f161c; }
+
+.type-group-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.type-group-name { font-size: 0.95rem; font-weight: 600; color: #ddd; }
+.type-group-desc { font-size: 0.76rem; color: #555; line-height: 1.35; }
+
+.type-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.type-group-expand {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  background: none;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #555;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.type-group-expand:hover { background: #1e1e1e; color: #999; border-color: #3a3a3a; }
+.type-group.expanded .type-group-expand { color: #7ec8e3; border-color: #2a5070; background: #0f1a22; }
+
+.type-expand-chevron {
+  display: inline-block;
+  font-size: 1rem;
+  color: inherit;
+  transition: transform 0.15s;
+}
+.type-expand-chevron.open { transform: rotate(90deg); }
+.type-expand-count { font-size: 0.72rem; color: inherit; }
+
+.type-group-suggestions {
+  border-top: 1px solid #1e2a32;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.type-group-suggestions .suggestion-row {
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid #1a1a1a;
+  background: #0f0f0f;
+}
+.type-group-suggestions .suggestion-row:last-child { border-bottom: none; }
+.type-group-suggestions .suggestion-row:hover { background: #141a14; border-color: transparent; }
+
+/* Suggestions shared */
 .suggestion-row {
   display: flex; align-items: stretch;
   border-radius: 6px; border: 1px solid #222; background: #161616;

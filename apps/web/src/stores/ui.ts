@@ -3,7 +3,7 @@ import {ref, watch} from 'vue';
 
 export type EditorContext = 'pipeline' | 'capsule';
 export type RightPaneTab = 'inspector' | 'interface' | 'trace' | 'output';
-export type LeftPaneSection = 'endpoints' | 'suggestions' | 'stepTypes' | 'capsules' | 'models';
+export type LeftPaneSection = 'endpoints' | 'stepLibrary' | 'capsules' | 'models';
 
 export interface UiState {
   editorContext: EditorContext;
