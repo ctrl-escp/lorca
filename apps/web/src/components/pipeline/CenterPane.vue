@@ -18,39 +18,43 @@
         @blur="commitPipelineName"
         @keydown.enter="commitPipelineName"
       />
-      <div class="run-controls">
-        <!-- Build is always visible -->
-        <button class="btn btn-secondary" type="button" title="Generate a pipeline from a natural-language description" @click="handleBuildFromDescription">✨ Build from description…</button>
-        <!-- Progressive overflow buttons: each revealed at a wider breakpoint -->
-        <button class="btn btn-secondary ovf-inline ovf-1" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-        <button class="btn btn-secondary ovf-inline ovf-2" type="button" title="Save selected steps as a draft Capsule" @click="handleExtractSelection">Extract to Capsule</button>
-        <button class="btn btn-secondary ovf-inline ovf-3" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
-        <button class="btn btn-secondary ovf-inline ovf-4" type="button" @click="handleExport">Export</button>
-        <button class="btn btn-secondary ovf-inline ovf-5" type="button" @click="handleImport">Import</button>
-        <!-- More dropdown: contains only the buttons not yet shown inline -->
-        <div class="more-menu-wrap" ref="moreMenuRef">
-          <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
-          <div v-if="moreMenuOpen" class="more-menu-dropdown">
-            <button class="more-menu-item ovf-drop ovf-drop-1" type="button" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-            <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleExtractSelection">Extract to Capsule</button>
-            <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleConvertPipeline">Convert to Capsule</button>
-            <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleExport">Export</button>
-            <button class="more-menu-item ovf-drop ovf-drop-5" type="button" @click="handleImport">Import</button>
+      <div class="run-controls" :class="{ 'is-running': runStore.isRunning }">
+        <div class="pipeline-action-controls">
+          <!-- Build is always visible -->
+          <button class="btn btn-secondary" type="button" title="Generate a pipeline from a natural-language description" @click="handleBuildFromDescription">✨ Build from description…</button>
+          <!-- Progressive overflow buttons: each revealed at a wider breakpoint -->
+          <button class="btn btn-secondary ovf-inline ovf-1" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
+          <button class="btn btn-secondary ovf-inline ovf-2" type="button" title="Save selected steps as a draft Capsule" @click="handleExtractSelection">Extract to Capsule</button>
+          <button class="btn btn-secondary ovf-inline ovf-3" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
+          <button class="btn btn-secondary ovf-inline ovf-4" type="button" @click="handleExport">Export</button>
+          <button class="btn btn-secondary ovf-inline ovf-5" type="button" @click="handleImport">Import</button>
+          <!-- More dropdown: contains only the buttons not yet shown inline -->
+          <div class="more-menu-wrap" ref="moreMenuRef">
+            <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
+            <div v-if="moreMenuOpen" class="more-menu-dropdown">
+              <button class="more-menu-item ovf-drop ovf-drop-1" type="button" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
+              <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleExtractSelection">Extract to Capsule</button>
+              <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleConvertPipeline">Convert to Capsule</button>
+              <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleExport">Export</button>
+              <button class="more-menu-item ovf-drop ovf-drop-5" type="button" @click="handleImport">Import</button>
+            </div>
           </div>
         </div>
-        <label v-if="runStore.isRunning" class="follow-run-label" title="Auto-scroll step selection to the running step">
-          <input type="checkbox" v-model="followRunLive" />
-          Follow
-        </label>
-        <button
-          class="btn btn-run"
-          :disabled="runStore.isRunning || !canRun"
-          :title="runButtonTitle"
-          @click="handleRun"
-        >
-          {{ runStore.isRunning ? 'Running…' : 'Execute Pipeline' }}
-        </button>
-        <button class="btn btn-cancel" v-if="runStore.isRunning" @click="runStore.cancel">Cancel</button>
+        <div class="execute-controls">
+          <label v-if="runStore.isRunning" class="follow-run-label" title="Auto-scroll step selection to the running step">
+            <input type="checkbox" v-model="followRunLive" />
+            <span class="follow-run-text">Follow</span>
+          </label>
+          <button
+            class="btn btn-run"
+            :disabled="runStore.isRunning || !canRun"
+            :title="runButtonTitle"
+            @click="handleRun"
+          >
+            {{ runStore.isRunning ? 'Running…' : 'Execute Pipeline' }}
+          </button>
+          <button class="btn btn-cancel" v-if="runStore.isRunning" @click="runStore.cancel">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -843,7 +847,15 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 }
 .pipeline-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
 
-.run-controls { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; min-width: 0; }
+.run-controls {
+  display: flex; flex: 1 1 auto; gap: 0.4rem; align-items: center;
+  justify-content: flex-end; flex-wrap: wrap; min-width: 0;
+}
+.pipeline-action-controls,
+.execute-controls {
+  display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.execute-controls { flex-shrink: 0; }
 .btn { border-radius: 5px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; border: 1px solid #333; }
 .btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 .btn-run:hover:not(:disabled) { background: #254a62; }
@@ -852,7 +864,10 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 .btn-secondary:hover { background: #222; color: #ccc; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }
-.follow-run-label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: #888; cursor: pointer; user-select: none; }
+.follow-run-label {
+  display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem;
+  color: #888; cursor: pointer; user-select: none; flex-shrink: 0;
+}
 .follow-run-label input { cursor: pointer; }
 
 /* More menu */
@@ -879,6 +894,33 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
   .ovf-5 { display: inline-flex; }
   .ovf-drop-5 { display: none; }
   .more-menu-wrap { display: none; }
+}
+
+/* Running adds Follow + Cancel — keep inline actions in the More menu longer */
+@container (min-width: 640px) and (max-width: 819px) {
+  .run-controls.is-running .ovf-1 { display: none; }
+  .run-controls.is-running .ovf-drop-1 { display: block; }
+}
+@container (min-width: 760px) and (max-width: 939px) {
+  .run-controls.is-running .ovf-2 { display: none; }
+  .run-controls.is-running .ovf-drop-2 { display: block; }
+}
+@container (min-width: 875px) and (max-width: 1054px) {
+  .run-controls.is-running .ovf-3 { display: none; }
+  .run-controls.is-running .ovf-drop-3 { display: block; }
+}
+@container (min-width: 945px) and (max-width: 1124px) {
+  .run-controls.is-running .ovf-4 { display: none; }
+  .run-controls.is-running .ovf-drop-4 { display: block; }
+}
+@container (min-width: 1010px) and (max-width: 1189px) {
+  .run-controls.is-running .ovf-5 { display: none; }
+  .run-controls.is-running .ovf-drop-5 { display: block; }
+  .run-controls.is-running .more-menu-wrap { display: block; }
+}
+
+@container (max-width: 720px) {
+  .follow-run-text { display: none; }
 }
 .more-menu-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
