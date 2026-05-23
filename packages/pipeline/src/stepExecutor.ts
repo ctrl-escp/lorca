@@ -79,10 +79,12 @@ function traceEvent(
   return {runId, stepId, nodeId: stepId, status, timestamp: new Date().toISOString(), ...extra};
 }
 
-function tryParseJson(text: string): unknown | null {
+type ParseResult = {ok: true; value: unknown} | {ok: false};
+
+function tryParseJson(text: string): ParseResult {
   const stripped = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  try { return JSON.parse(stripped); } catch { /* ignore */ }
-  try { return JSON.parse(text); } catch { return null; }
+  try { return {ok: true, value: JSON.parse(stripped)}; } catch { /* ignore */ }
+  try { return {ok: true, value: JSON.parse(text)}; } catch { return {ok: false}; }
 }
 
 function getJsonField(obj: unknown, fieldPath: string): unknown {
@@ -94,11 +96,46 @@ function getJsonField(obj: unknown, fieldPath: string): unknown {
   return current;
 }
 
+function flattenJsonFields(prefix: string, value: unknown, map: Record<string, unknown>, depth: number): void {
+  if (depth === 0 || value === null || typeof value !== 'object' || Array.isArray(value)) return;
+  for (const [field, val] of Object.entries(value as Record<string, unknown>)) {
+    const key = `${prefix}.${field}`;
+    map[key] = val;
+    flattenJsonFields(key, val, map, depth - 1);
+  }
+}
+
+/**
+ * Resolves an artifact reference that may use dot-notation into a JSON artifact.
+ * e.g. "step.json.field.sub" → looks up "step.json" artifact, traverses .field.sub
+ * Returns a synthetic artifact with the resolved leaf value, or undefined if not found.
+ */
+function resolveArtifactByPath(
+  artifacts: Record<string, PipelineArtifact>,
+  ref: string,
+): PipelineArtifact | undefined {
+  if (ref in artifacts) return artifacts[ref];
+  // Try progressively shorter prefixes
+  const parts = ref.split('.');
+  for (let len = parts.length - 1; len >= 1; len--) {
+    const prefix = parts.slice(0, len).join('.');
+    const artifact = artifacts[prefix];
+    if (artifact && artifact.kind === 'json') {
+      const remainingPath = parts.slice(len).join('.');
+      const value = getJsonField(artifact.value, remainingPath);
+      if (value !== undefined) {
+        return {...artifact, name: ref, value};
+      }
+    }
+  }
+  return undefined;
+}
+
 function exitConditionMet(exitCondition: LoopExitCondition, lastOutputText: string): boolean {
   if (exitCondition.type === 'iterations') return false;
   const parsed = tryParseJson(lastOutputText);
-  if (parsed === null) return false;
-  return getJsonField(parsed, exitCondition.fieldPath) === exitCondition.value;
+  if (!parsed.ok) return false;
+  return getJsonField(parsed.value, exitCondition.fieldPath) === exitCondition.value;
 }
 
 export async function executeStepChain(
@@ -282,28 +319,16 @@ export async function executeStepInternal(
   switch (config.type) {
     case 'presentation': {
       const artifactValues: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(artifacts)) artifactValues[k] = v.value;
+      for (const [k, v] of Object.entries(artifacts)) {
+        artifactValues[k] = v.value;
+        if (v.kind === 'json') flattenJsonFields(k, v.value, artifactValues, 8);
+      }
       const renderResult = renderTemplate(config.text, {artifacts: artifactValues, allowParams: false});
       if (!renderResult.ok) return {ok: false, error: {...renderResult.error, nodeId: step.id}};
       const key = `${step.outputNamespace}.text`;
       return stepOk([makeArtifact(key, step.id, 'text', renderResult.value)], {inputArtifactNames});
     }
 
-    case 'json-extract': {
-      const source = artifacts[config.sourceArtifactRef];
-      if (!source) {
-        return {ok: false, error: {code: 'missing_artifact', message: `Artifact not found: ${config.sourceArtifactRef}`, nodeId: step.id}};
-      }
-      const text = typeof source.value === 'string' ? source.value : JSON.stringify(source.value);
-      const parsed = tryParseJson(text);
-      if (parsed === null) {
-        return {ok: false, error: {code: 'json_parse_failed', message: `Could not extract JSON from: ${config.sourceArtifactRef}`, nodeId: step.id}};
-      }
-      const key = `${step.outputNamespace}.json`;
-      return stepOk([makeArtifact(key, step.id, 'json', parsed)], {inputArtifactNames});
-    }
-
-    case 'prompt-wrapper':
     case 'model-call': {
       return executePromptStep(step, compiledStep, artifacts, resolveEndpoint, abortSignal, resolveEndpointForModel);
     }
@@ -442,7 +467,10 @@ async function executePromptStep(
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
-  const {config} = step;
+  if (step.config.type !== 'model-call') {
+    return {ok: false, error: {code: 'unknown_error', message: `Unexpected step type in executePromptStep: ${step.config.type}`, nodeId: step.id}};
+  }
+  const config = step.config;
 
   const prevArtifact = compiledStep.previousOutputArtifactRef
     ? artifacts[compiledStep.previousOutputArtifactRef]
@@ -454,7 +482,7 @@ async function executePromptStep(
   const resolvedHistory: ResolvedHistoryRead[] = [];
   const historyReadInputs: TraceHistoryReadInput[] = [];
   for (const read of compiledStep.historyReads ?? []) {
-    const artifact = artifacts[read.sourceArtifactRef];
+    const artifact = resolveArtifactByPath(artifacts, read.sourceArtifactRef);
     if (!artifact) {
       if (read.required) {
         return {
@@ -486,14 +514,6 @@ async function executePromptStep(
     renderedPromptXml: renderedPrompt.xmlText,
     historyReadInputs: historyReadsForTrace(historyReadInputs),
   };
-
-  if (config.type === 'prompt-wrapper') {
-    return stepOk([makeArtifact(key, step.id, 'text', renderedPrompt.xmlText)], traceBase);
-  }
-
-  if (config.type !== 'model-call') {
-    return {ok: false, error: {code: 'unknown_error', message: `Unexpected step type in executePromptStep: ${String((config as {type: string}).type)}`, nodeId: step.id}};
-  }
 
   if (config.modelRef.kind === 'slot') {
     return {ok: false, error: {code: 'invalid_capsule_interface', message: "ModelRef kind 'slot' is only valid inside a Capsule", nodeId: step.id}};
@@ -532,9 +552,17 @@ async function executePromptStep(
     makeArtifact(`${step.outputNamespace}.rawResponse`, step.id, 'model-response', callResult.value.rawResponse),
   ];
 
-  const parsed = tryParseJson(callResult.value.text);
-  if (parsed !== null) {
-    produced.push(makeArtifact(`${step.outputNamespace}.parsedJson`, step.id, 'json', parsed));
+  const outputType = config.outputType ?? 'auto';
+  if (outputType === 'auto' || outputType === 'json') {
+    const parseResult = tryParseJson(callResult.value.text);
+    if (parseResult.ok) {
+      produced.push(makeArtifact(`${step.outputNamespace}.json`, step.id, 'json', parseResult.value));
+      produced.push(makeArtifact(`${step.outputNamespace}.jsonValid`, step.id, 'json', true));
+    } else if (outputType === 'json') {
+      return {ok: false, error: {code: 'json_parse_failed', message: 'Step output could not be parsed as JSON', nodeId: step.id}};
+    } else {
+      produced.push(makeArtifact(`${step.outputNamespace}.jsonValid`, step.id, 'json', false));
+    }
   }
 
   return stepOk(produced, {

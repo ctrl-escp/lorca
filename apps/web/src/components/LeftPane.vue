@@ -408,10 +408,8 @@ function stepsUsingModel(endpointId: string, modelName: string) {
 }
 
 const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
-  {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks'},
-  {type: 'prompt-wrapper', label: 'Prompt wrapper', description: 'Compose XML prompt blocks without calling a model'},
+  {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks. Set output format to JSON strict if downstream steps depend on parsed output.'},
   {type: 'presentation', label: 'Text', description: 'Free-form text with optional {{artifact.key}} interpolation'},
-  {type: 'json-extract', label: 'JSON extract', description: 'Parse JSON from a prior artifact'},
   {type: 'loop-group', label: 'Loop', description: 'Repeat an inner step chain until exit condition'},
 ];
 

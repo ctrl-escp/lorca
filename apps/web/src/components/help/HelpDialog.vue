@@ -52,7 +52,7 @@
         <template v-else>
           <section>
             <h3>Prompt composition</h3>
-            <p>Model-call and prompt-wrapper steps build XML from blocks, optional previous-step output, and history reads. The pipeline wraps your top prompt in <code>&lt;user_prompt&gt;</code>.</p>
+            <p>Model-call steps build XML from blocks, optional previous-step output, and history reads. The pipeline wraps your top prompt in <code>&lt;user_prompt&gt;</code>.</p>
           </section>
           <section>
             <h3>Artifact references (templates)</h3>

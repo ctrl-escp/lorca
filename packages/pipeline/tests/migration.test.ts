@@ -53,9 +53,19 @@ describe('migrateLegacyPipeline', () => {
     const migrated = migrateLegacyPipeline(makeLegacyPipeline());
     expect(migrated.schemaVersion).toBe(2);
     expect(migrated.steps).toHaveLength(2);
-    expect(migrated.steps.map((s) => s.type)).toEqual(['prompt-wrapper', 'model-call']);
+    expect(migrated.steps.map((s) => s.type)).toEqual(['presentation', 'model-call']);
     expect(migrated.steps[0]?.outputNamespace).toBe('wrapped');
     expect(migrated.steps[1]?.label).toBe('Main Model');
+  });
+
+  it('migrates prompt-wrapper preserving input artifact and tag wrapping', () => {
+    const migrated = migrateLegacyPipeline(makeLegacyPipeline());
+    const wrapperStep = migrated.steps[0];
+    expect(wrapperStep?.type).toBe('presentation');
+    if (wrapperStep?.config.type !== 'presentation') return;
+    expect(wrapperStep.config.text).toContain('<user>');
+    expect(wrapperStep.config.text).toContain('{{artifact.user_prompt.xml}}');
+    expect(wrapperStep.config.text).toContain('Wrap the input.');
   });
 
   it('migrates model-call system prompt into XML prompt blocks', () => {

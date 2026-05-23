@@ -473,11 +473,11 @@ describe('importExport', () => {
     expect(parsed.pipeline.schemaVersion).toBe(2);
     expect(parsed.pipeline.name).toBe('Legacy Pipeline');
     expect(parsed.pipeline.steps).toHaveLength(2);
-    expect(parsed.pipeline.steps.map((s) => s.type)).toEqual(['prompt-wrapper', 'model-call']);
+    expect(parsed.pipeline.steps.map((s) => s.type)).toEqual(['presentation', 'model-call']);
 
     const wrapper = parsed.pipeline.steps[0];
-    expect(wrapper?.prompt?.previousOutput.placement).toBe('beforeOwnPrompt');
-    expect(wrapper?.prompt?.blocks[0]?.body).toContain('Wrap the input');
+    // Legacy prompt-wrapper nodes migrate to presentation steps with instruction text as config.text
+    expect(wrapper?.config.type === 'presentation' && wrapper.config.text).toContain('Wrap the input');
 
     const model = parsed.pipeline.steps[1];
     expect(model?.label).toBe('Main Model');

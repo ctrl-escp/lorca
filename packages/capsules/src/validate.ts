@@ -129,7 +129,10 @@ function nodeOutputKeys(node: PipelineNode): string[] {
       return [outputKey(node, 'text')];
     case 'model-call': {
       const keys = [outputKey(node, 'text'), outputKey(node, 'rawResponse')];
-      if (node.config.expectedOutput === 'json') keys.push(outputKey(node, 'parsedJson'));
+      if (node.config.expectedOutput === 'json') {
+        keys.push(outputKey(node, 'parsedJson'));
+        keys.push(outputKey(node, 'json'));
+      }
       return keys;
     }
     case 'json-extract': return [outputKey(node, 'json')];

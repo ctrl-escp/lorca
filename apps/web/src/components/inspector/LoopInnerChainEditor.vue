@@ -31,9 +31,7 @@
 
     <div class="loop-inner-add">
       <button type="button" class="btn btn-sm btn-accent" @click="addInner('model-call')">+ Model</button>
-      <button type="button" class="btn btn-sm" @click="addInner('prompt-wrapper')">+ Wrapper</button>
       <button type="button" class="btn btn-sm" @click="addInner('presentation')">+ Text</button>
-      <button type="button" class="btn btn-sm" @click="addInner('json-extract')">+ JSON</button>
     </div>
 
     <template v-if="selectedInnerStep">
@@ -44,13 +42,6 @@
           <div class="inspector-field">
             <FieldLabel label="Text" />
             <textarea v-model="localTemplate" rows="4" @blur="commitTemplate" />
-          </div>
-        </template>
-
-        <template v-else-if="selectedInnerStep.config.type === 'json-extract'">
-          <div class="inspector-field">
-            <FieldLabel label="Source artifact" />
-            <input v-model="localSourceRef" placeholder="prior_step.text" @blur="commitJsonExtract" />
           </div>
         </template>
 
@@ -124,18 +115,16 @@ const contextSteps = computed(() => {
 const hasPromptBlocks = computed(() => {
   const s = selectedInnerStep.value;
   if (!s) return false;
-  return s.type === 'model-call' || s.type === 'prompt-wrapper' || Boolean(s.prompt?.blocks?.length);
+  return s.type === 'model-call' || Boolean(s.prompt?.blocks?.length);
 });
 
 const localTemplate = ref('');
-const localSourceRef = ref('');
 const localModelKey = ref('');
 const localUseAnyEndpoint = ref(false);
 
 watch(selectedInnerStep, (s) => {
   if (!s) return;
   if (s.config.type === 'presentation') localTemplate.value = s.config.text;
-  if (s.config.type === 'json-extract') localSourceRef.value = s.config.sourceArtifactRef;
   if (s.config.type === 'model-call') {
     localUseAnyEndpoint.value = s.config.modelRef.kind === 'any-enabled-endpoint';
     localModelKey.value = s.config.modelRef.kind === 'fixed'
@@ -158,9 +147,7 @@ watch(() => props.innerSteps, (steps) => {
 function typeLabel(type: StepType): string {
   const labels: Record<StepType, string> = {
     'model-call': 'Model',
-    'prompt-wrapper': 'Wrap',
     'presentation': 'Text',
-    'json-extract': 'JSON',
     'capsule-instance': 'Cap',
     'loop-group': 'Loop',
   };
@@ -193,17 +180,6 @@ function commitTemplate() {
     s.id,
     {config: {...s.config, text: localTemplate.value}},
     'Edit inner template',
-  );
-}
-
-function commitJsonExtract() {
-  const s = selectedInnerStep.value;
-  if (!s || s.config.type !== 'json-extract') return;
-  editorStore.commitLoopInnerStepEdit(
-    props.loopStepId,
-    s.id,
-    {config: {...s.config, sourceArtifactRef: localSourceRef.value}},
-    'Edit inner JSON source',
   );
 }
 

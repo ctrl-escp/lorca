@@ -72,6 +72,18 @@
               <div class="step-card-content">
               <div class="step-card-header">
                 <span class="step-type-badge" :class="`badge-${step.type}`">{{ stepTypeLabel(step.type) }}</span>
+                <span
+                  v-if="step.config.type === 'model-call' && step.config.outputType === 'json'"
+                  class="step-badge step-badge-json"
+                  :class="{'step-badge-json-fail': jsonValidFailed(step)}"
+                  title="JSON (strict): step fails if output is not valid JSON"
+                >JSON</span>
+                <span
+                  v-else-if="step.config.type === 'model-call' && (!step.config.outputType || step.config.outputType === 'auto') && jsonValidKnown(step)"
+                  class="step-badge step-badge-json"
+                  :class="{'step-badge-json-fail': !jsonValidPassed(step)}"
+                  :title="jsonValidPassed(step) ? 'Last run parsed as JSON' : 'Last run output was not valid JSON'"
+                >{{ jsonValidPassed(step) ? 'JSON✓' : 'JSON✗' }}</span>
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
                 <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
                 <span v-if="props.disabledModelStepIds?.has(step.id)" class="step-badge step-badge-model-off" title="This step's model or endpoint is disabled">model off</span>
@@ -332,9 +344,7 @@
       </div>
       <div class="chain-add-bar-buttons">
         <button class="btn btn-sm btn-accent" @click="$emit('append', 'model-call')">+ Model call</button>
-        <button class="btn btn-sm" @click="$emit('append', 'prompt-wrapper')">+ Prompt wrapper</button>
         <button class="btn btn-sm" @click="$emit('append', 'presentation')">+ Text</button>
-        <button class="btn btn-sm" @click="$emit('append', 'json-extract')">+ JSON extract</button>
         <button class="btn btn-sm" @click="$emit('append', 'loop-group')">+ Loop</button>
         <button v-if="showCapsuleAdd" class="btn btn-sm btn-capsule" @click="$emit('append', 'capsule-instance')">+ Capsule</button>
       </div>
@@ -610,9 +620,7 @@ function traceStatusClass(stepId: string): string {
 
 const TYPE_LABELS: Record<StepType, string> = {
   'model-call': 'Model call',
-  'prompt-wrapper': 'Wrapper',
   'presentation': 'Text',
-  'json-extract': 'JSON extract',
   'capsule-instance': 'Capsule',
   'loop-group': 'Loop',
 };
@@ -655,10 +663,6 @@ function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadg
     addSource(read.sourceArtifactRef, 'history', read.required ? `Required history read <${read.tagName}>` : `Optional history read <${read.tagName}>`);
   }
 
-  if (step.config.type === 'json-extract') {
-    addSource(step.config.sourceArtifactRef, 'direct', 'JSON source');
-  }
-
   if (step.config.type === 'presentation') {
     for (const templateRef of artifactRefsInTemplate(step.config.text)) {
       addSource(templateRef, 'template', 'Template reference');
@@ -675,7 +679,7 @@ function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadg
 }
 
 function usesPreviousOutputSource(step: PipelineStep): boolean {
-  if (!['model-call', 'prompt-wrapper', 'loop-group'].includes(step.config.type)) return false;
+  if (!['model-call', 'loop-group'].includes(step.config.type)) return false;
   return step.prompt ? step.prompt.previousOutput.enabled : true;
 }
 
@@ -721,6 +725,18 @@ function stepHasModelError(step: PipelineStep): boolean {
   if (modelRef.kind === 'fixed') return !modelRef.endpointId || !modelRef.modelName;
   if (modelRef.kind === 'any-enabled-endpoint') return !modelRef.modelName;
   return false;
+}
+
+function jsonValidFailed(step: PipelineStep): boolean {
+  return props.artifacts?.[`${step.outputNamespace}.jsonValid`]?.value === false;
+}
+
+function jsonValidKnown(step: PipelineStep): boolean {
+  return `${step.outputNamespace}.jsonValid` in (props.artifacts ?? {});
+}
+
+function jsonValidPassed(step: PipelineStep): boolean {
+  return props.artifacts?.[`${step.outputNamespace}.jsonValid`]?.value === true;
 }
 
 function runStateFor(stepId: string) {
@@ -1219,7 +1235,6 @@ function runStateTitle(stepId: string): string {
   background: #222; color: #666; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .badge-model-call { background: #1e2d3d; color: #5a9fd4; }
-.badge-prompt-wrapper { background: #2a2a1a; color: #b8a050; }
 .badge-presentation { background: #1e2a1e; color: #5a9d5a; }
 .badge-capsule-instance { background: #2a1e3d; color: #9d6db8; }
 
@@ -1259,6 +1274,8 @@ function runStateTitle(stepId: string): string {
 .step-badge { font-size: clamp(0.74rem, 1.45cqh, 1rem); padding: 1px 6px; border-radius: 2px; }
 .step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
 .step-badge-model-off { background: #2a2010; color: #c8a030; border: 1px solid #4a3a10; }
+.step-badge-json { background: #1a2a1a; color: #60c060; border: 1px solid #2a5a2a; font-size: clamp(0.64rem, 1.25cqh, 0.85rem); font-weight: 700; letter-spacing: 0.05em; }
+.step-badge-json-fail { background: #2a1a1a; color: #e06060; border-color: #5a2a2a; }
 .chain-step.model-disabled .step-card { border-left: 3px solid #7a6020; }
 
 .step-run-badge {

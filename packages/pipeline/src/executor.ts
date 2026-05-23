@@ -205,12 +205,12 @@ async function executeNode(
         return {ok: false, error: {code: 'missing_artifact', message: `Artifact not found: ${node.inputArtifactRef}`, nodeId: node.id}};
       }
       const text = typeof source.value === 'string' ? source.value : JSON.stringify(source.value);
-      const parsed = tryParseJson(text);
-      if (parsed === null) {
+      const parseResult = tryParseJson(text);
+      if (!parseResult.ok) {
         return {ok: false, error: {code: 'json_parse_failed', message: `Could not extract JSON from artifact: ${node.inputArtifactRef}`, nodeId: node.id}};
       }
       const key = outputKey(node, 'json');
-      return {ok: true, value: [makeArtifact(key, node.id, 'json', parsed)]};
+      return {ok: true, value: [makeArtifact(key, node.id, 'json', parseResult.value)]};
     }
 
     case 'model-call':
@@ -285,9 +285,10 @@ async function executeModelCallNode(
   ];
 
   if (expectedOutput === 'json') {
-    const parsed = tryParseJson(callResult.value.text);
-    if (parsed !== null) {
-      artifacts.push(makeArtifact(outputKey(node, 'parsedJson'), node.id, 'json', parsed));
+    const parseResult = tryParseJson(callResult.value.text);
+    if (parseResult.ok) {
+      artifacts.push(makeArtifact(outputKey(node, 'parsedJson'), node.id, 'json', parseResult.value));
+      artifacts.push(makeArtifact(outputKey(node, 'json'), node.id, 'json', parseResult.value));
     }
   }
 
@@ -597,21 +598,23 @@ function resolveCapsuleSlots(
   });
 }
 
-function tryParseJson(text: string): unknown | null {
+type ParseResult = {ok: true; value: unknown} | {ok: false};
+
+function tryParseJson(text: string): ParseResult {
   // Strategy 1: strict JSON parse
-  try { return JSON.parse(text); } catch { /* fall through */ }
+  try { return {ok: true, value: JSON.parse(text)}; } catch { /* fall through */ }
 
   // Strategy 2: fenced code block extraction
   const fenced = text.match(/```(?:json)?\s*\n?([\s\S]+?)\n?```/);
   if (fenced?.[1]) {
-    try { return JSON.parse(fenced[1]); } catch { /* fall through */ }
+    try { return {ok: true, value: JSON.parse(fenced[1])}; } catch { /* fall through */ }
   }
 
   // Strategy 3: first complete object or array
   const objMatch = text.match(/\{[\s\S]*\}/);
-  if (objMatch) { try { return JSON.parse(objMatch[0]); } catch { /* fall through */ } }
+  if (objMatch) { try { return {ok: true, value: JSON.parse(objMatch[0])}; } catch { /* fall through */ } }
   const arrMatch = text.match(/\[[\s\S]*\]/);
-  if (arrMatch) { try { return JSON.parse(arrMatch[0]); } catch { /* fall through */ } }
+  if (arrMatch) { try { return {ok: true, value: JSON.parse(arrMatch[0])}; } catch { /* fall through */ } }
 
-  return null;
+  return {ok: false};
 }

@@ -59,6 +59,22 @@ describe('validateCapsule', () => {
     expect(validateCapsule(def).ok).toBe(false);
   });
 
+  it('detects duplicate .json key from two expectedOutput=json nodes with same prefix', () => {
+    const jsonModelNode = (id: string) => ({
+      id,
+      type: 'model-call' as const,
+      artifactPrefix: 'result',
+      config: {modelRef: {kind: 'fixed' as const, endpointId: 'ep-1', modelName: 'llm'}, mode: 'generate' as const, inputArtifactRef: 'user_prompt.xml', expectedOutput: 'json' as const},
+    });
+    const def = minimalCapsule({
+      nodes: [jsonModelNode('mc1'), jsonModelNode('mc2')],
+      outputRef: {nodeId: 'mc1', outputName: 'text'},
+    });
+    const result = validateCapsule(def);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
+  });
+
   it('rejects invalid outputRef node', () => {
     const def = minimalCapsule({outputRef: {nodeId: 'nonexistent', outputName: 'text'}});
     const result = validateCapsule(def);

@@ -55,6 +55,15 @@ describe('validatePipeline', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
   });
+
+  it('detects duplicate .json key when two expectedOutput=json nodes share a prefix', () => {
+    const def = base();
+    def.nodes[1] = {id: 'mc', type: 'model-call', artifactPrefix: 'answer', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml', expectedOutput: 'json'}};
+    def.nodes.push({id: 'mc2', type: 'model-call', artifactPrefix: 'answer', config: {modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml', expectedOutput: 'json'}});
+    const result = validateLegacyPipeline(def);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
+  });
 });
 
 describe('topologicalOrder', () => {

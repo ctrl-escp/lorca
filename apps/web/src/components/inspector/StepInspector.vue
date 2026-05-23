@@ -85,6 +85,14 @@
                 @blur="commitModelCall"
               />
             </div>
+            <div class="inspector-field">
+              <FieldLabel label="Output format" title="How to handle the model's text output" />
+              <select v-model="localOutputType" title="Output format" @change="commitOutputType">
+                <option value="auto">Auto (try JSON, fall back silently)</option>
+                <option value="text">Text only (no JSON attempt)</option>
+                <option value="json">JSON strict (fail if not valid JSON)</option>
+              </select>
+            </div>
           </template>
 
           <template v-else-if="step.config.type === 'presentation'">
@@ -97,18 +105,6 @@
                 title="Text with optional artifact placeholders"
                 @focus="onTextFieldFocus"
                 @blur="commitTemplate"
-              />
-            </div>
-          </template>
-
-          <template v-else-if="step.config.type === 'json-extract'">
-            <div class="inspector-field">
-              <FieldLabel label="Source artifact" required title="Artifact key to parse as JSON (supports fenced code blocks)" />
-              <input
-                v-model="localSourceRef"
-                placeholder="answer.text"
-                title="Source artifact key"
-                @blur="commitJsonExtract"
               />
             </div>
           </template>
@@ -151,13 +147,7 @@
 
         <!-- Inputs -->
         <template v-else-if="activeTab === 'inputs'">
-          <template v-if="step.config.type === 'json-extract'">
-            <div class="inspector-field">
-              <FieldLabel label="Source artifact" />
-              <code class="binding-ref">{{ step.config.sourceArtifactRef || '(not set)' }}</code>
-            </div>
-          </template>
-          <template v-else-if="step.config.type === 'capsule-instance'">
+          <template v-if="step.config.type === 'capsule-instance'">
             <div class="binding-list">
               <div v-for="(ref, port) in step.config.inputBindings" :key="port" class="binding-row">
                 <span class="binding-port">{{ port }}</span>
@@ -299,7 +289,7 @@ const lastRunOutputValue = computed((): unknown | null => {
 });
 
 const hasPromptBlocks = computed(() =>
-  step.value?.config.type === 'model-call' || step.value?.config.type === 'prompt-wrapper',
+  step.value?.config.type === 'model-call',
 );
 
 const capsuleInstanceStep = computed((): (PipelineStep & {config: CapsuleInstanceStepConfig}) | null => {
@@ -334,11 +324,9 @@ function formatTime(iso: string): string {
 
 const TYPE_LABELS: Record<string, string> = {
   'model-call': 'Model Call',
-  'prompt-wrapper': 'Prompt Wrapper',
   'presentation': 'Text',
-  'json-extract': 'JSON Extract',
   'capsule-instance': 'Capsule',
-  'loop-group': 'Loop Group',
+  'loop-group': 'Loop',
 };
 
 const localLabel = ref('');
@@ -347,8 +335,8 @@ const localUseAnyEndpoint = ref(false);
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
 const localMaxTokens = ref('');
+const localOutputType = ref<'text' | 'auto' | 'json'>('auto');
 const localTemplate = ref('');
-const localSourceRef = ref('');
 const localMaxIterations = ref(3);
 
 watch(step, (s) => {
@@ -366,10 +354,10 @@ watch(step, (s) => {
     localMode.value = cfg.mode;
     localTemperature.value = cfg.temperature !== undefined ? String(cfg.temperature) : '';
     localMaxTokens.value = cfg.maxTokens !== undefined ? String(cfg.maxTokens) : '';
+    localOutputType.value = cfg.outputType ?? 'auto';
   }
 
   if (cfg.type === 'presentation') localTemplate.value = cfg.text;
-  if (cfg.type === 'json-extract') localSourceRef.value = cfg.sourceArtifactRef;
 
   if (cfg.type === 'loop-group') {
     localMaxIterations.value = cfg.maxIterations;
@@ -423,16 +411,20 @@ function commitModelCall() {
   editorStore.commitStepConfigEdit(s.id, {config: {...s.config, ...patch}}, 'Update model call');
 }
 
+function commitOutputType() {
+  const s = step.value;
+  if (!s || s.config.type !== 'model-call') return;
+  const {outputType: _old, ...rest} = s.config;
+  const newConfig = localOutputType.value === 'auto'
+    ? rest as typeof s.config
+    : {...rest, outputType: localOutputType.value} as typeof s.config;
+  editorStore.commitStepConfigEdit(s.id, {config: newConfig}, 'Update output format');
+}
+
 function commitTemplate() {
   const s = step.value;
   if (!s || s.config.type !== 'presentation') return;
   editorStore.commitStepEdit(s.id, {config: {...s.config, text: localTemplate.value}}, 'Edit text');
-}
-
-function commitJsonExtract() {
-  const s = step.value;
-  if (!s || s.config.type !== 'json-extract') return;
-  editorStore.commitStepConfigEdit(s.id, {config: {...s.config, sourceArtifactRef: localSourceRef.value}}, 'Update source');
 }
 
 function commitLoopGroup(exitCondition?: LoopExitCondition) {

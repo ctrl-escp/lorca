@@ -66,7 +66,7 @@ function artifactOutputName(ref: string): string {
 
 function inferKind(ref: string): CapsuleValueKind {
   const out = artifactOutputName(ref);
-  if (out === 'json' || out === 'parsedJson') return 'json';
+  if (out === 'json') return 'json';
   return 'text';
 }
 
@@ -110,11 +110,6 @@ function collectExternalInputRefs(
     for (const read of getStepHistoryReads(step)) {
       if (!isRefFromSelection(read.sourceArtifactRef, selectedIds, allSteps)) {
         external.add(read.sourceArtifactRef);
-      }
-    }
-    if (step.config.type === 'json-extract' && step.config.sourceArtifactRef) {
-      if (!isRefFromSelection(step.config.sourceArtifactRef, selectedIds, allSteps)) {
-        external.add(step.config.sourceArtifactRef);
       }
     }
   }
@@ -171,11 +166,6 @@ function collectExternalOutputRefs(
         addOutput(read.sourceArtifactRef);
       }
     }
-    if (step.config.type === 'json-extract' && step.config.sourceArtifactRef) {
-      if (isRefFromSelection(step.config.sourceArtifactRef, selectedIds, allSteps)) {
-        addOutput(step.config.sourceArtifactRef);
-      }
-    }
   }
 
   const activeAll = buildActiveStepChain(allSteps);
@@ -214,18 +204,6 @@ function remapStepForCapsule(
   inputPortByParentRef: Map<string, string>,
 ): PipelineStep {
   const clone: PipelineStep = JSON.parse(JSON.stringify(step));
-
-  if (clone.config.type === 'json-extract' && clone.config.sourceArtifactRef) {
-    const port = inputPortByParentRef.get(clone.config.sourceArtifactRef);
-    if (port) {
-      clone.config = {
-        ...clone.config,
-        sourceArtifactRef: port === 'user_prompt'
-          ? 'user_prompt.xml'
-          : `${port}.${artifactOutputName(clone.config.sourceArtifactRef)}`,
-      };
-    }
-  }
 
   const remapReads = (reads: StepHistoryReadConfig[]) =>
     reads.map((r) => remapHistoryRead(r, inputPortByParentRef));

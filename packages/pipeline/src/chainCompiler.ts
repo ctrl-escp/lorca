@@ -6,7 +6,6 @@ import type {
   PipelineNode,
   PipelineEdge,
   ModelCallConfig,
-  PromptWrapperConfig,
 } from '@lorca/core';
 import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
 import {newStepId} from './stepId.js';
@@ -228,35 +227,6 @@ function stepToLegacyNode(
       };
     }
 
-    case 'prompt-wrapper': {
-      const prevStep = stepIndex > 0 ? activeSteps[stepIndex - 1] : undefined;
-      const inputArtifactRef = prevStep
-        ? `${prevStep.outputNamespace}.${prevStep.primaryOutputName}`
-        : 'user_prompt.xml';
-
-      const instructionText = step.prompt?.blocks
-        .filter((b) => b.enabled)
-        .map((b) => b.body)
-        .join('\n') ?? '';
-
-      const legacyConfig: PromptWrapperConfig = {
-        tagName: step.prompt?.previousOutput.tagName ?? 'instructions',
-        instructionText,
-        includeInputArtifact: true,
-        inputPlacement: step.prompt?.previousOutput.placement === 'beforeOwnPrompt'
-          ? 'before-instructions'
-          : 'after-instructions',
-        inputArtifactRef,
-      };
-      return {
-        id: step.id,
-        type: 'prompt-wrapper',
-        artifactPrefix: step.outputNamespace,
-        title: step.label,
-        config: legacyConfig,
-      };
-    }
-
     case 'presentation':
       return {
         id: step.id,
@@ -264,15 +234,6 @@ function stepToLegacyNode(
         artifactPrefix: step.outputNamespace,
         title: step.label,
         template: config.text,
-      };
-
-    case 'json-extract':
-      return {
-        id: step.id,
-        type: 'json-extract',
-        artifactPrefix: step.outputNamespace,
-        title: step.label,
-        inputArtifactRef: config.sourceArtifactRef,
       };
 
     case 'capsule-instance':
@@ -387,6 +348,7 @@ function legacyNodeToStep(
       };
       if (node.config.temperature !== undefined) (modelStep.config as {temperature?: number}).temperature = node.config.temperature;
       if (node.config.maxTokens !== undefined) (modelStep.config as {maxTokens?: number}).maxTokens = node.config.maxTokens;
+      if (node.config.expectedOutput === 'json') (modelStep.config as {outputType?: string}).outputType = 'json';
       if (node.config.systemPrompt) {
         modelStep.prompt = {
           previousOutput: {enabled: true, placement: 'beforeOwnPrompt', tagName: 'previous_output'},
@@ -405,35 +367,28 @@ function legacyNodeToStep(
     }
 
     case 'prompt-wrapper': {
-      const wrapStep: PipelineStep = {
+      const {tagName, instructionText, includeInputArtifact, inputPlacement, template, inputArtifactRef} = node.config;
+      const ref = inputArtifactRef ?? 'user_prompt.xml';
+      let text: string;
+      if (!includeInputArtifact) {
+        text = `<${tagName}>\n${instructionText}\n</${tagName}>`;
+      } else if (inputPlacement === 'inside-template' && template) {
+        text = `<${tagName}>\n${template.replace('{{input}}', `{{artifact.${ref}}}`)}\n</${tagName}>`;
+      } else if (inputPlacement === 'before-instructions') {
+        text = `<${tagName}>\n{{artifact.${ref}}}\n${instructionText}\n</${tagName}>`;
+      } else {
+        text = `<${tagName}>\n${instructionText}\n{{artifact.${ref}}}\n</${tagName}>`;
+      }
+      return {
         id: node.id,
-        type: 'prompt-wrapper',
+        type: 'presentation',
         label,
         enabled: true,
         outputNamespace: prefix,
         primaryOutputName: 'text',
         lastEditedAt: now,
-        config: {type: 'prompt-wrapper', outputNames: ['text']},
-        prompt: {
-          previousOutput: {
-            enabled: node.config.includeInputArtifact,
-            placement: node.config.inputPlacement === 'before-instructions' ? 'beforeOwnPrompt' : 'afterOwnPrompt',
-            tagName: node.config.tagName,
-          },
-          historyReads: [],
-          blocks: node.config.instructionText
-            ? [{
-              id: newStepId('block'),
-              label: 'Instructions',
-              tagName: 'system',
-              body: node.config.instructionText,
-              enabled: true,
-              source: 'system-default' as const,
-            }]
-            : [],
-        },
-      };
-      return wrapStep;
+        config: {type: 'presentation', text, outputNames: ['text']},
+      } satisfies PipelineStep;
     }
 
     case 'template':
@@ -453,18 +408,22 @@ function legacyNodeToStep(
       } satisfies PipelineStep;
 
     case 'json-extract':
+      // V2 has no step type that parses JSON without a model call. Best-effort: pass through
+      // the raw text so the step chain still runs. Downstream refs to {prefix}.json will be
+      // broken; users should instead reference {predecessor}.json which V2 model-call steps
+      // now produce directly when outputType === 'json'.
       return {
         id: node.id,
-        type: 'json-extract',
+        type: 'presentation',
         label,
         enabled: true,
         outputNamespace: prefix,
-        primaryOutputName: 'json',
+        primaryOutputName: 'text',
         lastEditedAt: now,
         config: {
-          type: 'json-extract',
-          sourceArtifactRef: node.inputArtifactRef,
-          outputNames: ['json'],
+          type: 'presentation',
+          text: `{{artifact.${node.inputArtifactRef}}}`,
+          outputNames: ['text'],
         },
       } satisfies PipelineStep;
 
@@ -518,9 +477,9 @@ function legacyNodeToStep(
 function labelForNodeType(type: string): string {
   const labels: Record<string, string> = {
     'model-call': 'Model Call',
-    'prompt-wrapper': 'Prompt Wrapper',
+    'prompt-wrapper': 'Text',
     'presentation': 'Text',
-    'json-extract': 'JSON Extract',
+    'json-extract': 'Text',
     'capsule-instance': 'Capsule',
   };
   return labels[type] ?? type;

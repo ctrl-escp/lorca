@@ -70,7 +70,7 @@ function newBlockId(): string {
 
 /** Wire loop.prev + retry instructions into a refine/generate step inside a loop. */
 export function wireRetryFeedback(step: PipelineStep): PipelineStep {
-  if (step.type !== 'model-call' && step.type !== 'prompt-wrapper') return step;
+  if (step.type !== 'model-call') return step;
 
   const prompt = step.prompt ?? {
     previousOutput: {enabled: true, placement: 'afterOwnPrompt' as const, tagName: 'previous_output'},

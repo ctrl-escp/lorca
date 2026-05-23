@@ -65,15 +65,6 @@ const FIELDS: Partial<Record<PipelineNode['type'], PromptField>> = {
     readNode: (n) => (n.type === 'manual-text' ? n.text : ''),
     nodePatch: (v) => ({text: v}),
   },
-  'prompt-wrapper': {
-    label: 'Instruction text',
-    title: 'System-style instructions placed inside the wrapper tag',
-    placeholder: 'Enter instructions…',
-    rows: 6,
-    kind: 'node',
-    readNode: (n) => (n.type === 'prompt-wrapper' ? n.config.instructionText : ''),
-    nodePatch: (v) => ({config: {instructionText: v}}),
-  },
   template: {
     label: 'Template',
     required: true,
@@ -96,7 +87,6 @@ const FIELDS: Partial<Record<PipelineNode['type'], PromptField>> = {
 };
 
 const HINTS: Partial<Record<PipelineNode['type'], string>> = {
-  'json-extract': 'This step parses JSON from a prior artifact. Set the input reference in the Inspector.',
   'capsule-instance': 'Capsule steps run a locked sub-pipeline. Configure bindings in the Inspector.',
 };
 

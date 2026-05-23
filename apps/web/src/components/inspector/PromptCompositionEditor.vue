@@ -394,7 +394,7 @@ function commitHistoryReads(label: string) {
 
 function addRetryFeedback() {
   const step = chainSteps.value.find((s) => s.id === props.stepId);
-  if (!step || (step.type !== 'model-call' && step.type !== 'prompt-wrapper')) return;
+  if (!step || step.type !== 'model-call') return;
   const wired = wireRetryFeedback(step);
   if (!wired.prompt) return;
   localHistoryReads.value = wired.prompt.historyReads.map((r) => ({...r}));

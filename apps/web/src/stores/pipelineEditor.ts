@@ -26,12 +26,8 @@ function defaultStepConfig(type: StepType): StepConfig {
         mode: 'generate',
         outputNames: ['text', 'rawResponse'],
       };
-    case 'prompt-wrapper':
-      return {type: 'prompt-wrapper', outputNames: ['text']};
     case 'presentation':
       return {type: 'presentation', text: '', outputNames: ['text']};
-    case 'json-extract':
-      return {type: 'json-extract', sourceArtifactRef: '', outputNames: ['json']};
     case 'capsule-instance':
       return {
         type: 'capsule-instance',
@@ -55,21 +51,16 @@ function defaultStepConfig(type: StepType): StepConfig {
   }
 }
 
-function defaultPrimaryOutputName(type: StepType): string {
-  switch (type) {
-    case 'json-extract': return 'json';
-    default: return 'text';
-  }
+function defaultPrimaryOutputName(_type: StepType): string {
+  return 'text';
 }
 
 function defaultLabel(type: StepType): string {
   const labels: Record<StepType, string> = {
     'model-call': 'Model Call',
-    'prompt-wrapper': 'Prompt Wrapper',
     'presentation': 'Text',
-    'json-extract': 'JSON Extract',
     'capsule-instance': 'Capsule',
-    'loop-group': 'Loop Group',
+    'loop-group': 'Loop',
   };
   return labels[type];
 }

@@ -57,14 +57,12 @@ export function listStepOutputArtifacts(step: PipelineStep): ArtifactOption[] {
       return [
         mk('text'),
         mk('rawResponse', 'raw response'),
-        mk('parsedJson', 'parsed JSON (if available)'),
+        mk('json', 'JSON output (if available)'),
+        mk('jsonValid', 'JSON parse success flag'),
       ];
-    case 'prompt-wrapper':
     case 'presentation':
     case 'loop-group':
       return [mk('text')];
-    case 'json-extract':
-      return [mk('json')];
     case 'capsule-instance':
       return Object.entries(config.outputBindings).map(([name, ref]) => ({
         ref,

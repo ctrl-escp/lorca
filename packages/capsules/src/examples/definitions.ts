@@ -110,7 +110,7 @@ export const EXAMPLE_INTENT_EXTRACTION = buildExampleCapsule({
         name: 'intent_json',
         kind: 'json',
         description: 'Parsed intent object',
-        sourceArtifactKey: 'parse.json',
+        sourceArtifactKey: 'extract.json',
       },
     ],
     parameters: [],
@@ -149,12 +149,6 @@ export const EXAMPLE_INTENT_EXTRACTION = buildExampleCapsule({
         expectedOutput: 'json',
       },
     },
-    {
-      id: 'parse',
-      type: 'json-extract',
-      artifactPrefix: 'parse',
-      inputArtifactRef: 'extract.text',
-    },
   ],
 });
 
@@ -169,7 +163,7 @@ export const EXAMPLE_ACCEPTANCE_CRITERIA = buildExampleCapsule({
         name: 'acceptance_criteria_json',
         kind: 'json',
         description: 'Structured acceptance criteria',
-        sourceArtifactKey: 'parse.json',
+        sourceArtifactKey: 'generate.json',
       },
     ],
     parameters: [],
@@ -209,12 +203,6 @@ export const EXAMPLE_ACCEPTANCE_CRITERIA = buildExampleCapsule({
         inputArtifactRef: 'prompt.text',
         expectedOutput: 'json',
       },
-    },
-    {
-      id: 'parse',
-      type: 'json-extract',
-      artifactPrefix: 'parse',
-      inputArtifactRef: 'generate.text',
     },
   ],
 });
@@ -303,7 +291,7 @@ export const EXAMPLE_ANSWER_VERIFICATION = buildExampleCapsule({
         name: 'verification_result_json',
         kind: 'json',
         description: 'Pass/fail verification result',
-        sourceArtifactKey: 'parse.json',
+        sourceArtifactKey: 'verify.json',
       },
     ],
     parameters: [],
@@ -344,12 +332,6 @@ export const EXAMPLE_ANSWER_VERIFICATION = buildExampleCapsule({
         inputArtifactRef: 'prompt.text',
         expectedOutput: 'json',
       },
-    },
-    {
-      id: 'parse',
-      type: 'json-extract',
-      artifactPrefix: 'parse',
-      inputArtifactRef: 'verify.text',
     },
   ],
 });
@@ -481,7 +463,7 @@ export const EXAMPLE_CONSTRAINT_EXTRACTION = buildExampleCapsule({
         name: 'constraints_json',
         kind: 'json',
         description: 'Extracted constraints',
-        sourceArtifactKey: 'parse.json',
+        sourceArtifactKey: 'extract.json',
       },
     ],
     parameters: [],
@@ -520,12 +502,6 @@ export const EXAMPLE_CONSTRAINT_EXTRACTION = buildExampleCapsule({
         expectedOutput: 'json',
       },
     },
-    {
-      id: 'parse',
-      type: 'json-extract',
-      artifactPrefix: 'parse',
-      inputArtifactRef: 'extract.text',
-    },
   ],
 });
 
@@ -553,7 +529,7 @@ export const EXAMPLE_DRIFT_CHECK = buildExampleCapsule({
         name: 'drift_result_json',
         kind: 'json',
         description: 'Drift analysis result',
-        sourceArtifactKey: 'parse.json',
+        sourceArtifactKey: 'check.json',
       },
     ],
     parameters: [],
@@ -594,12 +570,6 @@ export const EXAMPLE_DRIFT_CHECK = buildExampleCapsule({
         inputArtifactRef: 'prompt.text',
         expectedOutput: 'json',
       },
-    },
-    {
-      id: 'parse',
-      type: 'json-extract',
-      artifactPrefix: 'parse',
-      inputArtifactRef: 'check.text',
     },
   ],
 });

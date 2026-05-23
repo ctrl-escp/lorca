@@ -51,9 +51,7 @@ export interface CapsuleInterface {
 
 export type StepType =
   | 'model-call'
-  | 'prompt-wrapper'
   | 'presentation'
-  | 'json-extract'
   | 'capsule-instance'
   | 'loop-group';
 
@@ -94,24 +92,14 @@ export interface ModelCallStepConfig {
   mode: 'generate' | 'chat';
   temperature?: number;
   maxTokens?: number;
+  outputType?: 'text' | 'auto' | 'json';
   outputNames: readonly ['text', 'rawResponse'];
-}
-
-export interface PromptWrapperStepConfig {
-  type: 'prompt-wrapper';
-  outputNames: readonly ['text'];
 }
 
 export interface PresentationStepConfig {
   type: 'presentation';
   text: string;
   outputNames: readonly ['text'];
-}
-
-export interface JsonExtractStepConfig {
-  type: 'json-extract';
-  sourceArtifactRef: string;
-  outputNames: readonly ['json'];
 }
 
 export interface CapsuleInstanceStepConfig {
@@ -140,9 +128,7 @@ export interface LoopGroupStepConfig {
 
 export type StepConfig =
   | ModelCallStepConfig
-  | PromptWrapperStepConfig
   | PresentationStepConfig
-  | JsonExtractStepConfig
   | CapsuleInstanceStepConfig
   | LoopGroupStepConfig;
 

@@ -63,9 +63,9 @@ describe('extractStepsToCapsule', () => {
     });
     const rewrite = makeStep({
       id: 'rewrite',
-      type: 'prompt-wrapper',
+      type: 'presentation',
       outputNamespace: 'rewrite',
-      config: {type: 'prompt-wrapper', outputNames: ['text']},
+      config: {type: 'presentation', text: '', outputNames: ['text']},
       prompt: {
         previousOutput: {enabled: false, placement: 'beforeOwnPrompt', tagName: 'prev'},
         historyReads: [{
