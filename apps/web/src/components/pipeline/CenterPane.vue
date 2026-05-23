@@ -23,6 +23,7 @@
         <div class="more-menu-wrap" ref="moreMenuRef">
           <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
           <div v-if="moreMenuOpen" class="more-menu-dropdown">
+            <button class="more-menu-item" type="button" title="Generate a pipeline from a natural-language description" @click="handleBuildFromDescription">✨ Build from description…</button>
             <button class="more-menu-item" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
             <button class="more-menu-item" type="button" title="Save selected steps as a draft Capsule" @click="handleExtractSelection">Extract to Capsule</button>
             <button class="more-menu-item" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
@@ -124,6 +125,32 @@
       @close="importModalOpen = false"
       @submit="handleImportSubmit"
     />
+    <PipelineGeneratorModal
+      :open="generatorModalOpen"
+      :generator-capsules="generatorCapsules"
+      :default-capsule-id="defaultGeneratorCapsuleId"
+      :loading="generatorLoading"
+      :error-message="generatorError"
+      :raw-response="generatorRawResponse"
+      :preview-labels="generatorPreviewLabels"
+      :warnings="generatorWarnings"
+      :manual-import-available="generatorManualImportAvailable"
+      @close="closeGeneratorModal"
+      @generate="handleGeneratePipeline"
+      @apply="openGeneratedModelRemap"
+      @manual-import="openManualImportFromGenerator"
+    />
+    <ImportRemapDialog
+      v-if="generatedModelRemapOpen"
+      :open="true"
+      kind="pipeline"
+      :missing-models="generatedModelRefs"
+      :models="modelsStore.models"
+      :endpoints="endpointsStore.endpoints"
+      :replaces-active-pipeline="true"
+      @cancel="generatedModelRemapOpen = false"
+      @confirm="applyGeneratedPipeline"
+    />
     <ConfirmDialog
       :open="confirmState.open"
       :title="confirmState.title"
@@ -147,7 +174,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
-import type {PipelineDefinition, StepOutputsExport, StepType} from '@lorca/core';
+import type {PipelineDefinition, PipelineStep, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
@@ -159,12 +186,22 @@ import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
+import {applyModelRemapsToSteps} from '@lorca/storage';
+import {ALL_SUGGESTIONS, LORCA_PIPELINE_GENERATOR_ID, resolveModelCallSuggestedBuckets} from '@lorca/capsules';
 import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
+import {
+  buildStepsFromGeneratorPlan,
+  generatorCapsuleCompatible,
+  usePipelineGenerator,
+} from '../../composables/usePipelineGenerator.js';
 import ChainEditor from './ChainEditor.vue';
 import PipelineSelector from './PipelineSelector.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
+import ImportRemapDialog from '../import/ImportRemapDialog.vue';
+import PipelineGeneratorModal from './PipelineGeneratorModal.vue';
+import type {MissingModelReference, ModelRemap} from '../../stores/importExport.js';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
@@ -178,6 +215,7 @@ const editorStore = usePipelineEditorStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
 const suggestionInsert = useSuggestionInsert();
+const pipelineGenerator = usePipelineGenerator();
 const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
 
@@ -188,10 +226,46 @@ const exportModal = ref<{open: boolean; json: string; filename: string; includeS
   includeStepOutputs: false,
 });
 const importModalOpen = ref(false);
+const generatorModalOpen = ref(false);
+const generatorLoading = ref(false);
+const generatorError = ref<string | null>(null);
+const generatorRawResponse = ref<string | null>(null);
+const generatorPreviewSteps = ref<PipelineStep[]>([]);
+const generatorWarnings = ref<string[]>([]);
+const generatedModelRemapOpen = ref(false);
+let generatorAbortController: AbortController | null = null;
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
 const hasStepOutputs = computed(() => Object.keys(runStore.artifacts).length > 0);
+
+const generatorCapsules = computed(() => {
+  const all = [...capsulesStore.lockedCapsules, ...capsulesStore.draftCapsules];
+  const seen = new Set<string>();
+  return all.filter((capsule) => {
+    if (seen.has(capsule.id)) return false;
+    seen.add(capsule.id);
+    return generatorCapsuleCompatible(capsule);
+  });
+});
+
+const defaultGeneratorCapsuleId = computed(() =>
+  generatorCapsules.value.find((capsule) => capsule.id === LORCA_PIPELINE_GENERATOR_ID)?.id
+  ?? generatorCapsules.value[0]?.id
+  ?? '',
+);
+
+const generatorPreviewLabels = computed(() =>
+  generatorPreviewSteps.value.map((step) => step.label),
+);
+
+const generatedModelRefs = computed<MissingModelReference[]>(() =>
+  collectGeneratedModelRefs(generatorPreviewSteps.value),
+);
+
+const generatorManualImportAvailable = computed(() =>
+  generatorError.value !== null && generatorRawResponse.value !== null,
+);
 
 const stepsWithDisabledModel = computed<Set<string>>(() => {
   const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
@@ -277,6 +351,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  generatorAbortController?.abort();
   window.removeEventListener('keydown', onKeyDown);
   document.removeEventListener('click', onDocClick, true);
 });
@@ -357,6 +432,81 @@ function handleSelectStep(stepId: string, extendRange?: boolean) {
 
 function handleSelectLoopInner(loopStepId: string, innerStepId: string) {
   editorStore.selectLoopInnerStep(loopStepId, innerStepId);
+}
+
+function handleBuildFromDescription() {
+  moreMenuOpen.value = false;
+  generatorError.value = null;
+  generatorRawResponse.value = null;
+  generatorPreviewSteps.value = [];
+  generatorWarnings.value = [];
+  generatorModalOpen.value = true;
+}
+
+function closeGeneratorModal() {
+  generatorAbortController?.abort();
+  generatorAbortController = null;
+  generatorLoading.value = false;
+  generatorModalOpen.value = false;
+}
+
+async function handleGeneratePipeline(payload: {description: string; capsuleId: string}) {
+  generatorAbortController?.abort();
+  const controller = new AbortController();
+  generatorAbortController = controller;
+  generatorLoading.value = true;
+  generatorError.value = null;
+  generatorRawResponse.value = null;
+  generatorPreviewSteps.value = [];
+  generatorWarnings.value = [];
+
+  const result = await pipelineGenerator.generatePipelinePlan(
+    payload.capsuleId,
+    payload.description,
+    controller.signal,
+  );
+  if (generatorAbortController === controller) generatorAbortController = null;
+  generatorLoading.value = false;
+
+  if (!result.ok) {
+    generatorError.value = result.message;
+    generatorRawResponse.value = result.rawResponse ?? null;
+    return;
+  }
+
+  const steps = buildStepsFromGeneratorPlan(result.entries);
+  if (steps.length === 0) {
+    generatorError.value = "Couldn't build steps from the generated plan";
+    generatorRawResponse.value = result.rawResponse;
+    return;
+  }
+
+  generatorRawResponse.value = result.rawResponse;
+  generatorWarnings.value = result.unknownSuggestionIds;
+  generatorPreviewSteps.value = steps;
+}
+
+function openGeneratedModelRemap() {
+  if (generatorPreviewSteps.value.length === 0) return;
+  generatedModelRemapOpen.value = true;
+}
+
+function applyGeneratedPipeline(remaps: Record<string, ModelRemap>) {
+  const steps = applyModelRemapsToSteps(generatorPreviewSteps.value, remaps);
+  editorStore.replaceSteps(steps, 'Build pipeline from description');
+  runStore.reset();
+  generatedModelRemapOpen.value = false;
+  generatorModalOpen.value = false;
+  generatorPreviewSteps.value = [];
+  generatorRawResponse.value = null;
+  generatorError.value = null;
+  generatorWarnings.value = [];
+  uiStore.setRightPaneTab('inspector');
+}
+
+function openManualImportFromGenerator() {
+  generatorModalOpen.value = false;
+  importModalOpen.value = true;
 }
 
 function handleWrapInRetryLoop() {
@@ -633,6 +783,40 @@ async function handlePipelineDelete(id: string) {
   }
   if (runStore.isRunning) runStore.cancel();
   runStore.reset();
+}
+
+function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference[] {
+  const refs: MissingModelReference[] = [];
+  const visit = (step: PipelineStep) => {
+    if (step.config.type === 'model-call') {
+      refs.push({
+        key: step.id,
+        nodeId: step.id,
+        endpointId: '',
+        modelName: step.config.modelRef.kind === 'slot' ? '' : step.config.modelRef.modelName,
+        label: `Model call ${step.label || step.id}`,
+        suggestedBuckets: resolveModelCallSuggestedBuckets(step),
+      });
+    }
+    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+      const suggestion = ALL_SUGGESTIONS.find((item) => item.id === step.createdFromSuggestionId);
+      for (const [slotName, modelRef] of Object.entries(step.config.modelSlotBindings)) {
+        refs.push({
+          key: `${step.id}::${slotName}`,
+          nodeId: step.id,
+          endpointId: '',
+          modelName: modelRef.kind === 'slot' ? '' : modelRef.modelName,
+          label: `Capsule slot ${slotName} (${step.label || suggestion?.name || step.id})`,
+          suggestedBuckets: suggestion?.preferredModelBucket ? [suggestion.preferredModelBucket] : ['general'],
+        });
+      }
+    }
+    if (step.config.type === 'loop-group') {
+      for (const inner of step.config.steps) visit(inner);
+    }
+  };
+  for (const step of steps) visit(step);
+  return refs;
 }
 </script>
 

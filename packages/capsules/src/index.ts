@@ -20,6 +20,8 @@ export {lockCapsule, nextVersion, createDraftFromLocked} from './lock.js';
 export {
   BUILTIN_EXAMPLES,
   BUILTIN_EXAMPLE_IDS,
+  LORCA_PIPELINE_GENERATOR_ID,
+  LORCA_PIPELINE_GENERATOR,
   getBuiltinExamples,
   getBuiltinExample,
   isBuiltinExampleId,

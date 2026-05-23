@@ -247,6 +247,15 @@ export function applyModelRemapsToSteps(
         return {...step, config: {...step.config, modelSlotBindings: bindings}};
       }
     }
+    if (step.config.type === 'loop-group') {
+      return {
+        ...step,
+        config: {
+          ...step.config,
+          steps: applyModelRemapsToSteps(step.config.steps, remaps),
+        },
+      };
+    }
     return step;
   });
 }

@@ -8,6 +8,7 @@ export {
   previewPipelineImport,
   previewCapsuleImport,
   applyModelRemapsToNodes,
+  applyModelRemapsToSteps,
   prepareImportedPipeline,
   prepareImportedCapsule,
   collectPipelineCapsuleRefs,

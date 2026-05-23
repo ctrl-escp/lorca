@@ -8,6 +8,7 @@ import {
   duplicateExampleCapsule,
   getBuiltinExample,
   isBuiltinExampleId,
+  LORCA_PIPELINE_GENERATOR_ID,
 } from '../src/examples/index.js';
 import {validateCapsule} from '../src/validate.js';
 
@@ -26,9 +27,10 @@ const SAMPLE_PARAMS: Record<string, unknown> = {
 };
 
 describe('builtin examples', () => {
-  it('defines all eight Phase 13 examples', () => {
-    expect(BUILTIN_EXAMPLE_IDS).toHaveLength(8);
+  it('defines the built-in Capsule library', () => {
+    expect(BUILTIN_EXAMPLE_IDS).toHaveLength(9);
     expect(BUILTIN_EXAMPLE_IDS).toEqual([
+      'lorca-pipeline-generator',
       'example-intent-extraction',
       'example-acceptance-criteria',
       'example-candidate-answer',
@@ -58,6 +60,10 @@ describe('builtin examples', () => {
   it('renders example template prompts (snapshots)', () => {
     for (const def of BUILTIN_EXAMPLES) {
       const templates = collectExampleTemplateStrings(def);
+      if (def.id === LORCA_PIPELINE_GENERATOR_ID) {
+        expect(templates).toHaveLength(0);
+        continue;
+      }
       expect(templates.length, `${def.id} should have at least one template`).toBeGreaterThan(0);
       for (const template of templates) {
         const rendered = renderTemplate(template, {

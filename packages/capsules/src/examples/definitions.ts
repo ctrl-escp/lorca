@@ -1,7 +1,103 @@
 import type {CapsuleDefinition} from '@lorca/core';
+import {ALL_SUGGESTIONS} from '../suggestions/index.js';
 import {buildExampleCapsule} from './build.js';
 
 const INPUT_NODE = {id: 'input', type: 'input' as const};
+
+const GENERATOR_SUGGESTION_CATALOG = JSON.stringify(
+  ALL_SUGGESTIONS.map((suggestion) => ({
+    id: suggestion.id,
+    name: suggestion.name,
+    category: suggestion.category,
+    description: suggestion.description,
+    preferredModelBucket: suggestion.preferredModelBucket ?? null,
+  })),
+  null,
+  2,
+);
+
+export const LORCA_PIPELINE_GENERATOR_ID = 'lorca-pipeline-generator';
+
+export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
+  schemaVersion: 1,
+  id: LORCA_PIPELINE_GENERATOR_ID,
+  name: 'Lorca Pipeline Generator',
+  description: 'Build a Lorca pipeline step sequence from a natural language description.',
+  version: 'v1',
+  status: 'locked',
+  interface: {
+    inputs: [
+      {
+        name: 'description',
+        kind: 'text',
+        required: true,
+        description: 'Natural language description of the pipeline to build.',
+      },
+    ],
+    outputs: [
+      {
+        name: 'pipeline_steps_json',
+        kind: 'json',
+        description: 'JSON plan describing suggestion steps to instantiate.',
+        sourceArtifactKey: 'generate.text',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'generator',
+        suggestedBuckets: ['general', 'thinking'],
+        required: true,
+        description: 'Model used to plan a pipeline from the description.',
+      },
+    ],
+  },
+  nodes: [
+    INPUT_NODE,
+    {
+      id: 'generate',
+      type: 'model-call',
+      artifactPrefix: 'generate',
+      config: {
+        modelRef: {kind: 'slot', slotName: 'generator'},
+        mode: 'chat',
+        systemPrompt: [
+          'You are a pipeline architect for Lorca, a local AI orchestration tool.',
+          'Given a user description, produce a JSON step sequence using only these built-in suggestions.',
+          'Return a concise ordered array. Prefer 2-5 steps unless the request clearly needs more.',
+          'Use only suggestion IDs from the catalog. Do not invent IDs.',
+          'Output format:',
+          '[',
+          '  { "suggestionId": "suggestion-intent-extraction" },',
+          '  { "suggestionId": "suggestion-acceptance-criteria" }',
+          ']',
+          'Respond with JSON only. No prose, no markdown fences.',
+          '',
+          'Available suggestions:',
+          GENERATOR_SUGGESTION_CATALOG,
+        ].join('\n'),
+        inputArtifactRef: 'description',
+        temperature: 0.2,
+        maxTokens: 1200,
+        expectedOutput: 'json',
+      },
+    },
+  ],
+  edges: [
+    {
+      id: 'e-input-generate',
+      fromNodeId: 'input',
+      fromOutput: 'xml',
+      toNodeId: 'generate',
+      toInput: 'input',
+    },
+  ],
+  outputRef: {nodeId: 'generate', outputName: 'text'},
+  tests: [],
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+  lockedAt: '2025-01-01T00:00:00.000Z',
+};
 
 export const EXAMPLE_INTENT_EXTRACTION = buildExampleCapsule({
   id: 'example-intent-extraction',
@@ -509,6 +605,7 @@ export const EXAMPLE_DRIFT_CHECK = buildExampleCapsule({
 });
 
 export const BUILTIN_EXAMPLES: CapsuleDefinition[] = [
+  LORCA_PIPELINE_GENERATOR,
   EXAMPLE_INTENT_EXTRACTION,
   EXAMPLE_ACCEPTANCE_CRITERIA,
   EXAMPLE_CANDIDATE_ANSWER,

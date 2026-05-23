@@ -11,6 +11,7 @@ import {
   prepareImportedPipeline,
   prepareImportedCapsule,
   applyModelRemapsToNodes,
+  applyModelRemapsToSteps,
 } from '../src/importExport.js';
 
 function makeLegacyPipeline(): LegacyPipelineDefinition {
@@ -317,6 +318,59 @@ describe('importExport', () => {
         endpointId: 'ep-local',
         modelName: 'llama3:latest',
       });
+    }
+  });
+
+  it('applies model remaps inside loop-group steps', () => {
+    const remapped = applyModelRemapsToSteps([
+      {
+        id: 'loop',
+        type: 'loop-group',
+        label: 'Retry Loop',
+        enabled: true,
+        outputNamespace: 'retry_loop',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'loop-group',
+          maxIterations: 2,
+          exitCondition: {type: 'iterations'},
+          outputNames: ['text'],
+          steps: [
+            {
+              id: 'inner-model',
+              type: 'model-call',
+              label: 'Inner Model',
+              enabled: true,
+              outputNamespace: 'inner',
+              primaryOutputName: 'text',
+              lastEditedAt: '2026-01-01T00:00:00Z',
+              config: {
+                type: 'model-call',
+                modelRef: {kind: 'fixed', endpointId: '', modelName: ''},
+                mode: 'generate',
+                outputNames: ['text', 'rawResponse'],
+              },
+            },
+          ],
+        },
+      },
+    ], {
+      'inner-model': {endpointId: 'ep-local', modelName: 'llama3:latest'},
+    });
+
+    const loop = remapped[0];
+    expect(loop?.config.type).toBe('loop-group');
+    if (loop?.config.type === 'loop-group') {
+      const inner = loop.config.steps[0];
+      expect(inner?.config.type).toBe('model-call');
+      if (inner?.config.type === 'model-call') {
+        expect(inner.config.modelRef).toEqual({
+          kind: 'fixed',
+          endpointId: 'ep-local',
+          modelName: 'llama3:latest',
+        });
+      }
     }
   });
 
