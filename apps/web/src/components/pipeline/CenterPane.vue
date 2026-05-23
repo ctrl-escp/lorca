@@ -191,7 +191,7 @@ import {useCapsulesStore} from '../../stores/capsules.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
-import {pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
+import {pipelineHasConfiguredModel, pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
 import {applyModelRemapsToSteps} from '@lorca/storage';
 import {ALL_SUGGESTIONS, LORCA_PIPELINE_GENERATOR_ID, resolveModelCallSuggestedBuckets} from '@lorca/capsules';
@@ -411,14 +411,17 @@ const finalArtifactKey = computed(() => {
   return `${outputStep.outputNamespace}.${outputStep.primaryOutputName}`;
 });
 
-const canRun = computed(() => pipelineStepChainRunReady(editorStore.pipeline, userPrompt.value));
+const canRun = computed(() =>
+  pipelineStepChainRunReady(editorStore.pipeline, userPrompt.value, capsulesStore.getCapsule),
+);
 
 const runButtonTitle = computed(() => {
   if (canRun.value) return 'Run the entire pipeline — ⌘↵';
   const needs: string[] = [];
   if (!userPrompt.value.trim()) needs.push('enter a prompt');
-  const hasModel = editorStore.steps.some((s) => s.enabled && s.type === 'model-call');
-  if (!hasModel) needs.push('add a model call step');
+  if (!pipelineHasConfiguredModel(editorStore.pipeline, capsulesStore.getCapsule)) {
+    needs.push('configure a model or capsule');
+  }
   return needs.length ? `To run: ${needs.join(' and ')}` : 'Configure pipeline to run';
 });
 
