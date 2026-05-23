@@ -333,22 +333,6 @@
       </div>
     </div>
 
-    <!-- Add step bar -->
-    <div class="chain-add-bar">
-      <div class="chain-add-bar-header">
-        <span class="chain-add-bar-label">Add step</span>
-        <div class="undo-redo-controls" v-if="showUndoRedo">
-          <button class="btn btn-sm btn-ghost" :disabled="!canUndo" @click="$emit('undo')" :title="lastUndoLabel ? `Undo: ${lastUndoLabel}` : 'Nothing to undo'">↩ Undo</button>
-          <button class="btn btn-sm btn-ghost" :disabled="!canRedo" @click="$emit('redo')" :title="lastRedoLabel ? `Redo: ${lastRedoLabel}` : 'Nothing to redo'">↪ Redo</button>
-        </div>
-      </div>
-      <div class="chain-add-bar-buttons">
-        <button class="btn btn-sm btn-accent" @click="$emit('append', 'model-call')">+ Model call</button>
-        <button class="btn btn-sm" @click="$emit('append', 'presentation')">+ Text</button>
-        <button class="btn btn-sm" @click="$emit('append', 'loop-group')">+ Loop</button>
-        <button v-if="showCapsuleAdd" class="btn btn-sm btn-capsule" @click="$emit('append', 'capsule-instance')">+ Capsule</button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -1456,24 +1440,6 @@ function runStateTitle(stepId: string): string {
 .output-label { font-size: 0.65rem; color: #555; }
 .output-key { font-size: 0.72rem; color: #7ec8e3; font-family: monospace; }
 
-.chain-add-bar {
-  flex-shrink: 0;
-  border-top: 2px solid #2a5070;
-  background: linear-gradient(180deg, #0f1418 0%, #111820 100%);
-  padding: 0.55rem 0.85rem 0.65rem;
-  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
-}
-.chain-add-bar-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 0.4rem;
-}
-.chain-add-bar-label {
-  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: #7ec8e3; font-weight: 700;
-}
-.undo-redo-controls { display: flex; gap: 0.25rem; }
-
-.chain-add-bar-buttons { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 
 .btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 4px; cursor: pointer; }
 .btn-sm { padding: 3px 9px; font-size: 0.72rem; }
@@ -1708,24 +1674,6 @@ function runStateTitle(stepId: string): string {
     font-size: 0.78rem;
   }
 
-  .chain-add-bar {
-    padding-inline: 0.65rem;
-  }
-
-  .chain-add-bar-header {
-    align-items: flex-start;
-    gap: 0.35rem;
-  }
-
-  .undo-redo-controls {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .chain-add-bar-buttons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  }
 }
 
 @container (max-width: 430px) {
