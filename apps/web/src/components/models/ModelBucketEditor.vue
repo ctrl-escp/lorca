@@ -34,7 +34,7 @@ import type {DiscoveredModel, ModelUsageBucket} from '@lorca/core';
 const showAll = ref(false);
 
 const ALL_BUCKETS: ModelUsageBucket[] = [
-  'tiny', 'thinking', 'summarize', 'rewrite', 'extract-json', 'verify', 'general', 'unknown',
+  'tiny', 'thinking', 'summarize', 'rewrite', 'rewrite-prose', 'rewrite-code', 'extract-json', 'verify', 'general', 'unknown',
 ];
 
 const BUCKET_TITLES: Record<ModelUsageBucket, string> = {
@@ -42,6 +42,8 @@ const BUCKET_TITLES: Record<ModelUsageBucket, string> = {
   thinking: 'Larger models for reasoning and complex generation',
   summarize: 'Models suited for summarization',
   rewrite: 'Models suited for rewriting and rephrasing',
+  'rewrite-prose': 'Models suited for prose and prompt rewriting',
+  'rewrite-code': 'Models suited for code rewriting and refactoring',
   'extract-json': 'Models suited for structured JSON extraction',
   verify: 'Models suited for verification and critique',
   general: 'General-purpose models',
@@ -93,6 +95,8 @@ function reset() {
 .bucket-thinking    { color: #a78bda; background: #1a1030; border-color: #3a2060; }
 .bucket-summarize   { color: #e8a04e; background: #2a1a08; border-color: #4a3010; }
 .bucket-rewrite     { color: #b0c840; background: #1a2008; border-color: #303810; }
+.bucket-rewrite-prose { color: #c8d86a; background: #202608; border-color: #3a4412; }
+.bucket-rewrite-code { color: #80b8f0; background: #101d2a; border-color: #203a58; }
 .bucket-extract-json { color: #60b860; background: #0d2010; border-color: #1a3a1a; }
 .bucket-verify      { color: #e07070; background: #2a1010; border-color: #4a2020; }
 .bucket-general     { color: #5a9fd4; background: #0d1e30; border-color: #1a3a58; }

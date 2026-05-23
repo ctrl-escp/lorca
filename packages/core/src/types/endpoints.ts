@@ -3,6 +3,8 @@ export type ModelUsageBucket =
   | 'thinking'
   | 'summarize'
   | 'rewrite'
+  | 'rewrite-prose'
+  | 'rewrite-code'
   | 'extract-json'
   | 'verify'
   | 'general'

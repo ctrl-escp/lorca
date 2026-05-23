@@ -16,7 +16,7 @@
 
 | # | Item | Rationale |
 |---|------|-----------|
-| S1a | **AI prompt improver** | ✨ per-block button; calls local model to rewrite. Result previewed and approved before applying; undo-tracked. Depends on N1. |
+| S1a | ~~**AI prompt improver**~~ ✅ | Shipped: per-block Improve button with local-model rewrite modal, prose-rewrite model preference, editable per-step improvement prompt, global model selection, current-block/previous-suggestion context controls, preview/approve apply flow, no-op/JSON-output guards, and undo-tracked apply. |
 | S1b | **AI next-step advisor** | After a run, suggests 2-3 next steps with reasoning. Independent from S1a. |
 | S1c | **NL pipeline generator (Capsule-based)** | "Describe it, build it." The generator logic lives in a user-editable built-in Capsule, revertible to the original. Depends on S1a + S1b validated. |
 | S2a | **True dependency model for the compiler** | `compileActiveStepsToExecutionPlan` unconditionally adds the previous step as an input. Must fix before S2b. |

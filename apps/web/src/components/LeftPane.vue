@@ -403,6 +403,8 @@ const MODEL_BUCKET_OPTIONS: {value: ModelUsageBucket | ''; label: string}[] = [
   {value: 'thinking', label: 'Thinking'},
   {value: 'summarize', label: 'Summarize'},
   {value: 'rewrite', label: 'Rewrite'},
+  {value: 'rewrite-prose', label: 'Rewrite prose'},
+  {value: 'rewrite-code', label: 'Rewrite code'},
   {value: 'extract-json', label: 'Extract JSON'},
   {value: 'verify', label: 'Verify'},
   {value: 'general', label: 'General'},

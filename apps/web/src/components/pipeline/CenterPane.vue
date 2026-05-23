@@ -603,10 +603,16 @@ async function handleNew() {
   if (!confirmed) return;
   if (runStore.isRunning) runStore.cancel();
   runStore.reset();
-  await pipelinesStore.addNewPipeline();
-  userPrompt.value = '';
-  localPipelineName.value = 'New Pipeline';
-  emit('new');
+  const prevId = pipelinesStore.activePipelineId;
+  try {
+    await pipelinesStore.addNewPipeline();
+    if (prevId) pipelinesStore.removePipeline(prevId);
+    userPrompt.value = '';
+    localPipelineName.value = 'New Pipeline';
+    emit('new');
+  } catch (error) {
+    inlineError.value = error instanceof Error ? error.message : 'Could not create a new pipeline.';
+  }
 }
 
 function handlePipelineSelect(id: string) {

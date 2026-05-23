@@ -22,6 +22,13 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
   const name = lc(input.providerModelName);
   const paramB = parseParamBillions(input.parameterSize);
   const buckets = new Set<ModelUsageBucket>();
+  const isCodeModel =
+    name.includes('coder') ||
+    name.includes('-code') ||
+    name.includes('code-') ||
+    name.includes('starcoder') ||
+    name.includes('codestral') ||
+    name.includes('codegen');
 
   // Thinking / reasoning models
   if (
@@ -54,8 +61,7 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
     name.includes('hermes') ||
     name.includes('mistral') ||
     name.includes('functionary') ||
-    name.includes('coder') ||   // code models excel at structured output
-    name.includes('-code')
+    isCodeModel
   ) {
     buckets.add('extract-json');
   }
@@ -68,6 +74,22 @@ export function assignBuckets(input: BucketInput): ModelUsageBucket[] {
   // Rewrite
   if (name.includes('rewrite') || name.includes('edit') || name.includes('refine')) {
     buckets.add('rewrite');
+    buckets.add(isCodeModel ? 'rewrite-code' : 'rewrite-prose');
+  }
+  if (isCodeModel) {
+    buckets.add('rewrite-code');
+  }
+  if (!isCodeModel && (
+    name.includes('instruct') ||
+    name.includes('chat') ||
+    name.includes('llama') ||
+    name.includes('gemma') ||
+    name.includes('mistral') ||
+    name.includes('mixtral') ||
+    name.includes('command') ||
+    name.includes('qwen')
+  )) {
+    buckets.add('rewrite-prose');
   }
 
   // Verify / judge

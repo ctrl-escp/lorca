@@ -23,6 +23,13 @@
       :has-unresolved="hasUnresolved"
       @close="showFullPromptModal = false"
     />
+    <PromptImproverModal
+      :open="promptImproverBlockIndex !== null"
+      :step-id="stepId"
+      :block="promptImproverBlock"
+      @close="promptImproverBlockIndex = null"
+      @apply="applyImprovedPrompt"
+    />
 
     <!-- Previous output -->
     <div class="pce-section">
@@ -154,13 +161,13 @@
         </div>
 
         <div class="pce-field-row">
-          <label class="pce-toggle-label pce-required-toggle" title="Required reads block execution when the source is unavailable">
+          <label class="pce-toggle-label pce-required-toggle" title="If this history input is missing at runtime, halt the pipeline with an error instead of silently skipping it">
             <input
               type="checkbox"
               :checked="read.required"
               @change="toggleRequired(idx)"
             />
-            Required
+            Stop if missing
           </label>
         </div>
 
@@ -209,6 +216,12 @@
             @input="liveUpdate"
             @blur="commitBlocks('Edit block tag')"
           />
+          <button
+            class="pce-improve-btn"
+            type="button"
+            title="Improve this prompt block with a local model"
+            @click="openPromptImprover(idx)"
+          >Improve</button>
           <button
             class="pce-delete-btn"
             type="button"
@@ -264,6 +277,7 @@ import {useActiveRunStore} from '../../stores/activeRun.js';
 import HelpDialog from '../help/HelpDialog.vue';
 import XmlPreview from '../shared/XmlPreview.vue';
 import FullPromptModal from './FullPromptModal.vue';
+import PromptImproverModal from './PromptImproverModal.vue';
 import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
 
 const props = defineProps<{
@@ -291,6 +305,7 @@ const localBlocks = ref<PromptBlock[]>([]);
 const showPreview = ref(false);
 const showPromptHelp = ref(false);
 const showFullPromptModal = ref(false);
+const promptImproverBlockIndex = ref<number | null>(null);
 
 const chainSteps = computed(() => props.contextSteps ?? editorStore.steps);
 
@@ -311,6 +326,10 @@ const promptArtifactRefs = computed(() => {
 
 const currentUserPromptArtifacts = computed(() =>
   buildUserPromptArtifacts(editorStore.pipeline.input.raw),
+);
+
+const promptImproverBlock = computed(() =>
+  promptImproverBlockIndex.value === null ? null : localBlocks.value[promptImproverBlockIndex.value] ?? null,
 );
 
 function syncFromConfig(cfg: PromptCompositionConfig | undefined) {
@@ -404,6 +423,19 @@ function addBlock() {
     source: 'custom',
   });
   commitBlocks('Add block');
+}
+
+function openPromptImprover(idx: number) {
+  promptImproverBlockIndex.value = idx;
+}
+
+function applyImprovedPrompt(body: string) {
+  const idx = promptImproverBlockIndex.value;
+  if (idx === null || !localBlocks.value[idx]) return;
+  beginPromptEdit();
+  localBlocks.value[idx] = {...localBlocks.value[idx]!, body};
+  commitBlocks('Apply prompt improvement');
+  promptImproverBlockIndex.value = null;
 }
 
 function defaultNewHistoryRead(): StepHistoryReadConfig {
@@ -656,6 +688,18 @@ const previewXml = computed(() =>
   flex-shrink: 0; background: none; border: none; color: #555; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px;
 }
 .pce-delete-btn:hover { color: #e07070; }
+
+.pce-improve-btn {
+  flex-shrink: 0;
+  background: #1a2430;
+  border: 1px solid #2a5070;
+  color: #7ec8e3;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 2px 7px;
+}
+.pce-improve-btn:hover { background: #254a62; color: #a8d8f0; }
 
 .pce-body {
   width: 100%; background: #0d0d0d; border: 1px solid #222; color: #e8e8e8;

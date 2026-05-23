@@ -30,6 +30,12 @@ describe('assignBuckets', () => {
     expect(assignBuckets({providerModelName: 'qwen2.5-coder:7b'})).toContain('extract-json');
   });
 
+  it('separates prose and code rewrite buckets', () => {
+    expect(assignBuckets({providerModelName: 'llama3.2:3b'})).toContain('rewrite-prose');
+    expect(assignBuckets({providerModelName: 'qwen2.5-coder:7b'})).toContain('rewrite-code');
+    expect(assignBuckets({providerModelName: 'qwen2.5-coder:7b'})).not.toContain('rewrite-prose');
+  });
+
   it('assigns general to common capable models', () => {
     expect(assignBuckets({providerModelName: 'llama3.2:3b'})).toContain('general');
     expect(assignBuckets({providerModelName: 'gemma3:27b'})).toContain('general');

@@ -46,6 +46,8 @@ function isLegacyPipeline(def: unknown): def is LegacyPipelineDefinition {
   );
 }
 
+const ACTIVE_PIPELINE_KEY = 'lorca:activePipelineId';
+
 export const usePipelinesStore = defineStore('pipelines', () => {
   const pipelines = ref<PipelineDefinition[]>([]);
   const activePipelineId = ref<string | null>(null);
@@ -67,7 +69,9 @@ export const usePipelinesStore = defineStore('pipelines', () => {
         return migrateManualTextSteps(v2);
       });
       pipelines.value = migrated;
-      activePipelineId.value = migrated[0]!.id;
+      const savedId = localStorage.getItem(ACTIVE_PIPELINE_KEY);
+      const match = savedId ? migrated.find((p) => p.id === savedId) : undefined;
+      activePipelineId.value = (match ?? migrated[0]!).id;
     } else {
       const def = createDefaultPipeline();
       await getDb().pipelines.put(cloneForStorage(def));
@@ -106,12 +110,14 @@ export const usePipelinesStore = defineStore('pipelines', () => {
 
   function removePipeline(id: string) {
     pipelines.value = pipelines.value.filter((p) => p.id !== id);
-    if (activePipelineId.value === id) activePipelineId.value = null;
+    if (activePipelineId.value === id) setActive(null);
     void getDb().pipelines.delete(id);
   }
 
   function setActive(id: string | null) {
     activePipelineId.value = id;
+    if (id) localStorage.setItem(ACTIVE_PIPELINE_KEY, id);
+    else localStorage.removeItem(ACTIVE_PIPELINE_KEY);
   }
 
   async function resetActivePipeline(): Promise<PipelineDefinition | null> {
@@ -125,7 +131,7 @@ export const usePipelinesStore = defineStore('pipelines', () => {
   async function addNewPipeline(): Promise<PipelineDefinition> {
     const def = createDefaultPipeline();
     await save(def);
-    activePipelineId.value = def.id;
+    setActive(def.id);
     return def;
   }
 
