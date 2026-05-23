@@ -12,7 +12,7 @@
     </div>
 
     <div class="right-content">
-      <StepInspector v-if="uiStore.rightPaneTab === 'inspector'" />
+      <StepInspector v-if="uiStore.rightPaneTab === 'inspector'" :key="uiStore.editorContext" />
       <CapsuleInterfacePanel
         v-else-if="uiStore.rightPaneTab === 'interface' && capsule"
         :iface="capsule.interface"
