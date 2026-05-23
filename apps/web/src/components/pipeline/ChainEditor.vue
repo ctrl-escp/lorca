@@ -222,9 +222,9 @@
                   :key="source.key"
                   class="step-source-badge"
                   :class="`source-${source.kind}`"
-                  :title="source.title"
+                  :title="source.kind === 'previous' ? `${source.title} — change this input first when reordering steps` : source.title"
                 >
-                  {{ source.label }}
+                  <span v-if="source.kind === 'previous'" class="prev-output-marker" aria-hidden="true">↑</span>{{ source.label }}
                 </span>
               </div>
 
@@ -1300,10 +1300,12 @@ function runStateTitle(stepId: string): string {
   font-size: clamp(0.82rem, 1.65cqh, 1.05rem);
   font-weight: 600;
 }
+.source-previous { border-color: #2a5060; border-style: dashed; background: #0f1e26; color: #6dbcd8; }
 .source-history { border-color: #3a3752; background: #181725; color: #aaa0dc; }
 .source-template { border-color: #3a4a35; background: #151e14; color: #9bcf8a; }
 .source-binding { border-color: #4a3d2a; background: #211a10; color: #d2b16f; }
 .source-direct { border-color: #4a332f; background: #211514; color: #d58a7a; }
+.prev-output-marker { opacity: 0.65; margin-right: 0.25em; font-size: 0.85em; }
 
 .step-trace { display: flex; gap: 0.55rem; font-size: clamp(0.84rem, 1.7cqh, 1.1rem); }
 .status-completed { color: #3a9d6e; }
