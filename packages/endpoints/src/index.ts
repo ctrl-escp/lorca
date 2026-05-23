@@ -7,6 +7,7 @@ export {
   partitionModelsByBuckets,
   isModelRefConfigured,
   pickModelRef,
+  pickModelRefForSlot,
   applyModelRefToStep,
   autoAssignModelToStep,
   autoAssignModelsToSteps,

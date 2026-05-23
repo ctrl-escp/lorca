@@ -229,6 +229,7 @@ export async function executeStepChain(
       pipeline,
       abortSignal,
       resolveEndpointForModel,
+      options.params,
     );
 
     if (!result.ok) {
@@ -312,6 +313,7 @@ export async function executeStepInternal(
   pipeline: PipelineDefinition,
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
+  params?: Record<string, unknown>,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
   const inputArtifactNames = compiledStep.inputArtifactRefs;
@@ -323,14 +325,18 @@ export async function executeStepInternal(
         artifactValues[k] = v.value;
         if (v.kind === 'json') flattenJsonFields(k, v.value, artifactValues, 8);
       }
-      const renderResult = renderTemplate(config.text, {artifacts: artifactValues, allowParams: false});
+      const renderResult = renderTemplate(config.text, {
+        artifacts: artifactValues,
+        allowParams: params !== undefined,
+        ...(params !== undefined ? {params} : {}),
+      });
       if (!renderResult.ok) return {ok: false, error: {...renderResult.error, nodeId: step.id}};
       const key = `${step.outputNamespace}.text`;
       return stepOk([makeArtifact(key, step.id, 'text', renderResult.value)], {inputArtifactNames});
     }
 
     case 'model-call': {
-      return executePromptStep(step, compiledStep, artifacts, resolveEndpoint, abortSignal, resolveEndpointForModel);
+      return executePromptStep(step, compiledStep, artifacts, resolveEndpoint, abortSignal, resolveEndpointForModel, params);
     }
 
     case 'capsule-instance': {
@@ -466,6 +472,7 @@ async function executePromptStep(
   resolveEndpoint: EndpointResolver,
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
+  params?: Record<string, unknown>,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
   if (step.config.type !== 'model-call') {
     return {ok: false, error: {code: 'unknown_error', message: `Unexpected step type in executePromptStep: ${step.config.type}`, nodeId: step.id}};
@@ -503,8 +510,11 @@ async function executePromptStep(
     historyReadInputs.push({sourceArtifactRef: read.sourceArtifactRef, omitted: false, preview: value});
   }
 
-  const renderedPrompt = step.prompt
-    ? renderPromptComposition(step.prompt, prevValue, resolvedHistory)
+  const prompt = step.prompt ? renderPromptTemplates(step.prompt, artifacts, params) : undefined;
+  if (prompt && !prompt.ok) return {ok: false, error: {...prompt.error, nodeId: step.id}};
+
+  const renderedPrompt = prompt?.ok
+    ? renderPromptComposition(prompt.value, prevValue, resolvedHistory)
     : {blocks: [], xmlText: prevValue ?? ''};
 
   const key = `${step.outputNamespace}.text`;
@@ -569,6 +579,30 @@ async function executePromptStep(
     ...traceBase,
     rawModelResponsePreview: rawResponsePreview(callResult.value.rawResponse),
   });
+}
+
+function renderPromptTemplates(
+  prompt: NonNullable<PipelineStep['prompt']>,
+  artifacts: Record<string, PipelineArtifact>,
+  params?: Record<string, unknown>,
+): Result<NonNullable<PipelineStep['prompt']>, PipelineError> {
+  const artifactValues: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(artifacts)) {
+    artifactValues[k] = v.value;
+    if (v.kind === 'json') flattenJsonFields(k, v.value, artifactValues, 8);
+  }
+
+  const blocks = [];
+  for (const block of prompt.blocks) {
+    const rendered = renderTemplate(block.body, {
+      artifacts: artifactValues,
+      allowParams: params !== undefined,
+      ...(params !== undefined ? {params} : {}),
+    });
+    if (!rendered.ok) return rendered;
+    blocks.push({...block, body: rendered.value});
+  }
+  return {ok: true, value: {...prompt, blocks}};
 }
 
 async function executeCapsuleStep(
@@ -679,7 +713,7 @@ async function executeCapsuleStepChain(
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Not a capsule step', nodeId: step.id}};
   }
 
-  const {inputBindings, outputBindings} = step.config;
+  const {inputBindings, outputBindings, parameterValues} = step.config;
   const instancePrefix = step.outputNamespace;
   const innerArtifacts: Record<string, PipelineArtifact> = {
     ...parentArtifacts,
@@ -732,7 +766,10 @@ async function executeCapsuleStepChain(
   const result = await executeStepChain(
     innerPipeline,
     userPromptRaw,
-    {seedArtifacts: innerArtifacts},
+    {
+      seedArtifacts: innerArtifacts,
+      ...(parameterValues && Object.keys(parameterValues).length > 0 ? {params: parameterValues} : {}),
+    },
     resolveEndpoint,
     innerCallbacks,
     resolveCapsule,

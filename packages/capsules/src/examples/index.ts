@@ -14,6 +14,8 @@ export {
   EXAMPLE_PROMPT_REWRITE,
   EXAMPLE_CONSTRAINT_EXTRACTION,
   EXAMPLE_DRIFT_CHECK,
+  EXAMPLE_BEST_OF_TWO,
+  EXAMPLE_EXPERT,
 } from './definitions.js';
 export {buildExampleCapsule, linearEdges, EXAMPLE_TIMESTAMP} from './build.js';
 export type {ExampleCapsuleSpec} from './build.js';

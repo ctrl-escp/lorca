@@ -15,8 +15,33 @@ import {validateCapsule} from '../src/validate.js';
 const SAMPLE_ARTIFACTS: Record<string, unknown> = {
   'user_prompt.raw': 'Build a todo app with offline sync',
   'user_prompt.xml': '<user_prompt>\nBuild a todo app with offline sync\n</user_prompt>',
+  'description.text': 'Build a pipeline that extracts intent and answers the request',
   acceptance_criteria: {criteria: ['Supports add', 'Works offline'], assumptions: []},
   candidate_answer: 'The app stores todos locally and syncs when online.',
+  'intent.json': {
+    intent: 'Build a todo app',
+    domain: 'software planning',
+    acceptance_criteria: ['Supports add', 'Works offline'],
+    constraints: ['Use local storage'],
+    quality_bar: ['Concrete architecture'],
+    ambiguities: [],
+  },
+  'candidate_a.text': 'Use IndexedDB and a service worker to keep todos offline.',
+  'candidate_b.text': 'Use localStorage and sync periodically when a connection returns.',
+  'domain.json': {
+    domain: 'software engineering',
+    expert_role: 'senior frontend engineer',
+    knowledge_needed: ['offline-first apps'],
+    risk_flags: [],
+  },
+  'plan.json': {
+    intent: 'Advise on an offline todo app',
+    acceptance_criteria: ['Explains storage', 'Explains sync'],
+    constraints: ['Be concise'],
+    must_cover: ['offline behavior'],
+    answer_style: 'practical',
+  },
+  'answer.text': 'Use IndexedDB for durable local state and a queued sync worker for remote updates.',
   source_text: 'Long paragraph about project history and goals that should be shortened.',
   baseline_text: 'The service returns 200 for healthy checks.',
   current_text: 'The service returns 503 for healthy checks.',
@@ -28,7 +53,7 @@ const SAMPLE_PARAMS: Record<string, unknown> = {
 
 describe('builtin examples', () => {
   it('defines the built-in Capsule library', () => {
-    expect(BUILTIN_EXAMPLE_IDS).toHaveLength(9);
+    expect(BUILTIN_EXAMPLE_IDS).toHaveLength(11);
     expect(BUILTIN_EXAMPLE_IDS).toEqual([
       'lorca-pipeline-generator',
       'example-intent-extraction',
@@ -39,6 +64,8 @@ describe('builtin examples', () => {
       'example-prompt-rewrite',
       'example-constraint-extraction',
       'example-drift-check',
+      'example-best-of-two',
+      'example-expert',
     ]);
   });
 
@@ -54,6 +81,33 @@ describe('builtin examples', () => {
     for (const def of BUILTIN_EXAMPLES) {
       const result = validateCapsule(def);
       expect(result.ok, `${def.id} should validate`).toBe(true);
+    }
+  });
+
+  it('defines executable step-chain prompts for every built-in example', () => {
+    for (const def of BUILTIN_EXAMPLES) {
+      expect(def.steps?.length, `${def.id} should define canonical steps`).toBeGreaterThan(0);
+      for (const step of def.steps ?? []) {
+        expect(step.type, `${def.id}:${step.id} should not expose legacy prompt text as a separate step`).toBe('model-call');
+        if (step.config.type === 'model-call') {
+          expect(step.prompt?.blocks.length || step.prompt?.previousOutput.enabled, `${def.id}:${step.id} should have a prompt`).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it('renders built-in step-chain prompt blocks', () => {
+    for (const def of BUILTIN_EXAMPLES) {
+      for (const step of def.steps ?? []) {
+        for (const block of step.prompt?.blocks ?? []) {
+          const rendered = renderTemplate(block.body, {
+            artifacts: SAMPLE_ARTIFACTS,
+            params: SAMPLE_PARAMS,
+            allowParams: true,
+          });
+          expect(rendered.ok, `${def.id}:${step.id} prompt block render failed`).toBe(true);
+        }
+      }
     }
   });
 

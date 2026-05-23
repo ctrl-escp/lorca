@@ -45,6 +45,8 @@ export interface ExecutePipelineOptions {
   abortSignal?: AbortSignal;
   /** Pre-seeded artifacts (e.g. Capsule input port values). */
   seedArtifacts?: Record<string, import('@lorca/core').PipelineArtifact>;
+  /** Parameter values available while rendering Capsule step prompts. */
+  params?: Record<string, unknown>;
 }
 
 export function compileStepChainToExecutionPlan(

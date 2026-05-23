@@ -1,6 +1,6 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
-import type {PipelineDefinition, PipelineStep, StepType, StepConfig, PipelineInputConfig} from '@lorca/core';
+import type {ModelRef, PipelineDefinition, PipelineStep, StepType, StepConfig, PipelineInputConfig} from '@lorca/core';
 import {
   makeEmptyPipeline,
   extractStepsToCapsule,
@@ -81,6 +81,23 @@ function defaultNamespace(type: StepType, existingNamespaces: ReadonlySet<string
     ns = `${base}_${i++}`;
   }
   return ns;
+}
+
+function defaultModelSlotBindings(capsule: CapsuleDefinition): Record<string, ModelRef> {
+  const bindings: Record<string, ModelRef> = {};
+  for (const slot of capsule.interface.modelSlots) {
+    if (slot.defaultModelRef) {
+      bindings[slot.name] = {
+        kind: 'fixed',
+        endpointId: slot.defaultModelRef.endpointId,
+        modelName: slot.defaultModelRef.modelName,
+      };
+      continue;
+    }
+    const modelName = slot.preferredModelNames?.[0];
+    if (modelName) bindings[slot.name] = {kind: 'any-enabled-endpoint', modelName};
+  }
+  return bindings;
 }
 
 export function buildDefaultStep(
@@ -258,6 +275,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const primaryOutputName = lastOut
       ? (lastOut.sourceArtifactKey?.split('.').pop() ?? 'text')
       : 'text';
+    const modelSlotBindings = defaultModelSlotBindings(capsule);
 
     return {
       id: newId('cap_inst'),
@@ -273,6 +291,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
         capsuleVersion: capsule.version,
         inputBindings,
         outputBindings,
+        ...(Object.keys(modelSlotBindings).length > 0 ? {modelSlotBindings} : {}),
         boundContentSignature: computeCapsuleContentSignature(capsule),
       },
       ...overrides,

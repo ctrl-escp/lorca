@@ -132,13 +132,14 @@
 import {ref, computed, watch, onMounted} from 'vue';
 import type {CapsuleDefinition, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
-import {autoAssignModelToStep} from '@lorca/endpoints';
+import {autoAssignModelToStep, pickModelRefForSlot} from '@lorca/endpoints';
 import {useCapsuleStepEditorStore} from '../../stores/capsuleStepEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
 import {useUiStore} from '../../stores/ui.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
+import {useEndpointsStore} from '../../stores/endpoints.js';
 import ChainEditor from '../pipeline/ChainEditor.vue';
 import {FieldLabel} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
@@ -152,6 +153,7 @@ const importStore = useImportExportStore();
 const uiStore = useUiStore();
 const capsulesStore = useCapsulesStore();
 const modelsStore = useModelsStore();
+const endpointsStore = useEndpointsStore();
 const editor = useCapsuleStepEditorStore();
 
 const exportModal = ref<{open: boolean; json: string; filename: string; includeStepOutputs: boolean}>({
@@ -168,6 +170,7 @@ const hasStepOutputs = computed(() => Object.keys(capsuleRunStore.artifacts).len
 onMounted(() => {
   editor.loadCapsule(props.capsule);
   capsuleRunStore.restoreForCapsule(props.capsule.id);
+  void ensureModelData();
 });
 
 watch(() => props.capsule, (c) => {
@@ -195,6 +198,10 @@ watch(() => def.value.input?.raw, (raw) => { if (raw !== undefined) testPrompt.v
 const testInputValues = ref<Record<string, string>>({});
 const testParamValues = ref<Record<string, string>>({});
 const testSlotAssignments = ref<Record<string, string>>({});
+
+watch([() => def.value.interface.modelSlots, () => modelsStore.models], () => {
+  fillMissingSlotAssignments();
+}, {immediate: true, deep: true});
 
 const finalArtifactKey = computed(() => {
   const enabled = editor.steps.filter((s) => s.enabled);
@@ -269,6 +276,7 @@ async function handleRunFromStep(stepId: string) {
   editor.updateUserPrompt(testPrompt.value.trim());
   const c = editor.getCapsule();
   if (!c) return;
+  await ensureModelData();
   const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
   uiStore.setRightPaneTab('trace');
   await capsuleRunStore.runFromStep(c, testPrompt.value, inputValues, paramValues, slotAssignments, stepId);
@@ -278,9 +286,32 @@ async function handleRunOnlyStep(stepId: string) {
   editor.updateUserPrompt(testPrompt.value.trim());
   const c = editor.getCapsule();
   if (!c) return;
+  await ensureModelData();
   const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
   uiStore.setRightPaneTab('trace');
   await capsuleRunStore.runOnlyStep(c, testPrompt.value, inputValues, paramValues, slotAssignments, stepId);
+}
+
+async function ensureModelData() {
+  await Promise.all([endpointsStore.load(), modelsStore.load()]);
+  fillMissingSlotAssignments();
+}
+
+function enabledModels() {
+  if (!endpointsStore.loaded) return [];
+  const disabledEndpointIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+  return modelsStore.models.filter((m) => m.enabled !== false && !disabledEndpointIds.has(m.endpointId));
+}
+
+function fillMissingSlotAssignments() {
+  const models = enabledModels();
+  for (const slot of def.value.interface.modelSlots) {
+    if (testSlotAssignments.value[slot.name]) continue;
+    const picked = pickModelRefForSlot(models, slot);
+    if (picked?.kind === 'fixed') {
+      testSlotAssignments.value[slot.name] = `${picked.endpointId}::${picked.modelName}`;
+    }
+  }
 }
 
 function buildTestInputs(c: CapsuleDefinition) {
@@ -321,6 +352,7 @@ function buildTestInputs(c: CapsuleDefinition) {
 async function runCapsule(stopAtStepId?: string) {
   const c = editor.getCapsule();
   if (!c) return;
+  await ensureModelData();
   const {inputValues, paramValues, slotAssignments} = buildTestInputs(c);
   uiStore.setRightPaneTab('trace');
   await capsuleRunStore.run(c, testPrompt.value, inputValues, paramValues, slotAssignments, stopAtStepId);

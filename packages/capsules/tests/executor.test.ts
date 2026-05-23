@@ -99,6 +99,49 @@ describe('executeCapsuleTestRun', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('resolves model slot assignments for step-chain capsules before running', async () => {
+    const def = buildCapsule({
+      interface: {
+        inputs: [],
+        outputs: [{name: 'answer', kind: 'text', sourceArtifactKey: 'answer.text'}],
+        parameters: [],
+        modelSlots: [{name: 'main_model', suggestedBuckets: ['general'], required: true}],
+      },
+      nodes: [],
+      edges: [],
+      input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+      steps: [{
+        id: 'intent',
+        type: 'model-call',
+        label: 'Intent',
+        enabled: true,
+        outputNamespace: 'answer',
+        primaryOutputName: 'text',
+        lastEditedAt: new Date().toISOString(),
+        config: {
+          type: 'model-call',
+          modelRef: {kind: 'slot', slotName: 'main_model'},
+          mode: 'generate',
+          outputNames: ['text', 'rawResponse'],
+        },
+      }],
+    });
+
+    const result = await executeCapsuleTestRun(
+      def,
+      {
+        userPromptRaw: 'hello',
+        inputValues: {},
+        paramValues: {},
+        slotAssignments: {main_model: {endpointId: 'ep-1', modelName: 'test'}},
+      },
+      (id) => (id === 'ep-1' ? ENDPOINT : undefined),
+      {onArtifact() {}, onTraceEvent() {}},
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
   it('pre-seeds input port artifacts from inputValues', async () => {
     const def = buildCapsule({
       interface: {

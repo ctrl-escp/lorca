@@ -80,6 +80,8 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     stopAtStepId?: string,
   ) {
     const endpointsStore = useEndpointsStore();
+    const modelsStore = useModelsStore();
+    await Promise.all([endpointsStore.load(), modelsStore.load()]);
     reset();
 
     const id = `capsule-run-${crypto.randomUUID().slice(0, 8)}`;
@@ -146,6 +148,8 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     stepId: string,
   ) {
     const endpointsStore = useEndpointsStore();
+    const modelsStore = useModelsStore();
+    await Promise.all([endpointsStore.load(), modelsStore.load()]);
 
     const prevSnapshots = {...snapshots.value};
     const prevExecutedStepIds = [...executedStepIds.value];
@@ -223,6 +227,8 @@ export const useCapsuleRunStore = defineStore('capsuleRun', () => {
     stepId: string,
   ) {
     const endpointsStore = useEndpointsStore();
+    const modelsStore = useModelsStore();
+    await Promise.all([endpointsStore.load(), modelsStore.load()]);
 
     const prevSnapshots = {...snapshots.value};
     const prevExecutedStepIds = [...executedStepIds.value];

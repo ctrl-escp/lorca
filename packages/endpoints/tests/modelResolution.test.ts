@@ -3,6 +3,7 @@ import {describe, it, expect} from 'vitest';
 import type {DiscoveredModel, PipelineStep} from '@lorca/core';
 import {
   pickModelRef,
+  pickModelRefForSlot,
   autoAssignModelToStep,
   modelMatchesBucket,
   modelMatchesAnyBucket,
@@ -23,6 +24,8 @@ const models: DiscoveredModel[] = [
     endpointId: 'ep-1',
     providerModelName: 'extract:latest',
     displayName: 'Extract',
+    family: 'mistral',
+    parameterSize: '7B',
     buckets: ['extract-json'],
     source: 'discovered',
   },
@@ -73,5 +76,20 @@ describe('modelResolution', () => {
         modelName: 'extract:latest',
       });
     }
+  });
+
+  it('pickModelRefForSlot falls back from exact names to family and size hints', () => {
+    expect(pickModelRefForSlot(models, {
+      name: 'extractor',
+      suggestedBuckets: ['extract-json'],
+      required: true,
+      preferredModelNames: ['missing:latest'],
+      preferredFamilies: ['mistral'],
+      preferredParameterSizes: ['7b'],
+    })).toEqual({
+      kind: 'fixed',
+      endpointId: 'ep-1',
+      modelName: 'extract:latest',
+    });
   });
 });

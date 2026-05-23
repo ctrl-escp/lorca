@@ -29,6 +29,103 @@ Candidate answer:
 The app stores todos locally and syncs when online."
 `;
 
+exports[`builtin examples > renders example template prompts (snapshots) > example-best-of-two 1`] = `
+"Analyze the user request as a task brief.
+Extract what a high-quality answer must do before anyone tries to answer.
+Respond with JSON only using this exact shape:
+{
+  "intent": string,
+  "domain": string,
+  "acceptance_criteria": string[],
+  "constraints": string[],
+  "quality_bar": string[],
+  "ambiguities": string[]
+}
+
+Rules:
+- Criteria must be observable in a final answer.
+- Constraints must include explicit limits, required formats, and user preferences.
+- Do not answer the request yet.
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-best-of-two 2`] = `
+"Answer the user request. Optimize for usefulness, correctness, and completeness.
+
+Use this extracted brief as your contract:
+{
+  "intent": "Build a todo app",
+  "domain": "software planning",
+  "acceptance_criteria": [
+    "Supports add",
+    "Works offline"
+  ],
+  "constraints": [
+    "Use local storage"
+  ],
+  "quality_bar": [
+    "Concrete architecture"
+  ],
+  "ambiguities": []
+}
+
+Answering rules:
+- Satisfy every acceptance criterion directly.
+- Respect every constraint.
+- State assumptions only when they materially affect the answer.
+- Prefer concrete steps, examples, and decisions over vague advice.
+- Do not mention that you are one of several candidates.
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-best-of-two 3`] = `
+"You are a strict answer judge. Compare two candidate answers against the task brief.
+Choose the answer that best satisfies the criteria, then produce a polished final answer.
+Respond with JSON only using this exact shape:
+{
+  "winner": "candidate_a" | "candidate_b" | "merged",
+  "best_answer": string,
+  "rationale": string,
+  "criterion_scores": { "criterion": string, "candidate_a": number, "candidate_b": number }[],
+  "remaining_risks": string[]
+}
+
+Scoring rules:
+- Score each criterion from 0 to 5.
+- Penalize hallucinated facts, ignored constraints, and answers that sound confident without support.
+- Use "merged" only when combining non-conflicting strengths clearly improves the result.
+
+Task brief:
+{
+  "intent": "Build a todo app",
+  "domain": "software planning",
+  "acceptance_criteria": [
+    "Supports add",
+    "Works offline"
+  ],
+  "constraints": [
+    "Use local storage"
+  ],
+  "quality_bar": [
+    "Concrete architecture"
+  ],
+  "ambiguities": []
+}
+
+User request:
+Build a todo app with offline sync
+
+Candidate A:
+Use IndexedDB and a service worker to keep todos offline.
+
+Candidate B:
+Use localStorage and sync periodically when a connection returns."
+`;
+
 exports[`builtin examples > renders example template prompts (snapshots) > example-candidate-answer 1`] = `
 "Write a complete candidate answer that satisfies the acceptance criteria.
 
@@ -64,6 +161,122 @@ The service returns 200 for healthy checks.
 
 Current:
 The service returns 503 for healthy checks."
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-expert 1`] = `
+"Identify the expert domain needed to answer the user request.
+Respond with JSON only:
+{ "domain": string, "expert_role": string, "knowledge_needed": string[], "risk_flags": string[] }
+
+Prefer a concrete expert role, such as "senior frontend engineer" or "employment attorney".
+Use risk_flags for uncertainty, safety, legal, medical, financial, or missing-context concerns.
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-expert 2`] = `
+"You are acting as this expert:
+{
+  "domain": "software engineering",
+  "expert_role": "senior frontend engineer",
+  "knowledge_needed": [
+    "offline-first apps"
+  ],
+  "risk_flags": []
+}
+
+Extract the intent and acceptance criteria for answering the user request well.
+Respond with JSON only:
+{
+  "intent": string,
+  "acceptance_criteria": string[],
+  "constraints": string[],
+  "must_cover": string[],
+  "answer_style": string
+}
+
+Criteria must be specific enough that a verifier can check the final answer.
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-expert 3`] = `
+"Answer as the selected expert. Be direct, practical, and careful.
+
+Expert domain:
+{
+  "domain": "software engineering",
+  "expert_role": "senior frontend engineer",
+  "knowledge_needed": [
+    "offline-first apps"
+  ],
+  "risk_flags": []
+}
+
+Answer contract:
+{
+  "intent": "Advise on an offline todo app",
+  "acceptance_criteria": [
+    "Explains storage",
+    "Explains sync"
+  ],
+  "constraints": [
+    "Be concise"
+  ],
+  "must_cover": [
+    "offline behavior"
+  ],
+  "answer_style": "practical"
+}
+
+Rules:
+- Cover every must_cover item and acceptance criterion.
+- Respect constraints and the requested answer_style.
+- Name assumptions and uncertainty instead of inventing facts.
+- For high-stakes domains, provide general information and recommend qualified professional help where appropriate.
+
+User request:
+Build a todo app with offline sync"
+`;
+
+exports[`builtin examples > renders example template prompts (snapshots) > example-expert 4`] = `
+"Verify the expert answer against the extracted contract.
+Respond with JSON only:
+{ "passed": boolean, "missing": string[], "weak_spots": string[], "repair_suggestions": string[], "confidence": number }
+
+A pass requires every acceptance criterion to be addressed in the answer.
+Set confidence from 0 to 1.
+
+Expert domain:
+{
+  "domain": "software engineering",
+  "expert_role": "senior frontend engineer",
+  "knowledge_needed": [
+    "offline-first apps"
+  ],
+  "risk_flags": []
+}
+
+Answer contract:
+{
+  "intent": "Advise on an offline todo app",
+  "acceptance_criteria": [
+    "Explains storage",
+    "Explains sync"
+  ],
+  "constraints": [
+    "Be concise"
+  ],
+  "must_cover": [
+    "offline behavior"
+  ],
+  "answer_style": "practical"
+}
+
+Expert answer:
+Use IndexedDB for durable local state and a queued sync worker for remote updates."
 `;
 
 exports[`builtin examples > renders example template prompts (snapshots) > example-intent-extraction 1`] = `

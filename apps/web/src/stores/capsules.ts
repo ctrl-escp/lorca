@@ -28,6 +28,11 @@ export const useCapsulesStore = defineStore('capsules', () => {
     capsules.value.filter((c) => c.status === 'draft'),
   );
 
+  const allCapsules = computed(() => [
+    ...draftCapsules.value,
+    ...lockedCapsules.value,
+  ]);
+
   async function load() {
     if (loaded.value) return;
     capsules.value = (await getDb().capsules.toArray()).map((c) => ensureCapsuleStepChain(c));
@@ -70,7 +75,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
   }
 
   function duplicateCapsule(sourceId: string): string | null {
-    const source = capsules.value.find((c) => c.id === sourceId);
+    const source = getCapsule(sourceId);
     if (!source) return null;
     const id = newId('cap');
     const now = new Date().toISOString();
@@ -107,8 +112,8 @@ export const useCapsulesStore = defineStore('capsules', () => {
   }
 
   function editLockedCapsule(id: string): string | null {
-    const locked = capsules.value.find((c) => c.id === id && c.status === 'locked');
-    if (!locked) return null;
+    const locked = getCapsule(id);
+    if (locked?.status !== 'locked') return null;
     const newCapsuleId = newId('cap');
     const draft = createDraftFromLocked(locked, newCapsuleId);
     capsules.value.push(draft);
@@ -118,6 +123,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
 
   return {
     capsules,
+    allCapsules,
     lockedCapsules,
     draftCapsules,
     loaded,

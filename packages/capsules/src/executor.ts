@@ -5,6 +5,7 @@ import type {
   PipelineArtifact,
   PipelineRunContext,
   PipelineError,
+  PipelineStep,
   Result,
 } from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
@@ -124,7 +125,7 @@ async function executeCapsuleStepChainTestRun(
     id: def.id,
     name: def.name,
     input: def.input ?? {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
-    steps: def.steps!,
+    steps: resolveStepSlots(def.steps!, testInput.slotAssignments),
     createdAt: def.createdAt,
     updatedAt: def.updatedAt,
   };
@@ -134,6 +135,7 @@ async function executeCapsuleStepChainTestRun(
     raw,
     {
       seedArtifacts: {...seedArtifacts, ...(testInput.seedArtifacts ?? {})},
+      ...(Object.keys(testInput.paramValues).length > 0 ? {params: testInput.paramValues} : {}),
       ...(testInput.abortSignal !== undefined ? {abortSignal: testInput.abortSignal} : {}),
       ...(testInput.stopAtStepId ? {stopAtStepId: testInput.stopAtStepId} : {}),
       ...(testInput.startAtStepId ? {startAtStepId: testInput.startAtStepId} : {}),
@@ -159,6 +161,33 @@ function resolveSlots(
       ...node,
       config: {
         ...node.config,
+        modelRef: {kind: 'fixed', endpointId: assignment.endpointId, modelName: assignment.modelName},
+      },
+    };
+  });
+}
+
+function resolveStepSlots(
+  steps: PipelineStep[],
+  slotAssignments: Record<string, {endpointId: string; modelName: string}>,
+): PipelineStep[] {
+  return steps.map((step) => {
+    if (step.config.type === 'loop-group') {
+      return {
+        ...step,
+        config: {
+          ...step.config,
+          steps: resolveStepSlots(step.config.steps, slotAssignments),
+        },
+      };
+    }
+    if (step.config.type !== 'model-call' || step.config.modelRef.kind !== 'slot') return step;
+    const assignment = slotAssignments[step.config.modelRef.slotName];
+    if (!assignment) return step;
+    return {
+      ...step,
+      config: {
+        ...step.config,
         modelRef: {kind: 'fixed', endpointId: assignment.endpointId, modelName: assignment.modelName},
       },
     };

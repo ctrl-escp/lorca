@@ -34,6 +34,10 @@ export interface CapsuleModelSlot {
   suggestedBuckets: ModelUsageBucket[];
   required: boolean;
   description?: string;
+  preferredModelNames?: string[];
+  preferredFamilies?: string[];
+  preferredParameterSizes?: string[];
+  preferredQuantizations?: string[];
   defaultModelRef?: {
     endpointId: string;
     modelName: string;

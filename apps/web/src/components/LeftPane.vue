@@ -150,7 +150,7 @@
       <div class="section-header" @click="toggleSection('capsules')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('capsules')" title="Your saved reusable mini-pipelines">
           <span class="chevron" :class="{open: isExpanded('capsules')}">›</span>
-          <span class="section-title">Capsules <span class="section-count">({{ capsulesStore.capsules.length }})</span></span>
+          <span class="section-title">Capsules <span class="section-count">({{ visibleCapsules.length }})</span></span>
         </button>
         <div class="section-actions" @click.stop>
           <button class="icon-btn" @click="onImportCapsule" title="Import a Capsule from a JSON file">↓</button>
@@ -160,8 +160,8 @@
       <div v-if="isExpanded('capsules')" class="section-body">
         <div class="capsule-list">
           <div
-            v-for="cap in capsulesStore.capsules"
-            :key="cap.id"
+            v-for="cap in visibleCapsules"
+            :key="`${cap.id}::${cap.version}`"
             class="capsule-row"
             :class="{active: uiStore.activeCapsuleEditId === cap.id}"
           >
@@ -189,7 +189,7 @@
               @click.stop="onDuplicateCapsule(cap.id)"
             >⊕</button>
           </div>
-          <p v-if="capsulesStore.capsules.length === 0" class="empty-hint">No Capsules yet.</p>
+          <p v-if="visibleCapsules.length === 0" class="empty-hint">No Capsules yet.</p>
         </div>
       </div>
     </section>
@@ -302,7 +302,7 @@
 
 <script setup lang="ts">
 import {ref, computed, onMounted, onUnmounted, watch} from 'vue';
-import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
+import type {AiEndpointConfig, CapsuleDefinition, DiscoveredModel, ModelRef, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
 import {ALL_SUGGESTIONS} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
@@ -320,7 +320,7 @@ import {useEndpointActions} from '../composables/useEndpointActions.js';
 import {DND_BODY_SUGGESTION, DND_SUGGESTION_ID} from '../utils/dragDrop.js';
 import {pickJsonFile} from '../utils/importFile.js';
 import {newId} from '../utils/id.js';
-import {autoAssignModelToStep, modelMatchesBucket} from '@lorca/endpoints';
+import {autoAssignModelToStep, modelMatchesBucket, pickModelRefForSlot} from '@lorca/endpoints';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
@@ -357,6 +357,8 @@ const advisorLoading = ref(false);
 const advisorSuggestions = ref<{suggestionId: string; reason: string}[]>([]);
 const advisorError = ref<{message: string; raw?: string} | null>(null);
 let advisorAbort: AbortController | null = null;
+
+const FEATURED_CAPSULE_IDS = ['example-best-of-two', 'example-expert'];
 
 // Suggestion replace dialog
 const replaceConfirmOpen = ref(false);
@@ -450,6 +452,16 @@ const filteredStepGroups = computed((): StepTypeGroup[] => {
     );
     if (!typeMatches && matchedSuggestions.length === 0) return [];
     return [{...entry, suggestions: typeMatches ? allSuggestions : matchedSuggestions, typeMatches}];
+  });
+});
+
+const visibleCapsules = computed(() => {
+  const priority = new Map(FEATURED_CAPSULE_IDS.map((id, index) => [id, index]));
+  return [...capsulesStore.allCapsules].sort((a, b) => {
+    const aPriority = priority.get(a.id) ?? Number.POSITIVE_INFINITY;
+    const bPriority = priority.get(b.id) ?? Number.POSITIVE_INFINITY;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return 0;
   });
 });
 
@@ -593,7 +605,24 @@ function onInsertCapsule(capsuleId: string) {
   const cap = capsulesStore.getCapsule(capsuleId);
   if (!cap) return;
   const stepId = pipelineEditorStore.insertCapsuleInstance(cap);
+  assignCapsuleSlotModels(stepId, cap);
   if (stepId) pipelineEditorStore.selectStep(stepId);
+}
+
+function assignCapsuleSlotModels(stepId: string | null, capsule: CapsuleDefinition) {
+  if (!stepId || capsule.interface.modelSlots.length === 0) return;
+  const step = pipelineEditorStore.pipeline.steps.find((s) => s.id === stepId);
+  if (!step || step.config.type !== 'capsule-instance') return;
+  const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+  const enabledModels = modelsStore.models.filter((m) => m.enabled !== false && !disabledEpIds.has(m.endpointId));
+  const modelSlotBindings: Record<string, ModelRef> = {...(step.config.modelSlotBindings ?? {})};
+  for (const slot of capsule.interface.modelSlots) {
+    const picked = pickModelRefForSlot(enabledModels, slot);
+    if (picked) modelSlotBindings[slot.name] = picked;
+  }
+  pipelineEditorStore.updateStepConfig(stepId, {
+    config: {...step.config, modelSlotBindings},
+  });
 }
 
 function onDuplicateCapsule(capsuleId: string) {
