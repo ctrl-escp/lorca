@@ -341,11 +341,17 @@ const epActions = useEndpointActions();
 
 const isPipelineContext = computed(() => uiStore.editorContext === 'pipeline');
 
+const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
+  {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks. Set output format to JSON strict if downstream steps depend on parsed output.'},
+  {type: 'loop-group', label: 'Loop', description: 'Repeat an inner step chain until exit condition'},
+  {type: 'presentation', label: 'Text', description: 'Free-form text with optional {{artifact.key}} interpolation'},
+];
+
 const showAddEndpoint = ref(false);
 const showAddModel = ref(false);
 const editingEndpointId = ref<string | null>(null);
 const stepLibraryQuery = ref('');
-const expandedTypeGroups = ref<Set<StepType>>(new Set());
+const expandedTypeGroups = ref<Set<StepType>>(new Set(STEP_TYPE_ENTRIES.map((e) => e.type)));
 const modelBucketFilter = ref<ModelUsageBucket | ''>('');
 const advisorLoading = ref(false);
 const advisorSuggestions = ref<{suggestionId: string; reason: string}[]>([]);
@@ -406,12 +412,6 @@ function stepsUsingModel(endpointId: string, modelName: string) {
       s.config.modelRef.modelName === modelName,
   );
 }
-
-const STEP_TYPE_ENTRIES: {type: StepType; label: string; description: string}[] = [
-  {type: 'model-call', label: 'Model call', description: 'Call a model with composed prompt blocks. Set output format to JSON strict if downstream steps depend on parsed output.'},
-  {type: 'presentation', label: 'Text', description: 'Free-form text with optional {{artifact.key}} interpolation'},
-  {type: 'loop-group', label: 'Loop', description: 'Repeat an inner step chain until exit condition'},
-];
 
 function matchesQuery(query: string, text: string): boolean {
   const q = query.trim().toLowerCase();
