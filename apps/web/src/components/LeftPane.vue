@@ -112,6 +112,40 @@
           </div>
           <p v-if="filteredSuggestions.length === 0" class="empty-hint">No suggestions match your filter.</p>
         </div>
+        <div v-if="isPipelineContext" class="ai-suggestions">
+          <div class="ai-suggestions-header">
+            <span class="ai-suggestions-title">AI suggestions</span>
+            <button
+              type="button"
+              class="btn-ai-suggest"
+              :disabled="advisorLoading || !hasAdvisorRunContext"
+              :title="hasAdvisorRunContext ? 'Suggest next steps from the last run' : 'Run the pipeline first'"
+              @click.stop="loadAiSuggestions"
+            >{{ advisorLoading ? 'Thinking...' : 'Suggest' }}</button>
+          </div>
+          <div v-if="advisorError" class="advisor-banner">
+            <div>
+              <strong>{{ advisorError.message }}</strong>
+              <pre v-if="advisorError.raw" class="advisor-raw">{{ advisorError.raw }}</pre>
+            </div>
+            <button type="button" class="advisor-dismiss" title="Dismiss" @click="advisorError = null">×</button>
+          </div>
+          <p v-else-if="!hasAdvisorRunContext" class="empty-hint">Run the pipeline to ask for next-step suggestions.</p>
+          <div v-if="advisorCards.length" class="advisor-list">
+            <div v-for="card in advisorCards" :key="card.suggestion.id" class="advisor-card">
+              <div class="advisor-card-main">
+                <span class="suggestion-row-name">{{ card.suggestion.name }}</span>
+                <span class="suggestion-row-desc">{{ card.reason }}</span>
+              </div>
+              <button
+                class="btn-insert-suggestion"
+                type="button"
+                title="Append to end of pipeline"
+                @click.stop="onInsertSuggestion(card.suggestion, 'append')"
+              >↓ Insert</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -271,7 +305,7 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, onMounted} from 'vue';
+import {ref, computed, onMounted, onUnmounted, watch} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
 import {ALL_SUGGESTIONS} from '@lorca/capsules';
@@ -284,6 +318,7 @@ import {useImportExportStore} from '../stores/importExport.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
 import {useActiveStepEditor} from '../composables/useActiveStepEditor.js';
 import {useSuggestionInsert} from '../composables/useSuggestionInsert.js';
+import {useStepAdvisor} from '../composables/useStepAdvisor.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useEndpointActions} from '../composables/useEndpointActions.js';
 import {DND_BODY_SUGGESTION, DND_SUGGESTION_ID} from '../utils/dragDrop.js';
@@ -304,6 +339,7 @@ const importStore = useImportExportStore();
 const pipelineEditorStore = usePipelineEditorStore();
 const editorStore = useActiveStepEditor();
 const suggestionInsert = useSuggestionInsert();
+const stepAdvisor = useStepAdvisor();
 const runStore = useActiveRunStore();
 const epActions = useEndpointActions();
 
@@ -315,6 +351,10 @@ const editingEndpointId = ref<string | null>(null);
 const stepTypeQuery = ref('');
 const suggestionQuery = ref('');
 const modelBucketFilter = ref<ModelUsageBucket | ''>('');
+const advisorLoading = ref(false);
+const advisorSuggestions = ref<{suggestionId: string; reason: string}[]>([]);
+const advisorError = ref<{message: string; raw?: string} | null>(null);
+let advisorAbort: AbortController | null = null;
 
 // Suggestion replace dialog
 const replaceConfirmOpen = ref(false);
@@ -397,6 +437,22 @@ const filteredSuggestions = computed(() =>
   ),
 );
 
+const advisorArtifactKeys = computed(() => Object.keys(runStore.artifacts).sort());
+
+const hasAdvisorRunContext = computed(() =>
+  isPipelineContext.value &&
+  !runStore.isRunning &&
+  runStore.status !== 'idle' &&
+  advisorArtifactKeys.value.length > 0,
+);
+
+const advisorCards = computed(() =>
+  advisorSuggestions.value.flatMap((entry) => {
+    const suggestion = ALL_SUGGESTIONS.find((s) => s.id === entry.suggestionId);
+    return suggestion ? [{suggestion, reason: entry.reason}] : [];
+  }),
+);
+
 const MODEL_BUCKET_OPTIONS: {value: ModelUsageBucket | ''; label: string}[] = [
   {value: '', label: 'All buckets'},
   {value: 'tiny', label: 'Tiny'},
@@ -426,6 +482,15 @@ onMounted(async () => {
   uiStore.expandLeftPaneSection(
     modelsStore.models.length === 0 ? 'endpoints' : 'stepTypes',
   );
+});
+
+onUnmounted(() => {
+  advisorAbort?.abort();
+});
+
+watch(() => runStore.runId, () => {
+  advisorSuggestions.value = [];
+  advisorError.value = null;
 });
 
 function isExpanded(section: LeftPaneSection): boolean {
@@ -539,6 +604,43 @@ async function onInsertSuggestion(suggestion: PipelineSuggestion, mode: Suggesti
   await suggestionInsert.insertSuggestion(suggestion, mode, {
     confirmReplace: () => confirmSuggestionReplace(suggestion.name),
   });
+}
+
+async function loadAiSuggestions() {
+  if (!hasAdvisorRunContext.value) return;
+  advisorAbort?.abort();
+  const controller = new AbortController();
+  advisorAbort = controller;
+  advisorLoading.value = true;
+  advisorError.value = null;
+
+  try {
+    const result = await stepAdvisor.getStepSuggestions(
+      pipelineEditorStore.pipeline,
+      advisorArtifactKeys.value,
+      ALL_SUGGESTIONS,
+      controller.signal,
+    );
+    if (controller.signal.aborted) return;
+    if (result.ok) {
+      advisorSuggestions.value = result.suggestions;
+    } else {
+      advisorSuggestions.value = [];
+      advisorError.value = {
+        message: result.message,
+        ...(result.rawResponse ? {raw: result.rawResponse} : {}),
+      };
+    }
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    advisorSuggestions.value = [];
+    advisorError.value = {message: error instanceof Error ? error.message : 'AI suggestions failed'};
+  } finally {
+    if (advisorAbort === controller) {
+      advisorAbort = null;
+      advisorLoading.value = false;
+    }
+  }
 }
 
 function onModelClick(model: DiscoveredModel) {
@@ -770,6 +872,87 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   border-radius: 5px; cursor: pointer; white-space: nowrap;
 }
 .btn-insert-suggestion:hover { background: #1e381e; color: #8dda8d; }
+
+.ai-suggestions {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #242424;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ai-suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.ai-suggestions-title {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a8a8a;
+}
+.btn-ai-suggest {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  background: #1a2630;
+  border: 1px solid #2b4c62;
+  color: #80c7df;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.btn-ai-suggest:hover:not(:disabled) { background: #203444; color: #9adcf0; }
+.btn-ai-suggest:disabled { opacity: 0.45; cursor: default; }
+.advisor-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #4b3020;
+  border-radius: 6px;
+  background: #221813;
+  color: #d89a72;
+  font-size: 0.78rem;
+}
+.advisor-dismiss {
+  border: none;
+  background: transparent;
+  color: #d89a72;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.advisor-raw {
+  max-height: 8rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0.4rem 0 0;
+  color: #b98b70;
+  font-size: 0.72rem;
+}
+.advisor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.advisor-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #263326;
+  border-radius: 6px;
+  background: #141a14;
+}
+.advisor-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
 
 .empty-hint { font-size: 0.88rem; color: #555; margin: 0; }
 
