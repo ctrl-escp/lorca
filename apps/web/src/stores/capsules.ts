@@ -35,7 +35,10 @@ export const useCapsulesStore = defineStore('capsules', () => {
 
   async function load() {
     if (loaded.value) return;
-    capsules.value = (await getDb().capsules.toArray()).map((c) => ensureCapsuleStepChain(c));
+    const fromDb = (await getDb().capsules.toArray()).map((c) => ensureCapsuleStepChain(c));
+    const dbIds = new Set(fromDb.map((c) => c.id));
+    const inMemoryOnly = capsules.value.filter((c) => !dbIds.has(c.id));
+    capsules.value = [...fromDb, ...inMemoryOnly];
     loaded.value = true;
   }
 
@@ -47,11 +50,22 @@ export const useCapsulesStore = defineStore('capsules', () => {
 
   function updateCapsule(id: string, patch: Partial<CapsuleDefinition>) {
     const idx = capsules.value.findIndex((c) => c.id === id);
-    if (idx !== -1) {
-      const updated = cloneForStorage({...capsules.value[idx]!, ...patch, updatedAt: new Date().toISOString()});
-      capsules.value[idx] = updated;
-      void getDb().capsules.put(updated);
-    }
+    if (idx === -1) return;
+    const {
+      id: _id,
+      status: _status,
+      lockedAt: _lockedAt,
+      version: _version,
+      createdAt: _createdAt,
+      ...mutablePatch
+    } = patch as CapsuleDefinition;
+    const updated = cloneForStorage({
+      ...capsules.value[idx]!,
+      ...mutablePatch,
+      updatedAt: new Date().toISOString(),
+    });
+    capsules.value[idx] = updated;
+    void getDb().capsules.put(updated);
   }
 
   function removeCapsule(id: string) {

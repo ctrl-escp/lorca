@@ -10,28 +10,28 @@ export interface UiState {
   activeCapsuleEditId: string | null;
   selectedNodeId: string | null;
   rightPaneTab: RightPaneTab;
-  leftPaneWidth: number;
-  rightPaneWidth: number;
+  leftPaneFlex: number;
+  rightPaneFlex: number;
 }
 
-const PANE_SIZE_STORAGE_KEY = 'lorca:ui:paneSizes';
+const PANE_FLEX_STORAGE_KEY = 'lorca:ui:paneFlexes';
 
-function readPersistedSizes(): {left: number; right: number} {
+function readPersistedFlexes(): {left: number; right: number} {
   try {
-    const raw = localStorage.getItem(PANE_SIZE_STORAGE_KEY);
-    if (!raw) return {left: 340, right: 400};
+    const raw = localStorage.getItem(PANE_FLEX_STORAGE_KEY);
+    if (!raw) return {left: 2, right: 3};
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === 'object') {
       const p = parsed as Record<string, unknown>;
       return {
-        left: typeof p.left === 'number' ? p.left : 340,
-        right: typeof p.right === 'number' ? p.right : 400,
+        left: typeof p.left === 'number' ? p.left : 2,
+        right: typeof p.right === 'number' ? p.right : 3,
       };
     }
   } catch {
     // ignore
   }
-  return {left: 280, right: 360};
+  return {left: 2, right: 3};
 }
 
 export const useUiStore = defineStore('ui', () => {
@@ -39,16 +39,16 @@ export const useUiStore = defineStore('ui', () => {
   const activeCapsuleEditId = ref<string | null>(null);
   const selectedNodeId = ref<string | null>(null);
   const rightPaneTab = ref<RightPaneTab>('inspector');
-  const sizes = readPersistedSizes();
-  const leftPaneWidth = ref(sizes.left);
-  const rightPaneWidth = ref(sizes.right);
+  const flexes = readPersistedFlexes();
+  const leftPaneFlex = ref(flexes.left);
+  const rightPaneFlex = ref(flexes.right);
   const leftPaneExpandedSection = ref<LeftPaneSection | null>(null);
 
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
-  watch([leftPaneWidth, rightPaneWidth], ([l, r]) => {
+  watch([leftPaneFlex, rightPaneFlex], ([l, r]) => {
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
-      localStorage.setItem(PANE_SIZE_STORAGE_KEY, JSON.stringify({left: l, right: r}));
+      localStorage.setItem(PANE_FLEX_STORAGE_KEY, JSON.stringify({left: l, right: r}));
     }, 250);
   });
 
@@ -90,8 +90,8 @@ export const useUiStore = defineStore('ui', () => {
     activeCapsuleEditId,
     selectedNodeId,
     rightPaneTab,
-    leftPaneWidth,
-    rightPaneWidth,
+    leftPaneFlex,
+    rightPaneFlex,
     leftPaneExpandedSection,
     openCapsuleEditor,
     closeCapsuleEditor,

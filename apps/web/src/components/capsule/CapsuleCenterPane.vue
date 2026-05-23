@@ -181,7 +181,7 @@ watch(() => props.capsule, (c) => {
 });
 
 watch(() => editor.capsule, (c) => {
-  if (c) emit('update', c);
+  if (c && c.id === uiStore.activeCapsuleEditId) emit('update', c);
 }, {deep: true});
 
 const localName = ref(props.capsule.name);
@@ -359,9 +359,16 @@ async function runCapsule(stopAtStepId?: string) {
 }
 
 function handleLock() {
-  if (!uiStore.activeCapsuleEditId) return;
-  const result = capsulesStore.lockCapsuleById(uiStore.activeCapsuleEditId);
-  if (!result.ok) alert(`Cannot lock: ${result.message}`);
+  const draft = editor.getCapsule();
+  if (!draft || draft.status !== 'draft') return;
+  capsulesStore.updateCapsule(draft.id, draft);
+  const result = capsulesStore.lockCapsuleById(draft.id);
+  if (!result.ok) {
+    alert(`Cannot lock: ${result.message}`);
+    return;
+  }
+  const locked = capsulesStore.getCapsule(draft.id);
+  if (locked) editor.loadCapsule(locked);
 }
 
 function handleEditLocked() {

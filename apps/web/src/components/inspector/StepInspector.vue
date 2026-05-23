@@ -1,5 +1,5 @@
 <template>
-  <div class="step-inspector">
+  <div ref="inspectorRef" class="step-inspector">
     <div v-if="!step" class="inspector-empty">Select a step to configure it.</div>
     <template v-else>
       <div class="inspector-header">
@@ -24,6 +24,7 @@
           :class="{active: activeTab === tab.id}"
           role="tab"
           :aria-selected="activeTab === tab.id"
+          :title="tab.title"
           @click="activeTab = tab.id"
         >{{ tab.label }}</button>
       </div>
@@ -196,8 +197,8 @@
           <p v-else class="empty-hint">No output artifacts from a run yet.</p>
         </template>
 
-        <!-- Last run -->
-        <template v-else-if="activeTab === 'last-run'">
+        <!-- Last run (tabs mode only — split modes show this in the bottom section) -->
+        <template v-else-if="activeTab === 'last-run' && splitMode === 'tabs'">
           <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
             <div class="inspector-status-header">
               <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
@@ -231,12 +232,51 @@
           <p v-else class="empty-hint">Run the pipeline to evaluate validation state.</p>
         </template>
       </div>
+
+      <!-- bottom last-run section (full / collapsed split modes) -->
+      <template v-if="showBottomSection">
+        <div
+          class="inspector-split-handle"
+          :class="{draggable: splitMode === 'full'}"
+          @mousedown="splitMode === 'full' ? onSplitHandleMouseDown($event) : undefined"
+        />
+        <div
+          class="inspector-bottom"
+          :style="splitMode === 'full' ? {height: bottomHeight + 'px'} : {}"
+        >
+          <div
+            v-if="splitMode === 'collapsed'"
+            class="inspector-bottom-header"
+            @click="isBottomExpanded = !isBottomExpanded"
+          >
+            <span class="bottom-status-dot" :class="`dot-${stepStatus?.state ?? 'not-run'}`" />
+            <span class="bottom-status-label">{{ stepStatus ? stepRunUiStateLabel(stepStatus.state) : 'No run data' }}</span>
+            <span v-if="lastSnapshot?.completedAt" class="bottom-status-time">{{ formatTime(lastSnapshot.completedAt) }}</span>
+            <span class="bottom-chevron">{{ isBottomExpanded ? '▾' : '▴' }}</span>
+          </div>
+          <div v-show="splitMode === 'full' || isBottomExpanded" class="inspector-bottom-content">
+            <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
+              <div v-if="splitMode === 'full'" class="inspector-status-header">
+                <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
+                <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">{{ formatTime(lastSnapshot.completedAt) }}</span>
+              </div>
+              <JsonViewer
+                v-if="lastRunOutputValue !== null"
+                class="inspector-output-preview"
+                :value="lastRunOutputValue"
+              />
+              <p v-else-if="stepStatus.state === 'not-run'" class="empty-hint">This step has not been executed yet.</p>
+            </div>
+            <p v-else class="empty-hint">No run data.</p>
+          </div>
+        </div>
+      </template>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref, watch, computed} from 'vue';
+import {ref, watch, computed, onMounted, onUnmounted} from 'vue';
 import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig, LoopExitCondition} from '@lorca/core';
 import {stepRunUiStateLabel} from '@lorca/pipeline';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
@@ -253,6 +293,7 @@ import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 
 type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
+type SplitMode = 'full' | 'collapsed' | 'tabs';
 
 const uiStore = useUiStore();
 const editorStore = useActiveStepEditor();
@@ -266,6 +307,48 @@ const {stateFor} = useStepStaleStateMap(() => editorStore.pipeline.input.raw);
 
 const step = computed(() => editorStore.selectedStep);
 const activeTab = ref<InspectorTab>('config');
+
+const inspectorRef = ref<HTMLElement | null>(null);
+const containerWidth = ref(0);
+const bottomHeight = ref(200);
+const isBottomExpanded = ref(false);
+
+const splitMode = computed((): SplitMode => {
+  if (containerWidth.value >= 380) return 'full';
+  if (containerWidth.value >= 240) return 'collapsed';
+  return 'tabs';
+});
+const showBottomSection = computed(() => splitMode.value !== 'tabs' && !!step.value);
+
+let resizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  if (!inspectorRef.value) return;
+  resizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry) containerWidth.value = entry.contentRect.width;
+  });
+  resizeObserver.observe(inspectorRef.value);
+});
+onUnmounted(() => resizeObserver?.disconnect());
+
+function onSplitHandleMouseDown(e: MouseEvent) {
+  e.preventDefault();
+  const startY = e.clientY;
+  const startHeight = bottomHeight.value;
+  function onMove(ev: MouseEvent) {
+    bottomHeight.value = Math.max(60, Math.min(500, startHeight + (startY - ev.clientY)));
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+  document.body.style.cursor = 'row-resize';
+  document.body.style.userSelect = 'none';
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
 
 const stepStatus = computed(() => {
   const s = step.value;
@@ -299,12 +382,18 @@ const capsuleInstanceStep = computed((): (PipelineStep & {config: CapsuleInstanc
 });
 
 const visibleTabs = computed(() => {
-  const tabs: {id: InspectorTab; label: string}[] = [
-    {id: 'config', label: 'Config'},
+  const tabs: {id: InspectorTab; label: string; title: string}[] = [
+    {id: 'config', label: 'Config', title: 'Step configuration: model, output format, and other settings'},
   ];
-  if (hasPromptBlocks.value) tabs.push({id: 'prompt', label: 'Prompt'});
-  tabs.push({id: 'inputs', label: 'Inputs'}, {id: 'outputs', label: 'Outputs'});
-  tabs.push({id: 'last-run', label: 'Last run'}, {id: 'validation', label: 'Validation'});
+  if (hasPromptBlocks.value) tabs.push({id: 'prompt', label: 'Prompt', title: 'Compose the prompt sent to the model'});
+  tabs.push(
+    {id: 'inputs', label: 'Inputs', title: 'Artifacts read by this step from previous steps'},
+    {id: 'outputs', label: 'Outputs', title: 'Artifacts produced by this step'},
+  );
+  if (splitMode.value === 'tabs') {
+    tabs.push({id: 'last-run', label: 'Last run', title: 'Output from the most recent execution of this step'});
+  }
+  tabs.push({id: 'validation', label: 'Validation', title: 'Validation errors and warnings for this step'});
   return tabs;
 });
 
@@ -313,6 +402,12 @@ watch(step, () => {
     activeTab.value = 'config';
   }
 }, {flush: 'sync'});
+
+watch(splitMode, () => {
+  if (!visibleTabs.value.some((t) => t.id === activeTab.value)) {
+    activeTab.value = 'config';
+  }
+});
 
 function formatTime(iso: string): string {
   try {
@@ -466,6 +561,79 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .inspector-tab.active { color: #7ec8e3; border-color: #2a4a6a; background: #1a2430; }
 
 .inspector-tab-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.65rem; }
+
+.inspector-split-handle {
+  flex-shrink: 0;
+  height: 5px;
+  margin: 0 -1rem;
+  position: relative;
+}
+.inspector-split-handle::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 2px;
+  height: 1px;
+  background: #1e1e1e;
+  transition: background 0.15s, height 0.15s, top 0.15s;
+}
+.inspector-split-handle.draggable { cursor: row-resize; }
+.inspector-split-handle.draggable:hover::after,
+.inspector-split-handle.draggable:active::after {
+  top: 1px;
+  height: 3px;
+  background: #3a6080;
+}
+
+.inspector-bottom {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.inspector-bottom-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+.inspector-bottom-header:hover { opacity: 0.85; }
+
+.bottom-status-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-current { background: #3a9d6e; }
+.dot-stale, .dot-failed-stale { background: #c8a050; }
+.dot-blocked, .dot-failed-current { background: #c0392b; }
+.dot-not-run, .dot-skipped-partial { background: #444; }
+.dot-disabled { background: #333; }
+
+.bottom-status-label { color: #aaa; }
+.bottom-status-time { color: #555; font-size: 0.75rem; margin-left: auto; }
+.bottom-chevron { color: #555; font-size: 0.7rem; margin-left: 0.2rem; }
+
+.inspector-bottom-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.inspector-bottom-content .inspector-status {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  margin: 0 -1rem;
+  padding: 0.55rem 1rem;
+}
 
 .ns-row { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; }
 .ns-label { color: #444; }

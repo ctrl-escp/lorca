@@ -24,17 +24,17 @@
       :errors="importStore.importErrors"
       @dismiss="importStore.cancelImport()"
     />
-    <main class="app-body">
+    <main ref="appBodyRef" class="app-body">
       <div
         class="panel-overlay"
         :class="{visible: mobileLeftOpen || mobileRightOpen}"
         @click="mobileLeftOpen = false; mobileRightOpen = false"
       />
-      <div class="pane pane-left" :class="{'mobile-open': mobileLeftOpen}" :style="{width: `${uiStore.leftPaneWidth}px`}">
+      <div class="pane pane-left" :class="{'mobile-open': mobileLeftOpen}" :style="{flex: uiStore.leftPaneFlex}">
         <LeftPane />
       </div>
       <PaneResizeHandle side="left" @resize="resizeLeftPane" />
-      <div class="pane pane-center">
+      <div class="pane pane-center" :style="{flex: 8 - uiStore.leftPaneFlex - uiStore.rightPaneFlex}">
         <CapsuleCenterPane
           v-if="uiStore.editorContext === 'capsule' && activeCapsule"
           ref="capsuleCenterPaneRef"
@@ -51,7 +51,7 @@
         />
       </div>
       <PaneResizeHandle side="right" @resize="resizeRightPane" />
-      <div class="pane pane-right" :class="{'mobile-open': mobileRightOpen}" :style="{width: `${uiStore.rightPaneWidth}px`}">
+      <div class="pane pane-right" :class="{'mobile-open': mobileRightOpen}" :style="{flex: uiStore.rightPaneFlex}">
         <RightPane
           v-bind="uiStore.editorContext === 'capsule' && activeCapsule ? {capsule: activeCapsule, onUpdateCapsuleInterface} : {}"
         />
@@ -170,12 +170,20 @@ async function onConfirmImport(remaps: Record<string, ModelRemap>) {
   }
 }
 
+const appBodyRef = ref<HTMLElement | null>(null);
+
 function resizeLeftPane(delta: number) {
-  uiStore.leftPaneWidth = Math.min(600, Math.max(260, uiStore.leftPaneWidth + delta));
+  const W = appBodyRef.value?.offsetWidth ?? window.innerWidth;
+  const flexDelta = (delta / W) * 8;
+  const maxLeft = 8 - uiStore.rightPaneFlex - 1;
+  uiStore.leftPaneFlex = Math.min(maxLeft, Math.max(1, uiStore.leftPaneFlex + flexDelta));
 }
 
 function resizeRightPane(delta: number) {
-  uiStore.rightPaneWidth = Math.min(700, Math.max(300, uiStore.rightPaneWidth + delta));
+  const W = appBodyRef.value?.offsetWidth ?? window.innerWidth;
+  const flexDelta = (delta / W) * 8;
+  const maxRight = 8 - uiStore.leftPaneFlex - 1;
+  uiStore.rightPaneFlex = Math.min(maxRight, Math.max(1, uiStore.rightPaneFlex + flexDelta));
 }
 
 onMounted(async () => {
@@ -236,9 +244,9 @@ body {
 .app-body { flex: 1; display: flex; min-height: 0; }
 
 .pane { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
-.pane-left { flex-shrink: 0; border-right: none; }
-.pane-center { flex: 1; min-width: 0; }
-.pane-right { flex-shrink: 0; border-left: none; }
+.pane-left { min-width: 150px; }
+.pane-center { min-width: 200px; }
+.pane-right { min-width: 200px; }
 
 /* ── Mobile layout ─────────────────────────────── */
 @media (max-width: 767px) {
