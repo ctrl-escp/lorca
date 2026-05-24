@@ -121,7 +121,7 @@ const title = computed(() =>
 }
 .help-header h2 { margin: 0; font-size: 1rem; color: #ddd; }
 .help-close {
-  background: none; border: none; color: #888; font-size: 1.25rem; cursor: pointer;
+  background: none; border: none; color: var(--text-label); font-size: 1.25rem; cursor: pointer;
 }
 .help-close:hover { color: #ccc; }
 .help-body {
@@ -138,7 +138,7 @@ const title = computed(() =>
 }
 .help-ref-list { list-style: none; padding: 0; max-height: 10rem; overflow-y: auto; }
 .help-ref-list li { margin-bottom: 0.2rem; }
-.help-muted { color: #666; font-style: italic; }
+.help-muted { color: var(--text-label); font-style: italic; }
 code { font-family: monospace; color: #7ec8e3; font-size: 0.78rem; }
 .help-shortcuts { width: 100%; border-collapse: collapse; margin-top: 0.25rem; }
 .help-shortcuts td { padding: 3px 0; vertical-align: middle; }

@@ -101,7 +101,7 @@ function submit() {
   padding: 4px 8px;
   font-size: 0.85rem;
 }
-.form-row input:focus, .form-row select:focus { outline: none; border-color: #555; }
+.form-row input:focus, .form-row select:focus { outline: none; border-color: var(--text-secondary); }
 .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }
 .btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ccc; border-radius: 4px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; }
 .btn:hover { background: #333; }

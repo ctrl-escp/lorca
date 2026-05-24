@@ -183,12 +183,12 @@ function stringToSlot(value: string): {endpointId: string; modelName: string} {
 
 <style scoped>
 .ci-inspector { display: flex; flex-direction: column; gap: 0.5rem; }
-.ci-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #888; }
+.ci-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-label); }
 .ci-field-row label { display: flex; align-items: center; gap: 0.3rem; cursor: help; }
-.ci-section-label { font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
+.ci-section-label { font-size: 0.65rem; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
 .ci-field { display: flex; flex-direction: column; gap: 0.15rem; }
-.ci-field label { font-size: 0.72rem; color: #888; cursor: help; }
-.kind-tag { font-size: 0.62rem; color: #555; background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
+.ci-field label { font-size: 0.72rem; color: var(--text-label); cursor: help; }
+.kind-tag { font-size: 0.62rem; color: var(--text-secondary); background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
 input, select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 4px; padding: 4px 8px; font-size: 0.82rem; width: 100%;

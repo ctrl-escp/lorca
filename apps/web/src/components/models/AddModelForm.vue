@@ -67,7 +67,7 @@ function submit() {
 .add-model-form { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; }
 .form-row { display: flex; flex-direction: column; gap: 0.2rem; }
 .form-row input, .form-row select { background: #111; border: 1px solid #333; color: #e8e8e8; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem; }
-.form-row input:focus, .form-row select:focus { outline: none; border-color: #555; }
+.form-row input:focus, .form-row select:focus { outline: none; border-color: var(--text-secondary); }
 .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }
 .btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ccc; border-radius: 4px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; }
 .btn:hover { background: #333; }

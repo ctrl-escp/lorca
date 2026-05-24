@@ -432,7 +432,7 @@ textarea {
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.25rem; }
 .model-select-row select { flex: 1; min-width: 0; }
 .btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
-.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: var(--text-muted); }
 .model-select-warning {
   margin: 0;
   color: #c8a050;
@@ -441,7 +441,7 @@ textarea {
 }
 .slot-binding-hint {
   margin: 0;
-  color: #666;
+  color: var(--text-label);
   font-size: 0.68rem;
   line-height: 1.35;
 }

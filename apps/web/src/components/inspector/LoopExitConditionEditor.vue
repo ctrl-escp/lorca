@@ -137,17 +137,17 @@ defineExpose({loopExitPresetLabel});
 
 <style scoped>
 .loop-exit-editor { display: flex; flex-direction: column; gap: 0.55rem; }
-.preset-hint { margin: 0.2rem 0 0; font-size: 0.72rem; color: #666; line-height: 1.35; }
+.preset-hint { margin: 0.2rem 0 0; font-size: 0.72rem; color: var(--text-label); line-height: 1.35; }
 .exit-summary {
   display: flex; flex-direction: column; gap: 0.2rem;
   padding: 0.45rem 0.55rem; background: #111; border: 1px solid #252525; border-radius: 4px;
 }
-.exit-summary-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 0.04em; }
+.exit-summary-label { font-size: 0.68rem; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.04em; }
 .exit-summary-code { font-size: 0.78rem; color: #7ec8e3; }
 .loop-help {
-  font-size: 0.72rem; color: #666; border: 1px solid #222; border-radius: 4px; padding: 0.35rem 0.55rem;
+  font-size: 0.72rem; color: var(--text-label); border: 1px solid #222; border-radius: 4px; padding: 0.35rem 0.55rem;
 }
-.loop-help summary { cursor: pointer; color: #888; }
+.loop-help summary { cursor: pointer; color: var(--text-secondary); }
 .loop-help ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
 .loop-help li { margin-bottom: 0.25rem; }
 .loop-help code { color: #7ec8e3; font-size: 0.7rem; }

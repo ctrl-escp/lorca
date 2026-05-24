@@ -15,7 +15,7 @@ defineProps<{
 <style scoped>
 .field-label {
   font-size: 0.72rem;
-  color: #888;
+  color: var(--text-label);
   display: inline-flex;
   align-items: baseline;
   gap: 0;

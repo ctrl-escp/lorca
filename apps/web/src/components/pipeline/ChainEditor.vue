@@ -1053,7 +1053,7 @@ function runStateTitle(stepId: string): string {
   position: relative;
 }
 
-.step-connector { color: #444; font-size: 0.85rem; margin: 1px 0; flex-shrink: 0; }
+.step-connector { color: var(--text-muted); font-size: 0.85rem; margin: 1px 0; flex-shrink: 0; }
 
 .step-card {
   width: 100%;
@@ -1139,7 +1139,7 @@ function runStateTitle(stepId: string): string {
   border-right: 1px solid #2a2a2a;
   border-radius: 8px 0 0 8px;
   background: #141414;
-  color: #555;
+  color: var(--text-secondary);
   user-select: none;
 }
 .step-drag-grip {
@@ -1147,7 +1147,7 @@ function runStateTitle(stepId: string): string {
   line-height: 1;
   letter-spacing: -0.12em;
 }
-.chain-step:hover .step-drag-handle { color: #777; background: #1c1c1c; }
+.chain-step:hover .step-drag-handle { color: var(--text-secondary); background: #1c1c1c; }
 .chain-step.selected .step-drag-handle {
   background: #0e1822;
   border-right-color: #2a5070;
@@ -1310,10 +1310,10 @@ function runStateTitle(stepId: string): string {
   min-height: 6rem;
 }
 .chain-empty-drop-slot { width: 100%; margin-bottom: 0.75rem; }
-.chain-empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
+.chain-empty-hint { font-size: 0.72rem; color: var(--text-secondary); margin: 0; }
 .step-type-badge {
   font-size: clamp(0.7rem, 1.5cqh, 0.95rem); padding: 2px 7px; border-radius: 3px;
-  background: #222; color: #666; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
+  background: #222; color: var(--text-label); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .badge-model-call { background: #1e2d3d; color: #5a9fd4; }
 .badge-presentation { background: #1e2a1e; color: #5a9d5a; }
@@ -1323,7 +1323,7 @@ function runStateTitle(stepId: string): string {
   flex: 1 1 10rem; min-width: 0; font-size: clamp(1.05rem, 2.3cqh, 1.45rem); font-weight: 650;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.step-title.disabled { text-decoration: line-through; color: #555; }
+.step-title.disabled { text-decoration: line-through; color: var(--text-secondary); }
 
 .step-actions {
   display: grid;
@@ -1337,7 +1337,7 @@ function runStateTitle(stepId: string): string {
 }
 .step-card:hover .step-actions, .chain-step.selected .step-actions { opacity: 1; }
 
-.step-meta { display: flex; gap: 0.55rem 1.25rem; font-size: clamp(0.86rem, 1.7cqh, 1.05rem); color: #555; flex-wrap: wrap; align-items: center; }
+.step-meta { display: flex; gap: 0.55rem 1.25rem; font-size: clamp(0.86rem, 1.7cqh, 1.05rem); color: var(--text-secondary); flex-wrap: wrap; align-items: center; }
 .step-meta-item { display: inline-flex; align-items: center; gap: 0.28rem; min-width: 0; max-width: 100%; }
 .step-meta-label { font-size: clamp(0.6rem, 1.15cqh, 0.75rem); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #3a3a3a; flex-shrink: 0; }
 .step-model { color: #5a9fd4; }
@@ -1349,8 +1349,8 @@ function runStateTitle(stepId: string): string {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.step-namespace { color: #666; font-family: monospace; }
-.step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
+.step-namespace { color: var(--text-label); font-family: monospace; }
+.step-disabled-badge { background: #2a2a1a; color: var(--text-label); border-radius: 2px; padding: 0 4px; }
 .step-capsule-status {
   border-radius: 2px;
   padding: 0 5px;
@@ -1378,12 +1378,12 @@ function runStateTitle(stepId: string): string {
 .step-run-badge {
   border-radius: 2px; padding: 1px 6px; font-size: clamp(0.74rem, 1.45cqh, 1rem); text-transform: lowercase;
 }
-.run-not-run { background: #1a1a1a; color: #555; }
+.run-not-run { background: #1a1a1a; color: var(--text-secondary); }
 .run-current { background: #1a2e1a; color: #5a9d5a; }
 .run-stale { background: #2e2a1a; color: #c8a050; }
 .run-failed-current { background: #2e1a1a; color: #c07070; }
 .run-failed-stale { background: #2e1a1a; color: #a05050; border: 1px dashed #804040; }
-.run-disabled { background: #1a1a1a; color: #444; }
+.run-disabled { background: #1a1a1a; color: var(--text-muted); }
 .run-skipped-partial { background: #1a1a2a; color: #606080; }
 .run-blocked { background: #2e1a1a; color: #e07070; border: 1px solid #5a3030; }
 
@@ -1399,7 +1399,7 @@ function runStateTitle(stepId: string): string {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #555;
+  color: var(--text-secondary);
 }
 .step-source-badge {
   max-width: min(100%, 18rem);
@@ -1425,8 +1425,8 @@ function runStateTitle(stepId: string): string {
 .status-completed { color: #3a9d6e; }
 .status-failed { color: #c0392b; }
 .status-started, .status-running { color: #e8a020; }
-.status-skipped, .status-cancelled { color: #555; }
-.step-duration { color: #444; }
+.status-skipped, .status-cancelled { color: var(--text-secondary); }
+.step-duration { color: var(--text-muted); }
 
 .step-output-preview-wrap {
   max-width: 100%;
@@ -1459,14 +1459,14 @@ function runStateTitle(stepId: string): string {
 .step-output-preview-header:hover { background: #121212; }
 .step-output-toggle-indicator {
   width: 1ch;
-  color: #888;
+  color: var(--text-label);
   font-family: monospace;
   font-size: clamp(0.86rem, 1.7cqh, 1.1rem);
   font-weight: 700;
 }
 .step-output-preview-label {
   flex: 1;
-  color: #666;
+  color: var(--text-label);
   font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1488,7 +1488,7 @@ function runStateTitle(stepId: string): string {
   background: transparent;
   padding: 0.65rem 0.75rem;
   font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
-  color: #888;
+  color: var(--text-label);
   max-height: none;
 }
 .btn-run-up-to {
@@ -1540,7 +1540,7 @@ function runStateTitle(stepId: string): string {
 
 .chain-empty {
   display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
-  padding: 2rem 0; color: #555; font-size: 0.82rem;
+  padding: 2rem 0; color: var(--text-secondary); font-size: 0.82rem;
 }
 .chain-empty p { margin: 0; }
 
@@ -1550,10 +1550,10 @@ function runStateTitle(stepId: string): string {
   border-radius: 5px; width: 100%; max-width: var(--chain-card-max-width); flex-shrink: 0;
   opacity: 0.75;
 }
-.output-label { font-size: 0.65rem; color: #555; }
+.output-label { font-size: 0.65rem; color: var(--text-secondary); }
 .output-key { font-size: 0.72rem; color: #7ec8e3; font-family: monospace; }
 
-.btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 4px; cursor: pointer; }
+.btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: var(--text-label); border-radius: 4px; cursor: pointer; }
 .btn-sm { padding: 3px 9px; font-size: 0.72rem; }
 .btn:hover:not(:disabled) { background: #222; color: #ccc; border-color: #3a3a3a; }
 .btn:disabled { opacity: 0.35; cursor: default; }
@@ -1563,8 +1563,8 @@ function runStateTitle(stepId: string): string {
 .btn-capsule:hover:not(:disabled) { background: #1a2a3a; }
 .btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
 .btn-primary:hover:not(:disabled) { background: #254a62; color: #a8dff5; }
-.btn-ghost { background: none; border-color: transparent; color: #555; }
-.btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: #888; border-color: #333; }
+.btn-ghost { background: none; border-color: transparent; color: var(--text-secondary); }
+.btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: var(--text-label); border-color: #333; }
 
 .icon-btn {
   width: var(--step-action-size);
@@ -1576,7 +1576,7 @@ function runStateTitle(stepId: string): string {
   background: #151515;
   border: 1px solid #2a2a2a;
   border-radius: 5px;
-  color: #777;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 .icon-btn:hover:not(:disabled) { background: #202020; border-color: #3a3a3a; color: #ccc; }
@@ -1703,9 +1703,9 @@ function runStateTitle(stepId: string): string {
   color: #8ab0d8;
 }
 .loop-group-icon { font-size: 1rem; color: #7ec8e3; }
-.loop-group-dot { color: #444; }
+.loop-group-dot { color: var(--text-muted); }
 .loop-group-exit { color: #9ab8d0; font-family: monospace; font-size: 0.85em; }
-.loop-inner-empty { font-size: 0.78rem; color: #555; margin: 0; }
+.loop-inner-empty { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
 .loop-inner-list {
   margin: 0;
   padding: 0;
@@ -1727,7 +1727,7 @@ function runStateTitle(stepId: string): string {
 }
 .loop-inner-item:hover { border-color: #3a5068; background: #121820; }
 .loop-inner-selected { border-color: #4a7090; background: #152030; }
-.loop-inner-index { color: #555; min-width: 1.1rem; font-family: monospace; }
+.loop-inner-index { color: var(--text-secondary); min-width: 1.1rem; font-family: monospace; }
 .loop-inner-type {
   font-size: 0.62rem;
   padding: 1px 5px;
@@ -1748,7 +1748,7 @@ function runStateTitle(stepId: string): string {
 .loop-prev-hint {
   margin: 0;
   font-size: 0.68rem;
-  color: #555;
+  color: var(--text-secondary);
 }
 .loop-prev-hint code { color: #6a8ab0; font-size: 0.65rem; }
 
@@ -1808,7 +1808,7 @@ function runStateTitle(stepId: string): string {
   border-color: #5a4770;
   background: #21182a;
 }
-.capsule-inline-empty { font-size: 0.78rem; color: #555; margin: 0; }
+.capsule-inline-empty { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
 .capsule-inline-step-list {
   margin: 0;
   padding: 0;

@@ -87,10 +87,10 @@ function handleStepOutputsChange(event: Event) {
   font-size: 0.78rem; color: #bbb; user-select: none;
 }
 .option-row input { cursor: pointer; }
-.option-row.disabled { color: #666; }
+.option-row.disabled { color: var(--text-label); }
 .option-row.disabled input { cursor: default; }
 .btn-close {
-  background: none; border: none; color: #666; font-size: 1.2rem;
+  background: none; border: none; color: var(--text-label); font-size: 1.2rem;
   cursor: pointer; padding: 0 2px; line-height: 1;
 }
 .btn-close:hover { color: #aaa; }

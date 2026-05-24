@@ -786,17 +786,17 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   color: inherit; flex: 1; min-width: 0; text-align: left;
 }
 
-.chevron { display: inline-block; font-size: 1.1rem; color: #555; transition: transform 0.15s; width: 1rem; flex-shrink: 0; }
+.chevron { display: inline-block; font-size: 1.1rem; color: var(--text-secondary); transition: transform 0.15s; width: 1rem; flex-shrink: 0; }
 .chevron.open { transform: rotate(90deg); color: #7ec8e3; }
 
 .section-title { font-size: 1rem; font-weight: 700; color: #bbb; letter-spacing: 0.01em; }
-.section-count { font-weight: 500; color: #555; }
+.section-count { font-weight: 500; color: var(--text-secondary); }
 
 .section-actions { display: flex; gap: 0.35rem; }
 
 .section-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
-.icon-btn { background: none; border: 1px solid #333; color: #888; border-radius: 5px; width: 36px; height: 36px; cursor: pointer; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.icon-btn { background: none; border: 1px solid #333; color: var(--text-label); border-radius: 5px; width: 36px; height: 36px; cursor: pointer; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .icon-btn:hover:not(:disabled) { background: #222; color: #ccc; }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
 .icon-btn.active { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
@@ -811,7 +811,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .capsule-row.active { background: #1e2d3d; border-color: #2a4d6e; }
 .capsule-row-main { flex: 1; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; }
 .capsule-row-name { font-size: 0.95rem; font-weight: 500; }
-.capsule-row-meta { font-size: 0.78rem; color: #555; }
+.capsule-row-meta { font-size: 0.78rem; color: var(--text-secondary); }
 .capsule-status { font-size: 0.72rem; padding: 1px 5px; border-radius: 3px; }
 .cs-draft { color: #c8a050; }
 .cs-locked { color: #7ec8e3; background: #1a2a3a; border: 1px solid #2a4a6a; }
@@ -832,11 +832,11 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   padding: 5px 8px;
   background: transparent;
   border: 1px solid #333;
-  color: #888;
+  color: var(--text-label);
   border-radius: 5px;
   cursor: pointer;
 }
-.btn-dup-capsule:hover { color: #ccc; border-color: #555; }
+.btn-dup-capsule:hover { color: #ccc; border-color: var(--text-secondary); }
 
 .palette-search {
   width: 100%;
@@ -878,7 +878,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   gap: 0.15rem;
 }
 .type-group-name { font-size: 0.95rem; font-weight: 600; color: #ddd; }
-.type-group-desc { font-size: 0.76rem; color: #555; line-height: 1.35; }
+.type-group-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.35; }
 
 .type-group-actions {
   display: flex;
@@ -894,14 +894,14 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   background: none;
   border: 1px solid #2a2a2a;
   border-radius: 4px;
-  color: #555;
+  color: var(--text-secondary);
   padding: 4px 6px;
   cursor: pointer;
   font-size: 0.75rem;
   line-height: 1;
   white-space: nowrap;
 }
-.type-group-expand:hover { background: #1e1e1e; color: #999; border-color: #3a3a3a; }
+.type-group-expand:hover { background: var(--border-divider); color: var(--text-secondary); border-color: #3a3a3a; }
 .type-group.expanded .type-group-expand { color: #7ec8e3; border-color: #2a5070; background: #0f1a22; }
 
 .type-expand-chevron {
@@ -966,7 +966,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
 }
 .suggestion-row-name { font-size: 1rem; font-weight: 600; }
-.suggestion-row-desc { font-size: 0.78rem; color: #666; line-height: 1.35; }
+.suggestion-row-desc { font-size: 0.78rem; color: var(--text-label); line-height: 1.35; }
 .suggestion-row-category { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a8a5a; }
 .suggestion-row-bucket { font-size: 0.7rem; color: #6a8ab0; font-family: monospace; }
 .suggestion-row-actions {
@@ -1084,7 +1084,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   gap: 0.2rem;
 }
 
-.empty-hint { font-size: 0.88rem; color: #555; margin: 0; }
+.empty-hint { font-size: 0.88rem; color: var(--text-secondary); margin: 0; }
 
 .model-row { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 7px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .model-row.disabled { opacity: 0.5; }
@@ -1103,8 +1103,8 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   cursor: pointer;
   background: none;
 }
-.btn-toggle-disable { border: 1px solid #333; color: #666; }
-.btn-toggle-disable:hover { color: #aaa; border-color: #555; }
+.btn-toggle-disable { border: 1px solid #333; color: var(--text-label); }
+.btn-toggle-disable:hover { color: #aaa; border-color: var(--text-secondary); }
 .btn-toggle-enable { border: 1px solid #1e4d37; color: #5ddb9e; }
 .btn-toggle-enable:hover { background: #1a2d22; }
 </style>

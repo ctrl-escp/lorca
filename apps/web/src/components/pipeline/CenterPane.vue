@@ -890,7 +890,7 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 
 .center-toolbar {
   display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
-  padding: 0.65rem 1rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
 .pipeline-name {
   flex: 1; background: transparent; border: none; color: #e8e8e8;
@@ -917,7 +917,7 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 .btn-cancel:hover { background: #3d2222; }
 .follow-run-label {
   display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem;
-  color: #888; cursor: pointer; user-select: none; flex-shrink: 0;
+  color: var(--text-label); cursor: pointer; user-select: none; flex-shrink: 0;
 }
 .follow-run-label input { cursor: pointer; }
 
@@ -998,9 +998,9 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 
 .user-prompt-bar {
   display: flex; align-items: flex-start; gap: 0.6rem;
-  padding: 0.65rem 1rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
-.prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; padding-top: 0.35rem; flex-shrink: 0; }
+.prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); padding-top: 0.35rem; flex-shrink: 0; }
 .user-prompt-input {
   flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 5px;
   color: #ccc; font-size: 0.9rem; padding: 0.5rem 0.65rem; resize: vertical;

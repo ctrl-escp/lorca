@@ -610,7 +610,7 @@ const previewXml = computed(() =>
 
 .pce-section-header {
   display: flex; align-items: center; justify-content: space-between;
-  border-top: 1px solid #1e1e1e; padding-top: 0.4rem;
+  border-top: 1px solid var(--border-divider); padding-top: 0.4rem;
 }
 .pce-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; }
 .pce-retry-btn {
@@ -629,14 +629,14 @@ const previewXml = computed(() =>
   color: #7ec8e3; border-radius: 3px; cursor: pointer;
 }
 .pce-help-btn:hover { background: #254a62; }
-.pce-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #444; }
+.pce-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-section); }
 
-.pce-toggle-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: #888; cursor: pointer; }
+.pce-toggle-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-label); cursor: pointer; }
 .pce-toggle-label input[type="checkbox"] { width: auto; }
 .pce-required-toggle { margin-left: 4rem; }
 
 .pce-field-row { display: flex; align-items: center; gap: 0.4rem; }
-.pce-field-label { font-size: 0.68rem; color: #666; flex-shrink: 0; width: 4rem; }
+.pce-field-label { font-size: 0.68rem; color: var(--text-label); flex-shrink: 0; width: 4rem; }
 
 .pce-input { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; }
 .pce-input:focus { outline: none; border-color: #3a6080; }
@@ -654,7 +654,7 @@ const previewXml = computed(() =>
 .pce-add-btn:hover:not(:disabled) { background: #1e381e; }
 .pce-add-btn:disabled { opacity: 0.35; cursor: default; }
 
-.pce-empty { font-size: 0.68rem; color: #444; }
+.pce-empty { font-size: 0.68rem; color: var(--text-muted); }
 
 .pce-history-read {
   border: 1px solid #222; border-radius: 4px; padding: 0.4rem;
@@ -665,18 +665,18 @@ const previewXml = computed(() =>
 .pce-history-read.pending { border-left: 2px solid #444; }
 
 .pce-history-header { display: flex; align-items: center; justify-content: space-between; }
-.pce-history-status { font-size: 0.65rem; color: #666; }
+.pce-history-status { font-size: 0.65rem; color: var(--text-secondary); }
 
 .pce-history-preview {
-  font-size: 0.65rem; color: #666; margin-left: 4rem;
+  font-size: 0.65rem; color: var(--text-secondary); margin-left: 4rem;
   display: flex; gap: 0.3rem; align-items: baseline; min-width: 0;
 }
 .pce-history-preview code {
   color: #5a8a5a; font-family: monospace; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
 }
-.pce-history-preview-empty { color: #444; font-style: italic; }
-.pce-preview-label { color: #555; flex-shrink: 0; }
+.pce-history-preview-empty { color: var(--text-muted); font-style: italic; }
+.pce-preview-label { color: var(--text-secondary); flex-shrink: 0; }
 
 .pce-history-issue {
   font-size: 0.65rem; color: #c07070; margin-left: 4rem;
@@ -699,7 +699,7 @@ const previewXml = computed(() =>
 .pce-tag-input.invalid { border-color: #c0392b; }
 
 .pce-delete-btn {
-  flex-shrink: 0; background: none; border: none; color: #555; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px;
+  flex-shrink: 0; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px;
 }
 .pce-delete-btn:hover { color: #e07070; }
 
@@ -724,13 +724,13 @@ const previewXml = computed(() =>
 
 .pce-toggle-preview-btn {
   font-size: 0.65rem; padding: 1px 6px;
-  background: #1a1a1a; border: 1px solid #2a2a2a; color: #666;
+  background: #1a1a1a; border: 1px solid #2a2a2a; color: var(--text-secondary);
   border-radius: 3px; cursor: pointer;
 }
-.pce-toggle-preview-btn:hover { color: #999; }
+.pce-toggle-preview-btn:hover { color: var(--text-label); }
 
 .pce-preview {
-  background: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 3px;
+  background: #0a0a0a; border: 1px solid var(--border-divider); border-radius: 3px;
   padding: 0.5rem; font-size: 0.7rem; white-space: pre-wrap;
   word-break: break-all; margin: 0; font-family: monospace; line-height: 1.5;
   max-height: 200px; overflow-y: auto;

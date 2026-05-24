@@ -39,7 +39,7 @@ function escapeHtml(value: string): string {
   color: #cfcfcf;
 }
 
-.xml-preview .xml-punct { color: #5f6870; }
+.xml-preview .xml-punct { color: var(--text-secondary); }
 .xml-preview .xml-tag { color: #7ec8e3; }
 .xml-preview .xml-attr { color: #d19a66; }
 .xml-preview .xml-string { color: #98c379; }

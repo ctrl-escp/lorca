@@ -166,7 +166,7 @@ function confirm() {
 .dialog-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-label);
   font-size: 1.2rem;
   cursor: pointer;
 }
@@ -177,7 +177,7 @@ function confirm() {
   flex-direction: column;
   gap: 0.75rem;
 }
-.hint { margin: 0; font-size: 0.82rem; color: #888; }
+.hint { margin: 0; font-size: 0.82rem; color: var(--text-label); }
 .warning {
   margin: 0;
   font-size: 0.82rem;
@@ -190,7 +190,7 @@ function confirm() {
 .remap-row { display: flex; flex-direction: column; gap: 0.3rem; }
 .remap-label { display: flex; flex-direction: column; gap: 0.1rem; }
 .remap-title { font-size: 0.82rem; color: #ddd; }
-.remap-meta { font-size: 0.72rem; color: #666; font-family: monospace; }
+.remap-meta { font-size: 0.72rem; color: var(--text-label); font-family: monospace; }
 select {
   background: #111;
   border: 1px solid #2a2a2a;

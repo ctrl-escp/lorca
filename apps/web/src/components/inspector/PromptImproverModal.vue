@@ -366,7 +366,7 @@ function applyResult() {
 .pim-close {
   background: none;
   border: none;
-  color: #777;
+  color: var(--text-secondary);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
@@ -395,7 +395,7 @@ function applyResult() {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #666;
+  color: var(--text-label);
 }
 
 .pim-select,
@@ -445,7 +445,7 @@ function applyResult() {
 }
 
 .pim-check:has(input:disabled) {
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .pim-original {

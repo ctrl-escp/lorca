@@ -233,8 +233,8 @@ function autoSelectModel() {
 }
 .loop-inner-header { display: flex; flex-direction: column; gap: 0.15rem; }
 .loop-inner-title { font-size: 0.78rem; font-weight: 600; color: #aaa; }
-.loop-inner-hint { font-size: 0.68rem; color: #555; }
-.loop-inner-empty { font-size: 0.75rem; color: #555; }
+.loop-inner-hint { font-size: 0.68rem; color: var(--text-muted); }
+.loop-inner-empty { font-size: 0.75rem; color: var(--text-muted); }
 .loop-inner-list { display: flex; flex-direction: column; gap: 0.25rem; }
 .loop-inner-row {
   display: flex;
@@ -248,7 +248,7 @@ function autoSelectModel() {
   font-size: 0.75rem;
 }
 .loop-inner-row.selected { border-color: #4a6a8a; background: #1a2430; }
-.loop-inner-index { color: #555; min-width: 1rem; }
+.loop-inner-index { color: var(--text-secondary); min-width: 1rem; }
 .loop-inner-type {
   font-size: 0.62rem;
   padding: 1px 4px;
@@ -257,7 +257,7 @@ function autoSelectModel() {
   border-radius: 2px;
 }
 .loop-inner-label { flex: 1; color: #ddd; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loop-inner-ns { color: #666; font-size: 0.68rem; }
+.loop-inner-ns { color: var(--text-label); font-size: 0.68rem; }
 .loop-inner-actions { display: flex; gap: 2px; opacity: 0; }
 .loop-inner-row:hover .loop-inner-actions,
 .loop-inner-row.selected .loop-inner-actions { opacity: 1; }
@@ -288,7 +288,7 @@ function autoSelectModel() {
 .icon-btn {
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-label);
   cursor: pointer;
   padding: 0 4px;
   font-size: 0.85rem;
@@ -299,7 +299,7 @@ function autoSelectModel() {
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; }
 .model-select-row select { flex: 1; min-width: 0; }
 .btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
-.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: var(--text-muted); }
 .model-select-warning {
   margin: 0;
   color: #c8a050;

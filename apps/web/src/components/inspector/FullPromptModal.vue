@@ -82,7 +82,7 @@ async function handleCopy() {
 .fpm-close {
   background: none;
   border: none;
-  color: #666;
+  color: var(--text-label);
   font-size: 1.1rem;
   cursor: pointer;
   line-height: 1;
@@ -138,7 +138,7 @@ async function handleCopy() {
 .fpm-close-btn {
   background: #1a1a1a;
   border: 1px solid #333;
-  color: #888;
+  color: var(--text-label);
 }
 .fpm-close-btn:hover { background: #222; color: #aaa; }
 </style>

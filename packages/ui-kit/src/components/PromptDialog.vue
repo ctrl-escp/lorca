@@ -67,7 +67,7 @@ function onConfirm() {
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 .dialog-title { font-size: 0.9rem; font-weight: 600; color: #e8e8e8; }
-.dialog-label { font-size: 0.75rem; color: #888; }
+.dialog-label { font-size: 0.75rem; color: var(--text-label); }
 .dialog-input {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 4px; padding: 6px 10px; font-size: 0.88rem; width: 100%;

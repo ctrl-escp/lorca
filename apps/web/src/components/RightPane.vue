@@ -161,10 +161,14 @@ watch(() => capsuleRunStore.status, (s) => {
 </script>
 
 <style scoped>
-.right-pane { display: flex; flex-direction: column; height: 100%; }
-.right-tabs { display: flex; border-bottom: 1px solid #1e1e1e; flex-shrink: 0; }
-.tab-btn { flex: 1; background: none; border: none; border-bottom: 2px solid transparent; color: #666; padding: 0.65rem 0.5rem; font-size: 0.88rem; cursor: pointer; }
-.tab-btn:hover { color: #999; }
+.right-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.right-tabs { display: flex; border-bottom: 1px solid var(--border-divider); flex-shrink: 0; }
+.tab-btn { flex: 1; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-tab); padding: 0.65rem 0.5rem; font-size: 0.88rem; cursor: pointer; }
+.tab-btn:hover { color: var(--text-tab-hover); }
 .tab-btn.active { color: #7ec8e3; border-bottom-color: #7ec8e3; }
 .right-content { flex: 1; overflow: hidden; }
 </style>

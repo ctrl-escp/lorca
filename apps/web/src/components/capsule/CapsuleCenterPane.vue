@@ -434,23 +434,23 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 
 .capsule-toolbar {
   display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
 .capsule-name {
   flex: 1; background: transparent; border: none;
   color: #e8e8e8; font-size: 0.9rem; font-weight: 500;
 }
 .capsule-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
-.capsule-version { font-size: 0.68rem; color: #555; background: #1a1a1a; padding: 1px 6px; border-radius: 3px; }
+.capsule-version { font-size: 0.68rem; color: var(--text-secondary); background: #1a1a1a; padding: 1px 6px; border-radius: 3px; }
 .capsule-status { font-size: 0.68rem; padding: 1px 6px; border-radius: 3px; }
 .status-draft { background: #2d2a1e; color: #c8a85a; }
 .status-locked { background: #1e2d1e; color: #5ddb9e; }
 
 .user-prompt-bar {
   display: flex; align-items: flex-start; gap: 0.5rem;
-  padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
-.prompt-label { font-size: 0.68rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; }
+.prompt-label { font-size: 0.68rem; color: var(--text-label); text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; }
 .user-prompt-input {
   flex: 1; background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.82rem; resize: vertical; font-family: inherit;
@@ -460,15 +460,15 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 .capsule-chain { flex: 1; min-height: 0; }
 
 .test-panel {
-  border-top: 1px solid #1e1e1e; flex-shrink: 0;
+  border-top: 1px solid var(--border-divider); flex-shrink: 0;
   max-height: 220px; overflow-y: auto;
   background: #0d0d0d;
 }
 .test-panel-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e1e1e;
+  padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-divider);
 }
-.test-panel-title { font-size: 0.72rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+.test-panel-title { font-size: 0.72rem; font-weight: 600; color: var(--text-label); text-transform: uppercase; letter-spacing: 0.05em; }
 .test-run-controls { display: flex; gap: 0.4rem; }
 .test-fields { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .test-field { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -478,12 +478,12 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 }
 .test-field input:focus, .test-field textarea:focus, .test-field select:focus { outline: none; border-color: #3a6080; }
 .test-field textarea { resize: vertical; font-family: inherit; }
-.kind-badge { font-size: 0.65rem; color: #555; background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
+.kind-badge { font-size: 0.65rem; color: var(--text-secondary); background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
 
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; }
 .model-select-row select { flex: 1; min-width: 0; }
 .btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
-.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: var(--text-muted); }
 .model-select-warning {
   margin: 0;
   color: #c8a050;

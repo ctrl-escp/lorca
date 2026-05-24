@@ -52,12 +52,12 @@ defineProps<{
   font-size: 0.72rem; color: #8080c0; background: #101018; border: 1px solid #303050;
   border-radius: 4px; padding: 0.4rem 0.55rem;
 }
-.output-idle, .output-running { color: #444; font-size: 0.78rem; }
+.output-idle, .output-running { color: var(--text-muted); font-size: 0.78rem; }
 .output-running { color: #e8a020; }
 .output-error { display: flex; flex-direction: column; gap: 0.3rem; }
 .error-code { color: #e07070; font-family: monospace; font-size: 0.8rem; }
 .error-msg { color: #c88; font-size: 0.82rem; }
-.error-node { color: #666; font-size: 0.75rem; }
+.error-node { color: var(--text-label); font-size: 0.75rem; }
 .output-value { display: flex; flex-direction: column; gap: 0.4rem; }
 .output-value.stale :deep(.json-viewer) { opacity: 0.85; }
 .output-value.stale :deep(.jv-raw),

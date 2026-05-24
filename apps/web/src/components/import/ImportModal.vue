@@ -98,7 +98,7 @@ function handleImport() {
 }
 .dialog-title { font-size: 0.9rem; font-weight: 600; color: #e8e8e8; }
 .btn-close {
-  background: none; border: none; color: #666; font-size: 1.2rem;
+  background: none; border: none; color: var(--text-label); font-size: 1.2rem;
   cursor: pointer; padding: 0 2px; line-height: 1;
 }
 .btn-close:hover { color: #aaa; }

@@ -83,8 +83,8 @@ const accessLabel = {
 .badge-unknown { background: #333; color: #999; }
 .badge-disabled { background: #2a2010; color: #b89a50; }
 
-.ep-url { font-size: 0.82rem; color: #888; font-family: monospace; }
-.ep-meta { display: flex; gap: 0.85rem; font-size: 0.82rem; color: #666; }
+.ep-url { font-size: 0.82rem; color: var(--text-label); font-family: monospace; }
+.ep-meta { display: flex; gap: 0.85rem; font-size: 0.82rem; color: var(--text-label); }
 .ep-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.1rem; }
 
 .ep-cors-warn {
@@ -108,7 +108,7 @@ const accessLabel = {
 .btn:disabled { opacity: 0.4; cursor: default; }
 .btn-danger { color: #e07070; }
 .btn-danger:hover:not(:disabled) { background: #2d1a1a; }
-.btn-muted { color: #888; }
+.btn-muted { color: var(--text-label); }
 .btn-enable { color: #5ddb9e; border-color: #1e4d37; }
 .btn-enable:hover:not(:disabled) { background: #1a2d22; }
 </style>

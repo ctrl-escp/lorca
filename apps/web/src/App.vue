@@ -242,6 +242,16 @@ onMounted(async () => {
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 
+:root {
+  --text-section: #8f8f8f;
+  --text-muted: #888;
+  --text-secondary: #999;
+  --text-label: #aaa;
+  --text-tab: var(--text-secondary);
+  --text-tab-hover: #bbb;
+  --border-divider: #2a2a2a;
+}
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
@@ -262,11 +272,11 @@ body {
   z-index: 10;
 }
 .app-header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; }
-.app-subtitle { font-size: 0.82rem; color: #555; }
+.app-subtitle { font-size: 0.82rem; color: var(--text-secondary); }
 .breadcrumb-back { background: none; border: none; color: #7ec8e3; font-size: 0.88rem; cursor: pointer; padding: 0; }
 .breadcrumb-back:hover { text-decoration: underline; }
-.breadcrumb-sep { color: #444; font-size: 0.88rem; }
-.breadcrumb-label { font-size: 0.88rem; color: #888; }
+.breadcrumb-sep { color: var(--text-muted); font-size: 0.88rem; }
+.breadcrumb-label { font-size: 0.88rem; color: var(--text-label); }
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
 .run-status { font-size: 0.82rem; padding: 3px 10px; border-radius: 4px; }
 .btn-header {
@@ -314,7 +324,7 @@ body {
     background: none;
     border: 1px solid #333;
     border-radius: 6px;
-    color: #888;
+    color: var(--text-label);
     font-size: 1.2rem;
     cursor: pointer;
     flex-shrink: 0;

@@ -122,7 +122,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
 }
 .selector-trigger:hover { border-bottom-color: #3a6080; }
 .selector-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.selector-chevron { font-size: 0.85rem; color: #555; transition: transform 0.15s; flex-shrink: 0; }
+.selector-chevron { font-size: 0.85rem; color: var(--text-secondary); transition: transform 0.15s; flex-shrink: 0; }
 .selector-chevron.open { transform: rotate(90deg); color: #7ec8e3; }
 
 .selector-dropdown {
@@ -142,7 +142,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
 .option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .option-delete {
-  flex-shrink: 0; background: none; border: none; color: #555;
+  flex-shrink: 0; background: none; border: none; color: var(--text-secondary);
   cursor: pointer; font-size: 1rem; padding: 0 2px; line-height: 1;
 }
 .option-delete:hover { color: #e07070; }

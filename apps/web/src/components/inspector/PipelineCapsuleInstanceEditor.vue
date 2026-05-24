@@ -267,7 +267,7 @@ function collapseInline() {
   display: flex; align-items: center; gap: 0.35rem;
   margin-bottom: 0.25rem;
 }
-.binding-port { font-size: 0.72rem; color: #888; min-width: 5rem; }
+.binding-port { font-size: 0.72rem; color: var(--text-label); min-width: 5rem; }
 .binding-edit-row input {
   flex: 1;
   background: #111;

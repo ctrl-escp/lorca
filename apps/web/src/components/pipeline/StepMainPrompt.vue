@@ -162,7 +162,7 @@ function commit() {
 <style scoped>
 .step-main-prompt {
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--border-divider);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -186,7 +186,7 @@ function commit() {
 .step-main-prompt-hint p {
   margin: 0;
   font-size: 0.78rem;
-  color: #555;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 </style>

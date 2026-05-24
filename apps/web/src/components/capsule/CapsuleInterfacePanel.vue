@@ -122,14 +122,14 @@ function removeSlot(i: number) { localSlots.value.splice(i, 1); emitUpdate(); }
 .interface-panel { padding: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; height: 100%; }
 .iface-section { background: #111; border: 1px solid #222; border-radius: 5px; padding: 0.5rem; }
 .iface-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-.iface-section-title { font-size: 0.72rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.05em; cursor: help; }
+.iface-section-title { font-size: 0.72rem; font-weight: 600; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.05em; cursor: help; }
 .port-row, .slot-row { display: flex; gap: 0.3rem; align-items: center; margin-bottom: 0.25rem; }
 .port-row input, .slot-row input { flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; }
 .port-row select { background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 4px; font-size: 0.78rem; }
-.req-check { font-size: 0.72rem; color: #666; display: flex; align-items: center; gap: 0.2rem; white-space: nowrap; cursor: help; }
-.remove-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; }
+.req-check { font-size: 0.72rem; color: var(--text-label); display: flex; align-items: center; gap: 0.2rem; white-space: nowrap; cursor: help; }
+.remove-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; }
 .remove-btn:hover { color: #c0392b; }
-.icon-btn { background: none; border: 1px solid #333; color: #888; border-radius: 3px; width: 18px; height: 18px; cursor: pointer; font-size: 0.9rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.icon-btn { background: none; border: 1px solid #333; color: var(--text-label); border-radius: 3px; width: 18px; height: 18px; cursor: pointer; font-size: 0.9rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .icon-btn:hover { background: #222; color: #ccc; }
-.empty-hint { font-size: 0.72rem; color: #555; margin: 0; }
+.empty-hint { font-size: 0.72rem; color: var(--text-muted); margin: 0; }
 </style>

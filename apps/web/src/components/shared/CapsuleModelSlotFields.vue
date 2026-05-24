@@ -136,7 +136,7 @@ function forceFillAll() {
 }
 .capsule-slot-title {
   font-size: 0.65rem;
-  color: #555;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -177,7 +177,7 @@ function forceFillAll() {
 .btn-autoselect:hover {
   background: #222;
   color: #ccc;
-  border-color: #444;
+  border-color: var(--text-muted);
 }
 .model-select-warning {
   margin: 0;

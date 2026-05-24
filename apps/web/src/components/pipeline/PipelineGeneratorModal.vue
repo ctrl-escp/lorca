@@ -159,7 +159,7 @@ function submit() {
 .dialog-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-label);
   font-size: 1.2rem;
   cursor: pointer;
 }
@@ -175,7 +175,7 @@ function submit() {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #777;
+  color: var(--text-section);
 }
 textarea, select {
   background: #111;

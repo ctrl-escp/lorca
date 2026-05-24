@@ -243,7 +243,7 @@ const JsonNode: Component = defineComponent({
 .jv-tool {
   border: 1px solid #2a2a2a;
   background: #141414;
-  color: #888;
+  color: var(--text-label);
   border-radius: 3px;
   cursor: pointer;
   font-size: 0.65rem;
@@ -299,7 +299,7 @@ const JsonNode: Component = defineComponent({
   height: 1rem;
   margin: 0 0.1rem 0 0;
   padding: 0;
-  color: #666;
+  color: var(--text-label);
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -310,7 +310,7 @@ const JsonNode: Component = defineComponent({
 }
 
 .jv-collapse:hover {
-  color: #bbb;
+  color: var(--text-tab-hover);
 }
 
 .jv-spacer {
@@ -323,11 +323,11 @@ const JsonNode: Component = defineComponent({
 .jv-number { color: #d19a66; }
 .jv-bool { color: #e06c75; }
 .jv-null { color: #abb2bf; }
-.jv-punctuation { color: #777; }
+.jv-punctuation { color: var(--text-secondary); }
 
 .jv-badge {
   margin: 0 0.35rem;
-  color: #888;
+  color: var(--text-label);
   font-size: 0.7rem;
 }
 </style>

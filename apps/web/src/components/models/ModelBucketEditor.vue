@@ -100,7 +100,7 @@ function reset() {
 .bucket-extract-json { color: #60b860; background: #0d2010; border-color: #1a3a1a; }
 .bucket-verify      { color: #e07070; background: #2a1010; border-color: #4a2020; }
 .bucket-general     { color: #5a9fd4; background: #0d1e30; border-color: #1a3a58; }
-.bucket-unknown     { color: #888888; background: #1a1a1a; border-color: #333333; }
+.bucket-unknown     { color: var(--text-label); background: #1a1a1a; border-color: #333333; }
 
 /* "+" button to reveal all toggles */
 .bucket-add-btn {
@@ -111,11 +111,11 @@ function reset() {
   background: none;
   border: 1px solid #333;
   border-radius: 3px;
-  color: #555;
+  color: var(--text-secondary);
   cursor: pointer;
   line-height: 1;
 }
-.bucket-add-btn:hover { color: #999; border-color: #555; }
+.bucket-add-btn:hover { color: var(--text-secondary); border-color: var(--text-secondary); }
 .bucket-add-btn.open { color: #7ec8e3; border-color: #2a5070; background: #1e3d52; }
 
 /* All-buckets picker (shown when expanded) */
@@ -127,7 +127,7 @@ function reset() {
   border-radius: 3px;
   border: 1px solid #2a2a2a;
   background: #141414;
-  color: #555;
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
 }
@@ -135,6 +135,6 @@ function reset() {
 .bucket-toggle.active { filter: none; }
 /* Active toggles reuse the same bucket-* color classes above */
 
-.btn-reset { font-size: 0.65rem; color: #666; background: none; border: none; cursor: pointer; text-decoration: underline; align-self: flex-start; padding: 0; }
+.btn-reset { font-size: 0.65rem; color: var(--text-label); background: none; border: none; cursor: pointer; text-decoration: underline; align-self: flex-start; padding: 0; }
 .btn-reset:hover { color: #aaa; }
 </style>
