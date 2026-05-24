@@ -275,8 +275,8 @@
                   v-for="source in sourceBadgesByStepId[step.id]"
                   :key="source.key"
                   class="step-source-badge"
-                  :class="`source-${source.kind}`"
-                  :title="source.kind === 'previous' ? `${source.title} — change this input first when reordering steps` : source.title"
+                  :class="[`source-${source.kind}`, {invalid: source.invalid}]"
+                  :title="source.title"
                 >
                   <span v-if="source.kind === 'previous'" class="prev-output-marker" aria-hidden="true">↑</span>{{ source.label }}
                 </span>
@@ -381,7 +381,7 @@
 <script setup lang="ts">
 import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
 import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineError, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
-import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary} from '@lorca/pipeline';
+import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary, dataSourceBadgeTitle, findPreviousEnabledStepAt, validateHistoryRead, historyReadIssueLabel} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
   DND_STEP_ID,
@@ -402,6 +402,7 @@ interface StepDataSourceBadge {
   label: string;
   title: string;
   kind: StepDataSourceKind;
+  invalid?: boolean;
 }
 
 const DropSlotIndicator = defineComponent({
@@ -715,36 +716,62 @@ function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadg
   const badges: StepDataSourceBadge[] = [];
   const seenRefs = new Set<string>();
 
-  function addSource(artifactRef: string, kind: StepDataSourceKind, detail: string) {
+  function addBadge(badge: StepDataSourceBadge, artifactRef: string) {
     const cleaned = artifactRef.trim();
     if (!cleaned || seenRefs.has(cleaned)) return;
     seenRefs.add(cleaned);
-    const source = sourceLabelForArtifactRef(cleaned);
-    badges.push({
-      key: `${kind}:${cleaned}`,
-      label: source,
-      title: `${detail}: ${cleaned}`,
-      kind,
-    });
+    badges.push(badge);
   }
 
   if (usesPreviousOutputSource(step)) {
-    addSource(previousInputArtifactRef(index), 'previous', 'Previous input');
+    const prevRef = previousInputArtifactRef(index);
+    addBadge({
+      key: `previous:${prevRef}`,
+      label: sourceLabelForArtifactRef(prevRef),
+      title: dataSourceBadgeTitle('previous', 'Previous input', prevRef),
+      kind: 'previous',
+    }, prevRef);
   }
 
   for (const read of getStepHistoryReads(step)) {
-    addSource(read.sourceArtifactRef, 'history', read.required ? `Required history read <${read.tagName}>` : `Optional history read <${read.tagName}>`);
+    const validation = validateHistoryRead(read, step.id, props.steps);
+    const validationMessage = validation.ok
+      ? undefined
+      : validation.issues.map(historyReadIssueLabel).join(', ');
+    const titleOptions = validationMessage ? {validationMessage} : undefined;
+    addBadge({
+      key: `history:${read.sourceArtifactRef}`,
+      label: sourceLabelForArtifactRef(read.sourceArtifactRef),
+      title: dataSourceBadgeTitle(
+        'history',
+        read.required ? `Required history read <${read.tagName}>` : `Optional history read <${read.tagName}>`,
+        read.sourceArtifactRef,
+        titleOptions,
+      ),
+      kind: 'history',
+      invalid: !validation.ok,
+    }, read.sourceArtifactRef);
   }
 
   if (step.config.type === 'presentation') {
     for (const templateRef of artifactRefsInTemplate(step.config.text)) {
-      addSource(templateRef, 'template', 'Template reference');
+      addBadge({
+        key: `template:${templateRef}`,
+        label: sourceLabelForArtifactRef(templateRef),
+        title: dataSourceBadgeTitle('template', 'Template reference', templateRef),
+        kind: 'template',
+      }, templateRef);
     }
   }
 
   if (step.config.type === 'capsule-instance') {
     for (const [port, bindingRef] of Object.entries(step.config.inputBindings)) {
-      addSource(bindingRef, 'binding', `Capsule input "${port}"`);
+      addBadge({
+        key: `binding:${port}:${bindingRef}`,
+        label: sourceLabelForArtifactRef(bindingRef),
+        title: dataSourceBadgeTitle('binding', `Capsule input "${port}"`, bindingRef),
+        kind: 'binding',
+      }, bindingRef);
     }
   }
 
@@ -757,16 +784,8 @@ function usesPreviousOutputSource(step: PipelineStep): boolean {
 }
 
 function previousInputArtifactRef(index: number): string {
-  const previous = previousEnabledStep(index);
+  const previous = findPreviousEnabledStepAt(props.steps, index);
   return previous ? `${previous.outputNamespace}.${previous.primaryOutputName}` : 'user_prompt.xml';
-}
-
-function previousEnabledStep(index: number): PipelineStep | null {
-  for (let i = index - 1; i >= 0; i--) {
-    const step = props.steps[i];
-    if (step?.enabled) return step;
-  }
-  return null;
 }
 
 function artifactRefsInTemplate(text: string): string[] {
@@ -1418,6 +1437,7 @@ function runStateTitle(stepId: string): string {
 .source-template { border-color: #3a4a35; background: #151e14; color: #9bcf8a; }
 .source-binding { border-color: #4a3d2a; background: #211a10; color: #d2b16f; }
 .source-direct { border-color: #4a332f; background: #211514; color: #d58a7a; }
+.step-source-badge.invalid { border-color: #7a3030; background: #2a1414; color: #e08080; }
 .prev-output-marker { opacity: 0.65; margin-right: 0.25em; font-size: 0.85em; }
 
 .step-trace { display: flex; gap: 0.55rem; font-size: clamp(0.84rem, 1.7cqh, 1.1rem); }

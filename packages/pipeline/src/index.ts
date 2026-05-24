@@ -67,3 +67,11 @@ export {
   wireRetryFeedback,
   wireRetryFeedbackOnFirstModelCall,
 } from './loopHelpers.js';
+export {
+  REORDER_REF_HINTS,
+  findPreviousEnabledStepAt,
+  findPreviousEnabledStep,
+  resolvePreviousOutputArtifactRef,
+  dataSourceBadgeTitle,
+} from './stepRefs.js';
+export type {StepDataSourceRefKind} from './stepRefs.js';

@@ -35,7 +35,7 @@
 
     <template v-if="resolvedCapsule">
       <div v-if="Object.keys(localInputBindings).length > 0" class="inspector-field">
-        <FieldLabel label="Input bindings" title="Parent artifact keys bound to Capsule input ports" />
+        <FieldLabel label="Input bindings" :title="`${REORDER_REF_HINTS.binding} Parent artifact keys bound to Capsule input ports.`" />
         <div v-for="port in resolvedCapsule.interface.inputs" :key="port.name" class="binding-edit-row">
           <span class="binding-port">{{ port.name }}</span>
           <input
@@ -81,7 +81,7 @@
 <script setup lang="ts">
 import {ref, computed, watch, onMounted} from 'vue';
 import type {PipelineStep, CapsuleInstanceStepConfig} from '@lorca/core';
-import {computeCapsuleContentSignature} from '@lorca/pipeline';
+import {computeCapsuleContentSignature, REORDER_REF_HINTS} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
