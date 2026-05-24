@@ -135,5 +135,14 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     return def;
   }
 
-  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive, resetActivePipeline, addNewPipeline};
+  async function clearAllPipelines(): Promise<PipelineDefinition> {
+    await getDb().pipelines.clear();
+    const def = createDefaultPipeline();
+    await getDb().pipelines.put(cloneForStorage(def));
+    pipelines.value = [def];
+    setActive(def.id);
+    return def;
+  }
+
+  return {pipelines, activePipelineId, activePipeline, loaded, load, save, addPipeline, updatePipeline, removePipeline, setActive, resetActivePipeline, addNewPipeline, clearAllPipelines};
 });

@@ -9,6 +9,7 @@
         :active-id="pipelinesStore.activePipelineId"
         @select="handlePipelineSelect"
         @delete="handlePipelineDelete"
+        @clear-all="handleClearAllPipelines"
       />
       <input
         v-else
@@ -35,6 +36,7 @@
               <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleLockSelectionAsCapsule">Lock as Capsule</button>
               <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleExport">Export</button>
               <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleImport">Import</button>
+              <button class="more-menu-item" type="button" @click="handleClearAllPipelines">Clear all pipelines…</button>
             </div>
           </div>
         </div>
@@ -848,6 +850,27 @@ async function handlePipelineDelete(id: string) {
   }
   if (runStore.isRunning) runStore.cancel();
   runStore.reset();
+}
+
+async function handleClearAllPipelines() {
+  moreMenuOpen.value = false;
+  const confirmed = await showConfirm({
+    title: 'Clear All Pipelines',
+    message: 'Delete all saved pipelines? A fresh default pipeline will be created. This cannot be undone.',
+    confirmLabel: 'Clear all',
+    destructive: true,
+  });
+  if (!confirmed) return;
+  if (runStore.isRunning) runStore.cancel();
+  runStore.reset();
+  try {
+    await pipelinesStore.clearAllPipelines();
+    userPrompt.value = '';
+    localPipelineName.value = 'New Pipeline';
+    emit('new');
+  } catch (error) {
+    inlineError.value = error instanceof Error ? error.message : 'Could not clear pipelines.';
+  }
 }
 
 function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference[] {

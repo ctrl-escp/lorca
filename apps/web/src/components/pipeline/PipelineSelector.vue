@@ -30,6 +30,12 @@
           @click.stop="requestDelete(pipeline.id, pipeline.name)"
         >×</button>
       </div>
+      <button
+        type="button"
+        class="selector-clear-all"
+        title="Delete all saved pipelines"
+        @click="requestClearAll"
+      >Clear all pipelines…</button>
     </div>
   </div>
 
@@ -58,6 +64,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [id: string];
   delete: [id: string];
+  'clear-all': [];
   'request-remount': [];
 }>();
 
@@ -98,6 +105,11 @@ function confirmDelete() {
 
 function cancelDelete() {
   deleteConfirm.value = {open: false, message: '', targetId: ''};
+}
+
+function requestClearAll() {
+  open.value = false;
+  emit('clear-all');
 }
 
 // Close on outside click
@@ -146,4 +158,12 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
   cursor: pointer; font-size: 1rem; padding: 0 2px; line-height: 1;
 }
 .option-delete:hover { color: #e07070; }
+
+.selector-clear-all {
+  display: block; width: 100%;
+  background: none; border: none; border-top: 1px solid #2a2a2a;
+  color: var(--text-secondary); cursor: pointer;
+  font-size: 0.78rem; padding: 8px 10px; text-align: left;
+}
+.selector-clear-all:hover { background: #222; color: #e07070; }
 </style>
