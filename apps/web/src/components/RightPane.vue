@@ -24,6 +24,7 @@
         :artifacts="isCapsuleMode ? capsuleRunStore.artifacts : runStore.artifacts"
         :partial-run="isCapsuleMode ? capsuleRunStore.partial : runStore.partial"
         :selected-step-id="activeSelectedStepId"
+        :capsule-instance-id="activeCapsuleInstanceId"
         :step-labels="traceStepLabels"
       />
       <OutputPanel
@@ -47,6 +48,10 @@ import {useUiStore} from '../stores/ui.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
 import {useCapsuleRunStore} from '../stores/capsuleRun.js';
 import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
+import {
+  inlineCapsuleTraceStepLabels,
+  resolveInlineCapsuleRunScope,
+} from '../utils/inlineCapsuleRun.js';
 
 import StepInspector from './inspector/StepInspector.vue';
 import {useCapsuleStepEditorStore} from '../stores/capsuleStepEditor.js';
@@ -82,13 +87,25 @@ const CAPSULE_TABS = [
 
 const activeTabs = computed(() => isCapsuleMode.value ? CAPSULE_TABS : PIPELINE_TABS);
 
-const activeSelectedStepId = computed(() =>
-  isCapsuleMode.value ? capsuleEditorStore.selectedStepId : editorStore.selectedStepId,
+const inlineCapsuleScope = computed(() =>
+  isCapsuleMode.value
+    ? null
+    : resolveInlineCapsuleRunScope(editorStore.selectedStep, editorStore.selectedInlineCapsuleInnerStepId),
 );
+
+const activeSelectedStepId = computed(() => {
+  if (isCapsuleMode.value) return capsuleEditorStore.selectedStepId;
+  if (inlineCapsuleScope.value) return inlineCapsuleScope.value.innerStepId;
+  return editorStore.selectedStepId;
+});
+
+const activeCapsuleInstanceId = computed(() => inlineCapsuleScope.value?.capsuleStepId ?? null);
 
 const traceStepLabels = computed(() => {
   const steps = isCapsuleMode.value ? capsuleEditorStore.steps : editorStore.steps;
-  return Object.fromEntries(steps.map((s) => [s.id, s.label]));
+  return isCapsuleMode.value
+    ? Object.fromEntries(steps.map((s) => [s.id, s.label]))
+    : inlineCapsuleTraceStepLabels(steps);
 });
 
 const activeTrace = computed(() => isCapsuleMode.value ? capsuleRunStore.trace : runStore.trace);

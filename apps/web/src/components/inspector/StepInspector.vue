@@ -1,10 +1,12 @@
 <template>
   <div ref="inspectorRef" class="step-inspector">
-    <div v-if="!step" class="inspector-empty">Select a step to configure it.</div>
+    <div v-if="!effectiveStep" class="inspector-empty">Select a step to configure it.</div>
     <template v-else>
       <div class="inspector-header">
-        <span class="step-type-badge" :title="`Step type: ${step.type}`">{{ TYPE_LABELS[step.type] ?? step.type }}</span>
+        <span v-if="inlineCapsuleScope" class="inline-scope-label" :title="`Inside inline capsule ${step?.label ?? ''}`">Inline</span>
+        <span class="step-type-badge" :title="`Step type: ${effectiveStep.type}`">{{ TYPE_LABELS[effectiveStep.type] ?? effectiveStep.type }}</span>
         <input
+          v-if="!inlineCapsuleScope"
           class="step-label-input"
           v-model="localLabel"
           placeholder="Step label"
@@ -13,6 +15,7 @@
           @blur="commitLabel"
           @keydown.enter="($event.target as HTMLInputElement).blur()"
         />
+        <span v-else class="step-label-readonly">{{ effectiveStep.label }}</span>
       </div>
 
       <div class="inspector-tabs" role="tablist">
@@ -34,18 +37,18 @@
         <template v-if="activeTab === 'config'">
           <div class="ns-row">
             <span class="ns-label" title="Artifact namespace for this step's outputs">namespace</span>
-            <code class="ns-value">{{ step.outputNamespace }}</code>
+            <code class="ns-value">{{ effectiveStep?.outputNamespace }}</code>
             <span class="ns-dot">·</span>
-            <code class="ns-value">{{ step.primaryOutputName }}</code>
+            <code class="ns-value">{{ effectiveStep?.primaryOutputName }}</code>
           </div>
 
           <CapsuleInlineStepEditor
-            v-if="selectedInlineCapsuleInnerStep"
-            :capsule-step-id="step.id"
-            :inner-step="selectedInlineCapsuleInnerStep"
+            v-if="inlineCapsuleScope"
+            :capsule-step-id="inlineCapsuleScope.capsuleStepId"
+            :inner-step="inlineCapsuleScope.innerStep"
           />
 
-          <template v-else-if="step.config.type === 'model-call'">
+          <template v-else-if="effectiveStep.config.type === 'model-call'">
             <div class="inspector-field">
               <FieldLabel label="Model" required title="Which model to call for this step" />
               <div class="model-select-row">
@@ -106,7 +109,7 @@
             </div>
           </template>
 
-          <template v-else-if="step.config.type === 'presentation'">
+          <template v-else-if="effectiveStep.config.type === 'presentation'">
             <div class="inspector-field">
               <FieldLabel label="Text" title="Free-form text with optional {{artifact.key}} interpolation" />
               <textarea
@@ -125,7 +128,7 @@
             :step="capsuleInstanceStep"
           />
 
-          <template v-else-if="step.config.type === 'loop-group'">
+          <template v-else-if="effectiveStep.config.type === 'loop-group'">
             <div class="inspector-field">
               <FieldLabel label="Max iterations" required title="Maximum number of times the inner chain will run" />
               <input
@@ -136,12 +139,12 @@
               />
             </div>
             <LoopExitConditionEditor
-              :exit-condition="step.config.exitCondition"
+              :exit-condition="effectiveStep.config.exitCondition"
               @update="onLoopExitUpdate"
             />
             <LoopInnerChainEditor
-              :loop-step-id="step.id"
-              :inner-steps="step.config.steps"
+              :loop-step-id="effectiveStep.id"
+              :inner-steps="effectiveStep.config.steps"
             />
           </template>
         </template>
@@ -149,39 +152,45 @@
         <!-- Prompt -->
         <template v-else-if="activeTab === 'prompt'">
           <PromptCompositionEditor
-            v-if="hasPromptBlocks"
-            :step-id="step.id"
-            :config="step.prompt"
+            v-if="hasPromptBlocks && effectiveStep?.prompt && inlineCapsuleScope"
+            :step-id="effectiveStep.id"
+            :config="effectiveStep.prompt"
+            :nested-edit-target="{kind: 'inline-capsule', parentStepId: inlineCapsuleScope.capsuleStepId}"
+          />
+          <PromptCompositionEditor
+            v-else-if="hasPromptBlocks && effectiveStep?.prompt"
+            :step-id="effectiveStep.id"
+            :config="effectiveStep.prompt"
           />
           <p v-else class="empty-hint">This step type has no prompt composition.</p>
         </template>
 
         <!-- Inputs -->
         <template v-else-if="activeTab === 'inputs'">
-          <template v-if="step.config.type === 'capsule-instance'">
+          <template v-if="effectiveStep?.config.type === 'capsule-instance' && !inlineCapsuleScope">
             <div class="binding-list">
-              <div v-for="(ref, port) in step.config.inputBindings" :key="port" class="binding-row">
+              <div v-for="(ref, port) in effectiveStep.config.inputBindings" :key="port" class="binding-row">
                 <span class="binding-port">{{ port }}</span>
                 <span class="binding-arrow">←</span>
                 <code class="binding-ref">{{ ref }}</code>
               </div>
-              <p v-if="Object.keys(step.config.inputBindings).length === 0" class="empty-hint">No input bindings.</p>
+              <p v-if="Object.keys(effectiveStep.config.inputBindings).length === 0" class="empty-hint">No input bindings.</p>
             </div>
           </template>
-          <template v-else-if="hasPromptBlocks && step.prompt">
-            <p v-if="step.prompt.historyReads.length === 0" class="empty-hint">
+          <template v-else-if="hasPromptBlocks && effectiveStep?.prompt">
+            <p v-if="effectiveStep.prompt.historyReads.length === 0" class="empty-hint">
               No history reads. Open the Prompt tab to add prior-step outputs.
             </p>
             <ul v-else class="history-read-list">
-              <li v-for="(hr, i) in step.prompt.historyReads" :key="`${hr.sourceStepId}-${i}`" class="history-read-row">
+              <li v-for="(hr, i) in effectiveStep.prompt.historyReads" :key="`${hr.sourceStepId}-${i}`" class="history-read-row">
                 <code class="binding-ref">{{ hr.sourceArtifactRef }}</code>
                 <span class="history-read-tag">&lt;{{ hr.tagName }}&gt;</span>
                 <span v-if="hr.required" class="history-read-required">required</span>
               </li>
             </ul>
-            <p v-if="step.prompt.previousOutput?.enabled" class="inputs-hint">
-              Previous output: <code>{{ step.prompt.previousOutput.tagName }}</code>
-              ({{ step.prompt.previousOutput.placement }})
+            <p v-if="effectiveStep.prompt.previousOutput?.enabled" class="inputs-hint">
+              Previous output: <code>{{ effectiveStep.prompt.previousOutput.tagName }}</code>
+              ({{ effectiveStep.prompt.previousOutput.placement }})
             </p>
           </template>
           <p v-else class="empty-hint">No configurable inputs for this step type.</p>
@@ -191,10 +200,10 @@
         <template v-else-if="activeTab === 'outputs'">
           <div class="inspector-field">
             <FieldLabel label="Primary output key" />
-            <code class="binding-ref">{{ step.outputNamespace }}.{{ step.primaryOutputName }}</code>
+            <code class="binding-ref">{{ scopedPrimaryOutputKey }}</code>
           </div>
-          <div v-if="step.config.type === 'capsule-instance'" class="binding-list">
-            <div v-for="(ref, port) in step.config.outputBindings" :key="port" class="binding-row">
+          <div v-if="effectiveStep?.config.type === 'capsule-instance' && !inlineCapsuleScope" class="binding-list">
+            <div v-for="(ref, port) in effectiveStep.config.outputBindings" :key="port" class="binding-row">
               <span class="binding-port">{{ port }}</span>
               <span class="binding-arrow">→</span>
               <code class="binding-ref">{{ ref }}</code>
@@ -304,6 +313,11 @@ import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {
+  inlineCapsuleArtifactKey,
+  inlineCapsuleSnapshotKey,
+  resolveInlineCapsuleRunScope,
+} from '../../utils/inlineCapsuleRun.js';
 
 type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
 type SplitMode = 'full' | 'collapsed' | 'tabs';
@@ -320,6 +334,14 @@ const endpointsStore = useEndpointsStore();
 const {stateFor} = useStepStaleStateMap(() => editorStore.pipeline.input.raw);
 
 const step = computed(() => editorStore.selectedStep);
+
+const inlineCapsuleScope = computed(() =>
+  uiStore.editorContext === 'pipeline'
+    ? resolveInlineCapsuleRunScope(pipelineEditorStore.selectedStep, pipelineEditorStore.selectedInlineCapsuleInnerStepId)
+    : null,
+);
+
+const effectiveStep = computed(() => inlineCapsuleScope.value?.innerStep ?? step.value);
 const activeTab = ref<InspectorTab>('config');
 
 const inspectorRef = ref<HTMLElement | null>(null);
@@ -332,7 +354,7 @@ const splitMode = computed((): SplitMode => {
   if (containerWidth.value >= 240) return 'collapsed';
   return 'tabs';
 });
-const showBottomSection = computed(() => splitMode.value !== 'tabs' && !!step.value);
+const showBottomSection = computed(() => splitMode.value !== 'tabs' && !!effectiveStep.value);
 
 let resizeObserver: ResizeObserver | null = null;
 onMounted(() => {
@@ -365,42 +387,59 @@ function onSplitHandleMouseDown(e: MouseEvent) {
 }
 
 const stepStatus = computed(() => {
+  const scope = inlineCapsuleScope.value;
+  if (scope) {
+    const snapshot = runStore.value.snapshots[inlineCapsuleSnapshotKey(scope.capsuleStepId, scope.innerStepId)];
+    if (!snapshot) return {stepId: scope.innerStepId, state: 'not-run' as const};
+    return {
+      stepId: scope.innerStepId,
+      state: snapshot.status === 'completed' ? 'current' as const : 'failed-current' as const,
+    };
+  }
   const s = step.value;
   if (!s) return null;
   return stateFor(s.id);
 });
 
 const lastSnapshot = computed(() => {
+  const scope = inlineCapsuleScope.value;
+  if (scope) {
+    return runStore.value.snapshots[inlineCapsuleSnapshotKey(scope.capsuleStepId, scope.innerStepId)] ?? null;
+  }
   const s = step.value;
   if (!s) return null;
   return runStore.value.snapshots[s.id] ?? null;
 });
 
 const lastRunOutputValue = computed((): unknown | null => {
-  const s = step.value;
+  const scope = inlineCapsuleScope.value;
+  const s = effectiveStep.value;
   const snapshot = lastSnapshot.value;
   if (!s || !snapshot?.primaryOutputPreview) return null;
-  const key = `${s.outputNamespace}.${s.primaryOutputName}`;
-  const artifact = runStore.value.artifacts[key];
+  const localKey = `${s.outputNamespace}.${s.primaryOutputName}`;
+  const artifactKey = scope
+    ? inlineCapsuleArtifactKey(scope.instancePrefix, localKey)
+    : localKey;
+  const artifact = runStore.value.artifacts[artifactKey];
   return artifact ? artifact.value : snapshot.primaryOutputPreview;
 });
 
 const hasPromptBlocks = computed(() =>
-  step.value?.config.type === 'model-call',
+  effectiveStep.value?.config.type === 'model-call',
 );
 
 const capsuleInstanceStep = computed((): (PipelineStep & {config: CapsuleInstanceStepConfig}) | null => {
   const s = step.value;
-  if (!s || s.config.type !== 'capsule-instance') return null;
+  if (!s || s.config.type !== 'capsule-instance' || inlineCapsuleScope.value) return null;
   return s as PipelineStep & {config: CapsuleInstanceStepConfig};
 });
 
-const selectedInlineCapsuleInnerStep = computed((): PipelineStep | null => {
-  const s = step.value;
-  const innerId = pipelineEditorStore.selectedInlineCapsuleInnerStepId;
-  if (uiStore.editorContext !== 'pipeline' || !s || s.config.type !== 'capsule-instance' || !innerId) return null;
-  if (s.config.displayMode !== 'inline') return null;
-  return s.config.inlineSteps?.find((inner) => inner.id === innerId) ?? null;
+const scopedPrimaryOutputKey = computed(() => {
+  const s = effectiveStep.value;
+  if (!s) return '';
+  const localKey = `${s.outputNamespace}.${s.primaryOutputName}`;
+  const scope = inlineCapsuleScope.value;
+  return scope ? inlineCapsuleArtifactKey(scope.instancePrefix, localKey) : localKey;
 });
 
 const visibleTabs = computed(() => {
@@ -585,6 +624,11 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .step-type-badge { font-size: 0.72rem; padding: 2px 8px; background: #1a2a3a; color: #7ec8e3; border-radius: 4px; flex-shrink: 0; border: 1px solid #2a4a6a; }
 .step-label-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #2a2a2a; color: #e8e8e8; font-size: 1rem; font-weight: 500; padding: 3px 0; min-width: 0; }
 .step-label-input:focus { outline: none; border-bottom-color: #3a6080; }
+.step-label-readonly { flex: 1; color: #e8e8e8; font-size: 1rem; font-weight: 500; min-width: 0; }
+.inline-scope-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #7d5aa0; background: #1d1628; border: 1px solid #4a3f5a; border-radius: 3px; padding: 2px 6px;
+}
 
 .inspector-tabs {
   display: flex; flex-wrap: wrap; gap: 0.2rem; flex-shrink: 0;

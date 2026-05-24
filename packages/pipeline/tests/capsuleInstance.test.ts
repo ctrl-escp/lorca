@@ -454,4 +454,49 @@ describe('capsule-instance step-chain execution', () => {
     expect(modelCallBodies).toHaveLength(1);
     expect(modelCallBodies[0]).toMatchObject({model: 'bound-model'});
   });
+
+  it('forwards inner step trace and namespaced artifacts for inline capsule chains', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        displayMode: 'inline',
+        inlineSteps: [makeTextStep('body', 'inline body', 'body')],
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+    const trace: import('@lorca/core').PipelineTraceEvent[] = [];
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      () => ENDPOINT,
+      {
+        onArtifact(a) { artifacts[a.name] = a; },
+        onTraceEvent(e) { trace.push(e); },
+      },
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(trace.some((e) => e.stepId === 'body' && e.capsuleInstanceId === 'inst-inline')).toBe(true);
+    expect(artifacts['cap.internal.body.text']?.value).toBe('inline body');
+    expect(result.ok ? result.value.snapshots['inst-inline:body'] : undefined).toMatchObject({
+      stepId: 'body',
+      status: 'completed',
+      outputArtifactRefs: ['cap.internal.body.text'],
+    });
+  });
 });

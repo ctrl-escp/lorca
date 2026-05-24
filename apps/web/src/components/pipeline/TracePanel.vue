@@ -95,6 +95,8 @@ const props = defineProps<{
   artifacts?: Record<string, PipelineArtifact>;
   partialRun?: boolean;
   selectedStepId?: string | null;
+  /** When set, only show trace events scoped to this capsule instance. */
+  capsuleInstanceId?: string | null;
   /** stepId → display label for trace rows */
   stepLabels?: Record<string, string>;
 }>();
@@ -109,9 +111,13 @@ watch(() => props.selectedStepId, (id) => {
 });
 
 const displayTrace = computed(() => {
-  if (!filterToSelected.value || !props.selectedStepId) return props.trace;
+  let events = props.trace;
+  if (props.capsuleInstanceId) {
+    events = events.filter((e) => e.capsuleInstanceId === props.capsuleInstanceId);
+  }
+  if (!filterToSelected.value || !props.selectedStepId) return events;
   const id = props.selectedStepId;
-  return props.trace.filter(
+  return events.filter(
     (e) => e.nodeId === id || e.stepId === id,
   );
 });

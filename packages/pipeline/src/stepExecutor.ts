@@ -38,6 +38,8 @@ import {
 interface StepExecutionResult {
   artifacts: PipelineArtifact[];
   traceExtras?: Partial<PipelineTraceEvent>;
+  /** Snapshots for steps executed inside a capsule instance, keyed as `${capsuleStepId}:${innerStepId}`. */
+  nestedSnapshots?: Record<string, StepRunSnapshot>;
 }
 
 function stepOk(artifacts: PipelineArtifact[], traceExtras?: Partial<PipelineTraceEvent>): Result<StepExecutionResult, PipelineError> {
@@ -227,6 +229,7 @@ export async function executeStepChain(
       resolveEndpoint,
       resolveCapsule,
       pipeline,
+      callbacks,
       abortSignal,
       resolveEndpointForModel,
       options.params,
@@ -254,6 +257,9 @@ export async function executeStepChain(
       produced.push(artifact.name);
     }
     executedStepIds.push(step.id);
+    if (result.value.nestedSnapshots) {
+      Object.assign(snapshots, result.value.nestedSnapshots);
+    }
     const preview = primaryOutputPreview(step, artifacts);
     snapshots[step.id] = buildStepRunSnapshot(
       step,
@@ -311,6 +317,7 @@ export async function executeStepInternal(
   resolveEndpoint: EndpointResolver,
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
+  callbacks: ExecutorCallbacks,
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
   params?: Record<string, unknown>,
@@ -340,9 +347,16 @@ export async function executeStepInternal(
     }
 
     case 'capsule-instance': {
-      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
+      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel);
       if (!capResult.ok) return capResult;
-      return stepOk(capResult.value, {inputArtifactNames});
+      return {
+        ok: true,
+        value: {
+          artifacts: capResult.value.artifacts,
+          traceExtras: {inputArtifactNames},
+          ...(capResult.value.nestedSnapshots ? {nestedSnapshots: capResult.value.nestedSnapshots} : {}),
+        },
+      };
     }
 
     case 'loop-group': {
@@ -428,6 +442,7 @@ async function executeLoopGroupStep(
         resolveEndpoint,
         resolveCapsule,
         pipeline,
+        {onTraceEvent() {}, onArtifact() {}},
         abortSignal,
         resolveEndpointForModel,
       );
@@ -611,8 +626,9 @@ async function executeCapsuleStep(
   resolveEndpoint: EndpointResolver,
   resolveCapsule: CapsuleResolver | undefined,
   pipeline: PipelineDefinition,
+  callbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
-): Promise<Result<PipelineArtifact[], PipelineError>> {
+): Promise<Result<{artifacts: PipelineArtifact[]; nestedSnapshots?: Record<string, StepRunSnapshot>}, PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeCapsuleStep called on non-capsule step', nodeId: step.id}};
   }
@@ -632,7 +648,7 @@ async function executeCapsuleStep(
     : capsule;
 
   if (executionCapsule.steps && executionCapsule.steps.length > 0) {
-    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
+    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel);
   }
 
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
@@ -701,7 +717,62 @@ async function executeCapsuleStep(
   const result = await executePipeline(legacyDef, ctx, resolveEndpoint, collectedCallbacks, resolveCapsule, resolveEndpointForModel);
   if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
 
-  return {ok: true, value: produced};
+  return {ok: true, value: {artifacts: produced}};
+}
+
+const USER_PROMPT_ARTIFACT_PREFIXES = ['user_prompt.raw', 'user_prompt.xml'] as const;
+
+function capsuleInternalArtifactKey(instancePrefix: string, localName: string): string {
+  return `${instancePrefix}.internal.${localName}`;
+}
+
+function namespaceCapsuleArtifactRef(instancePrefix: string, ref: string): string {
+  if (ref.startsWith(`${instancePrefix}.internal.`)) return ref;
+  if (USER_PROMPT_ARTIFACT_PREFIXES.some((p) => ref === p || ref.startsWith(`${p}.`))) return ref;
+  return capsuleInternalArtifactKey(instancePrefix, ref);
+}
+
+function namespaceCapsuleTraceEvent(
+  event: PipelineTraceEvent,
+  instancePrefix: string,
+  capsuleInstanceId: string,
+): PipelineTraceEvent {
+  const ns = (name: string) => namespaceCapsuleArtifactRef(instancePrefix, name);
+  const next: PipelineTraceEvent = {
+    ...event,
+    capsuleInstanceId,
+  };
+  if (event.error && event.error.capsuleInstanceId === undefined) {
+    next.error = {...event.error, capsuleInstanceId};
+  }
+  if (event.inputArtifactNames) {
+    next.inputArtifactNames = event.inputArtifactNames.map(ns);
+  }
+  if (event.outputArtifactNames) {
+    next.outputArtifactNames = event.outputArtifactNames.map(ns);
+  }
+  if (event.historyReadInputs) {
+    next.historyReadInputs = event.historyReadInputs.map((hr) => ({
+      ...hr,
+      sourceArtifactRef: ns(hr.sourceArtifactRef),
+    }));
+  }
+  return next;
+}
+
+function remapCapsuleInnerSnapshots(
+  capsuleStepId: string,
+  instancePrefix: string,
+  innerSnapshots: Record<string, StepRunSnapshot>,
+): Record<string, StepRunSnapshot> {
+  const remapped: Record<string, StepRunSnapshot> = {};
+  for (const [innerStepId, snapshot] of Object.entries(innerSnapshots)) {
+    remapped[`${capsuleStepId}:${innerStepId}`] = {
+      ...snapshot,
+      outputArtifactRefs: snapshot.outputArtifactRefs.map((ref) => namespaceCapsuleArtifactRef(instancePrefix, ref)),
+    };
+  }
+  return remapped;
 }
 
 async function executeCapsuleStepChain(
@@ -711,8 +782,9 @@ async function executeCapsuleStepChain(
   resolveEndpoint: EndpointResolver,
   resolveCapsule: CapsuleResolver | undefined,
   parentPipeline: PipelineDefinition,
+  outerCallbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
-): Promise<Result<PipelineArtifact[], PipelineError>> {
+): Promise<Result<{artifacts: PipelineArtifact[]; nestedSnapshots?: Record<string, StepRunSnapshot>}, PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Not a capsule step', nodeId: step.id}};
   }
@@ -759,11 +831,15 @@ async function executeCapsuleStepChain(
   };
 
   const innerCallbacks: ExecutorCallbacks = {
-    onTraceEvent() { /* outer run owns trace aggregation */ },
+    onTraceEvent(event) {
+      outerCallbacks.onTraceEvent(namespaceCapsuleTraceEvent(event, instancePrefix, step.id));
+    },
     onArtifact(a) {
       innerArtifacts[a.name] = a;
-      const internalKey = `${instancePrefix}.internal.${a.name}`;
-      innerArtifacts[internalKey] = {...a, name: internalKey, stepId: step.id};
+      const internalKey = capsuleInternalArtifactKey(instancePrefix, a.name);
+      const namespaced = {...a, name: internalKey, stepId: step.id};
+      innerArtifacts[internalKey] = namespaced;
+      outerCallbacks.onArtifact(namespaced);
     },
   };
 
@@ -800,7 +876,13 @@ async function executeCapsuleStepChain(
     }
   }
 
-  return {ok: true, value: publicOutputs};
+  return {
+    ok: true,
+    value: {
+      artifacts: publicOutputs,
+      nestedSnapshots: remapCapsuleInnerSnapshots(step.id, instancePrefix, result.value.snapshots),
+    },
+  };
 }
 
 function artifactOutputSuffix(ref: string): string {
