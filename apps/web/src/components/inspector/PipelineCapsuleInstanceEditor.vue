@@ -65,17 +65,31 @@
       Spread / Edit inline
     </button>
     </template>
+
+    <CapsuleModelSlotFields
+      v-if="resolvedCapsule && resolvedCapsule.interface.modelSlots.length > 0"
+      :slots="resolvedCapsule.interface.modelSlots"
+      :assignments="localSlotKeys"
+      :models="enabledModels"
+      header-label="Model slot assignments"
+      slot-name-prefix=""
+      @update="onSlotAssignmentsUpdate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref, computed, watch} from 'vue';
+import {ref, computed, watch, onMounted} from 'vue';
 import type {PipelineStep, CapsuleInstanceStepConfig} from '@lorca/core';
 import {computeCapsuleContentSignature} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useCapsulesStore} from '../../stores/capsules.js';
+import {useModelsStore} from '../../stores/models.js';
+import {useEndpointsStore} from '../../stores/endpoints.js';
+import {bindingsFromSlotKeys, slotKeysFromBindings} from '../../utils/modelAutoSelect.js';
 import {FieldLabel} from '@lorca/ui-kit';
+import CapsuleModelSlotFields from '../shared/CapsuleModelSlotFields.vue';
 
 const props = defineProps<{
   step: PipelineStep & {config: CapsuleInstanceStepConfig};
@@ -84,12 +98,21 @@ const props = defineProps<{
 const editorStore = useActiveStepEditor();
 const pipelineEditor = usePipelineEditorStore();
 const capsulesStore = useCapsulesStore();
+const modelsStore = useModelsStore();
+const endpointsStore = useEndpointsStore();
 
 const availableCapsules = computed(() => capsulesStore.capsules);
 
 const localCapsuleKey = ref('');
 const localInputBindings = ref<Record<string, string>>({});
 const localOutputBindings = ref<Record<string, string>>({});
+const localSlotKeys = ref<Record<string, string>>({});
+
+const enabledModels = computed(() => {
+  if (!endpointsStore.loaded) return [];
+  const disabledEndpointIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
+  return modelsStore.models.filter((m) => m.enabled !== false && !disabledEndpointIds.has(m.endpointId));
+});
 
 const resolvedCapsule = computed(() => {
   if (!localCapsuleKey.value) return undefined;
@@ -108,7 +131,12 @@ watch(() => props.step, (s) => {
   localCapsuleKey.value = `${s.config.capsuleId}::${s.config.capsuleVersion}`;
   localInputBindings.value = {...s.config.inputBindings};
   localOutputBindings.value = {...s.config.outputBindings};
+  localSlotKeys.value = slotKeysFromBindings(s.config.modelSlotBindings);
 }, {immediate: true, deep: true});
+
+onMounted(() => {
+  void Promise.all([endpointsStore.load(), modelsStore.load()]);
+});
 
 function onCapsuleSelect() {
   const cap = resolvedCapsule.value;
@@ -122,6 +150,17 @@ function onCapsuleSelect() {
   }, 'Change Capsule instance');
   localInputBindings.value = {...draft.config.inputBindings};
   localOutputBindings.value = {...draft.config.outputBindings};
+  localSlotKeys.value = slotKeysFromBindings(draft.config.modelSlotBindings);
+}
+
+function onSlotAssignmentsUpdate(keys: Record<string, string>) {
+  localSlotKeys.value = keys;
+  editorStore.commitStepConfigEdit(props.step.id, {
+    config: {
+      ...props.step.config,
+      modelSlotBindings: bindingsFromSlotKeys(keys),
+    },
+  }, 'Update Capsule model slots');
 }
 
 function beginBindingsEdit() {

@@ -48,18 +48,22 @@
           <template v-else-if="step.config.type === 'model-call'">
             <div class="inspector-field">
               <FieldLabel label="Model" required title="Which model to call for this step" />
-              <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
-                <option value="">— select model —</option>
-                <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
-                  <option
-                    v-for="m in modelsForEndpoint(ep.id)"
-                    :key="m.id"
-                    :value="`${m.endpointId}::${m.providerModelName}`"
-                  >
-                    {{ m.displayName }}
-                  </option>
-                </optgroup>
-              </select>
+              <div class="model-select-row">
+                <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
+                  <option value="">— select model —</option>
+                  <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
+                    <option
+                      v-for="m in modelsForEndpoint(ep.id)"
+                      :key="m.id"
+                      :value="`${m.endpointId}::${m.providerModelName}`"
+                    >
+                      {{ m.displayName }}
+                    </option>
+                  </optgroup>
+                </select>
+                <button type="button" class="btn-autoselect" title="Auto-select a suitable model" @click="autoSelectModel">Auto</button>
+              </div>
+              <p v-if="autoSelectWarning" class="model-select-warning">{{ autoSelectWarning }}</p>
               <label class="checkbox-row" title="Run this model on the first enabled endpoint that has it">
                 <input type="checkbox" v-model="localUseAnyEndpoint" @change="commitModelCall" />
                 <span>Use this model on any enabled endpoint</span>
@@ -294,6 +298,7 @@ import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {FieldLabel, JsonViewer} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
+import {modelKeyFromRef, tryAutoSelectModelCallStep} from '../../utils/modelAutoSelect.js';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
@@ -443,6 +448,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const localLabel = ref('');
 const localModelKey = ref('');
+const autoSelectWarning = ref('');
 const localUseAnyEndpoint = ref(false);
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
@@ -521,6 +527,20 @@ function commitModelCall() {
   const maxTok = parseInt(localMaxTokens.value, 10);
   if (!isNaN(maxTok) && maxTok > 0) patch.maxTokens = maxTok;
   editorStore.commitStepConfigEdit(s.id, {config: {...s.config, ...patch}}, 'Update model call');
+}
+
+function autoSelectModel() {
+  const s = step.value;
+  if (!s || s.config.type !== 'model-call') return;
+  const result = tryAutoSelectModelCallStep(s, modelsStore.models);
+  if (result.ok) {
+    autoSelectWarning.value = '';
+    localUseAnyEndpoint.value = false;
+    localModelKey.value = modelKeyFromRef(result.modelRef);
+    commitModelCall();
+  } else {
+    autoSelectWarning.value = result.warning;
+  }
 }
 
 function commitOutputType() {
@@ -698,6 +718,17 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: #3a6080; }
 textarea { resize: vertical; font-family: monospace; line-height: 1.4; }
+
+.model-select-row { display: flex; gap: 0.4rem; align-items: center; }
+.model-select-row select { flex: 1; min-width: 0; }
+.btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.model-select-warning {
+  margin: 0;
+  color: #c8a050;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
 
 .binding-list { display: flex; flex-direction: column; gap: 0.25rem; }
 .binding-row { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }

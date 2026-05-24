@@ -20,16 +20,20 @@
     <template v-else-if="innerStep.config.type === 'model-call'">
       <div class="inspector-field">
         <FieldLabel label="Model" required />
-        <select v-model="localModelKey" @change="commitModelCall">
-          <option value="">— select model —</option>
-          <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
-            <option
-              v-for="m in modelsForEndpoint(ep.id)"
-              :key="m.id"
-              :value="`${m.endpointId}::${m.providerModelName}`"
-            >{{ m.displayName }}</option>
-          </optgroup>
-        </select>
+        <div class="model-select-row">
+          <select v-model="localModelKey" @change="commitModelCall">
+            <option value="">— select model —</option>
+            <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
+              <option
+                v-for="m in modelsForEndpoint(ep.id)"
+                :key="m.id"
+                :value="`${m.endpointId}::${m.providerModelName}`"
+              >{{ m.displayName }}</option>
+            </optgroup>
+          </select>
+          <button type="button" class="btn-autoselect" title="Auto-select a suitable model" @click="autoSelectModel">Auto</button>
+        </div>
+        <p v-if="autoSelectWarning" class="model-select-warning">{{ autoSelectWarning }}</p>
         <label class="checkbox-row" title="Run this model on the first enabled endpoint that has it">
           <input type="checkbox" v-model="localUseAnyEndpoint" @change="commitModelCall" />
           <span>Use this model on any enabled endpoint</span>
@@ -97,6 +101,7 @@ import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
+import {modelKeyFromRef, tryAutoSelectModelCallStep} from '../../utils/modelAutoSelect.js';
 
 const props = defineProps<{
   capsuleStepId: string;
@@ -110,6 +115,7 @@ const modelsStore = useModelsStore();
 const localLabel = ref('');
 const localTemplate = ref('');
 const localModelKey = ref('');
+const autoSelectWarning = ref('');
 const localUseAnyEndpoint = ref(false);
 const localMode = ref<'generate' | 'chat'>('generate');
 const localTemperature = ref('');
@@ -211,6 +217,20 @@ function commitModelCall() {
     'Update inline model',
   );
 }
+
+function autoSelectModel() {
+  const s = props.innerStep;
+  if (s.config.type !== 'model-call') return;
+  const result = tryAutoSelectModelCallStep(s, modelsStore.models);
+  if (result.ok) {
+    autoSelectWarning.value = '';
+    localUseAnyEndpoint.value = false;
+    localModelKey.value = modelKeyFromRef(result.modelRef);
+    commitModelCall();
+  } else {
+    autoSelectWarning.value = result.warning;
+  }
+}
 </script>
 
 <style scoped>
@@ -261,6 +281,16 @@ textarea {
   border-radius: 3px;
   padding: 4px 6px;
   font-size: 0.78rem;
+}
+.model-select-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.25rem; }
+.model-select-row select { flex: 1; min-width: 0; }
+.btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.model-select-warning {
+  margin: 0;
+  color: #c8a050;
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 textarea {
   resize: vertical;

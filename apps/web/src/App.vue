@@ -138,16 +138,16 @@ const runStatus = computed(() =>
 );
 
 const canUndo = computed(() =>
-  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canUndo : pipelineEditorStore.canUndo
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canUndo : pipelineEditorStore.canUndo,
 );
 const canRedo = computed(() =>
-  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canRedo : pipelineEditorStore.canRedo
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canRedo : pipelineEditorStore.canRedo,
 );
 const undoLabel = computed(() =>
-  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastUndoLabel : pipelineEditorStore.lastUndoLabel
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastUndoLabel : pipelineEditorStore.lastUndoLabel,
 );
 const redoLabel = computed(() =>
-  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastRedoLabel : pipelineEditorStore.lastRedoLabel
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastRedoLabel : pipelineEditorStore.lastRedoLabel,
 );
 
 function doUndo() {

@@ -3,7 +3,11 @@ import {describe, it, expect} from 'vitest';
 import type {DiscoveredModel, PipelineStep} from '@lorca/core';
 import {
   pickModelRef,
+  pickModelRefMatchingBuckets,
   pickModelRefForSlot,
+  pickModelRefForSlotStrict,
+  autoSelectModelCallStep,
+  autoSelectCapsuleSlot,
   autoAssignModelToStep,
   modelMatchesBucket,
   modelMatchesAnyBucket,
@@ -43,6 +47,62 @@ describe('modelResolution', () => {
       endpointId: 'ep-1',
       modelName: 'extract:latest',
     });
+  });
+
+  it('pickModelRefMatchingBuckets returns null when no bucket matches', () => {
+    expect(pickModelRefMatchingBuckets(models, ['verify'])).toBeNull();
+    expect(pickModelRefMatchingBuckets(models, ['extract-json'])).toEqual({
+      kind: 'fixed',
+      endpointId: 'ep-1',
+      modelName: 'extract:latest',
+    });
+  });
+
+  it('autoSelectModelCallStep warns when no model matches suggested buckets', () => {
+    const step: PipelineStep = {
+      id: 's1',
+      type: 'model-call',
+      label: 'Test',
+      enabled: true,
+      outputNamespace: 'test',
+      primaryOutputName: 'text',
+      lastEditedAt: new Date().toISOString(),
+      config: {
+        type: 'model-call',
+        modelRef: {kind: 'fixed', endpointId: '', modelName: ''},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
+      },
+    };
+    const result = autoSelectModelCallStep(step, models, ['verify']);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.warning).toContain('verify');
+      expect(result.warning).toContain('verification and critique');
+    }
+  });
+
+  it('pickModelRefForSlotStrict does not fall back to an arbitrary model', () => {
+    expect(pickModelRefForSlotStrict(models, {
+      name: 'extractor',
+      suggestedBuckets: ['verify'],
+      required: true,
+    })).toBeNull();
+  });
+
+  it('autoSelectCapsuleSlot explains slot requirements when nothing matches', () => {
+    const result = autoSelectCapsuleSlot({
+      name: 'checker',
+      suggestedBuckets: ['verify'],
+      required: true,
+      preferredModelNames: ['judge:latest'],
+    }, models);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.warning).toContain('checker');
+      expect(result.warning).toContain('verify');
+      expect(result.warning).toContain('judge:latest');
+    }
   });
 
   it('partitionModelsByBuckets puts matching models first', () => {

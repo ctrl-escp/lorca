@@ -112,17 +112,14 @@
           </div>
         </template>
 
-        <template v-if="def.interface.modelSlots.length > 0">
-          <div v-for="slot in def.interface.modelSlots" :key="slot.name" class="test-field">
-            <FieldLabel :label="`slot: ${slot.name}`" :required="slot.required" :title="`Model to use for slot '${slot.name}' during test run`" />
-            <select v-model="testSlotAssignments[slot.name]" :title="`Model assignment for slot '${slot.name}'`">
-              <option value="">— select model —</option>
-              <option v-for="m in modelsStore.models" :key="m.id" :value="`${m.endpointId}::${m.providerModelName}`">
-                {{ m.displayName }}
-              </option>
-            </select>
-          </div>
-        </template>
+        <CapsuleModelSlotFields
+          v-if="def.interface.modelSlots.length > 0"
+          :slots="def.interface.modelSlots"
+          :assignments="testSlotAssignments"
+          :models="enabledModels()"
+          header-label="Model slots"
+          @update="testSlotAssignments = $event"
+        />
       </div>
     </div>
   </div>
@@ -133,6 +130,7 @@ import {ref, computed, watch, onMounted} from 'vue';
 import type {CapsuleDefinition, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {autoAssignModelToStep, pickModelRefForSlot} from '@lorca/endpoints';
+import {modelKeyFromRef} from '../../utils/modelAutoSelect.js';
 import {useCapsuleStepEditorStore} from '../../stores/capsuleStepEditor.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useImportExportStore} from '../../stores/importExport.js';
@@ -144,6 +142,7 @@ import ChainEditor from '../pipeline/ChainEditor.vue';
 import {FieldLabel} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
+import CapsuleModelSlotFields from '../shared/CapsuleModelSlotFields.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -309,7 +308,7 @@ function fillMissingSlotAssignments() {
     if (testSlotAssignments.value[slot.name]) continue;
     const picked = pickModelRefForSlot(models, slot);
     if (picked?.kind === 'fixed') {
-      testSlotAssignments.value[slot.name] = `${picked.endpointId}::${picked.modelName}`;
+      testSlotAssignments.value[slot.name] = modelKeyFromRef(picked);
     }
   }
 }
@@ -478,6 +477,18 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 .test-field input:focus, .test-field textarea:focus, .test-field select:focus { outline: none; border-color: #3a6080; }
 .test-field textarea { resize: vertical; font-family: inherit; }
 .kind-badge { font-size: 0.65rem; color: #555; background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
+
+.model-select-row { display: flex; gap: 0.4rem; align-items: center; }
+.model-select-row select { flex: 1; min-width: 0; }
+.btn-autoselect { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 4px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer; }
+.btn-autoselect:hover { background: #222; color: #ccc; border-color: #444; }
+.model-select-warning {
+  margin: 0;
+  color: #c8a050;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.test-run-warning { padding: 0 0.75rem 0.5rem; }
 
 .btn { border-radius: 4px; padding: 3px 12px; font-size: 0.78rem; cursor: pointer; border: 1px solid #333; }
 .btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }

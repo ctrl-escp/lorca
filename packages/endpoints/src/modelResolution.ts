@@ -1,4 +1,16 @@
 import type {CapsuleModelSlot, DiscoveredModel, ModelRef, ModelUsageBucket, PipelineStep} from '@lorca/core';
+import {
+  formatModelCallRequirementMessage,
+  formatSlotModelRequirementMessage,
+  noEnabledModelsMessage,
+} from './bucketLabels.js';
+
+export {MODEL_USAGE_BUCKET_LABELS, formatBucketRequirement, formatBucketsRequirement} from './bucketLabels.js';
+export {
+  formatModelCallRequirementMessage,
+  formatSlotModelRequirementMessage,
+  noEnabledModelsMessage,
+} from './bucketLabels.js';
 
 export function effectiveBuckets(model: DiscoveredModel): ModelUsageBucket[] {
   return model.userBuckets ?? model.buckets;
@@ -35,12 +47,29 @@ export function isModelRefConfigured(ref: ModelRef): boolean {
   return false;
 }
 
+/** Pick the first enabled model matching any of the buckets, or null if none match. */
+export function pickModelRefMatchingBuckets(
+  models: readonly DiscoveredModel[],
+  buckets: readonly ModelUsageBucket[],
+): ModelRef | null {
+  const available = enabledModels(models);
+  if (available.length === 0) return null;
+
+  for (const bucket of buckets) {
+    const match = available.find((m) => modelMatchesBucket(m, bucket));
+    if (match) {
+      return {kind: 'fixed', endpointId: match.endpointId, modelName: match.providerModelName};
+    }
+  }
+  return null;
+}
+
 /** Pick the first model matching preferredBucket, else the first available model. */
 export function pickModelRef(
   models: readonly DiscoveredModel[],
   preferredBucket?: ModelUsageBucket,
 ): ModelRef | null {
-  const available = models.filter((m) => m.endpointId && m.enabled !== false);
+  const available = enabledModels(models);
   if (available.length === 0) return null;
 
   if (preferredBucket) {
@@ -54,12 +83,82 @@ export function pickModelRef(
   return {kind: 'fixed', endpointId: first.endpointId, modelName: first.providerModelName};
 }
 
+/** Pick a slot model only when it satisfies slot hints; never falls back to an arbitrary model. */
+export function pickModelRefForSlotStrict(
+  models: readonly DiscoveredModel[],
+  slot: CapsuleModelSlot,
+): ModelRef | null {
+  const available = enabledModels(models);
+  if (available.length === 0) return null;
+
+  if (slot.defaultModelRef) {
+    const exactDefault = available.find((m) =>
+      m.endpointId === slot.defaultModelRef?.endpointId
+      && m.providerModelName === slot.defaultModelRef.modelName,
+    );
+    if (exactDefault) {
+      return {kind: 'fixed', endpointId: exactDefault.endpointId, modelName: exactDefault.providerModelName};
+    }
+  }
+
+  for (const name of slot.preferredModelNames ?? []) {
+    const exactName = available.find((m) => modelNameMatches(m, name));
+    if (exactName) {
+      return {kind: 'fixed', endpointId: exactName.endpointId, modelName: exactName.providerModelName};
+    }
+  }
+
+  const ranked = [...available].sort((a, b) => slotModelScore(b, slot) - slotModelScore(a, slot));
+  const best = ranked[0];
+  if (best && slotModelScore(best, slot) > 0) {
+    return {kind: 'fixed', endpointId: best.endpointId, modelName: best.providerModelName};
+  }
+
+  return pickModelRefMatchingBuckets(models, slot.suggestedBuckets);
+}
+
+export type ModelAutoSelectResult =
+  | {ok: true; modelRef: Extract<ModelRef, {kind: 'fixed'}>}
+  | {ok: false; warning: string};
+
+export function autoSelectModelCallStep(
+  step: PipelineStep,
+  models: readonly DiscoveredModel[],
+  suggestedBuckets: readonly ModelUsageBucket[],
+): ModelAutoSelectResult {
+  if (step.type !== 'model-call') {
+    return {ok: false, warning: 'Auto-select is only available for model-call steps.'};
+  }
+  if (enabledModels(models).length === 0) {
+    return {ok: false, warning: noEnabledModelsMessage()};
+  }
+  const picked = pickModelRefMatchingBuckets(models, suggestedBuckets);
+  if (!picked || picked.kind !== 'fixed') {
+    return {ok: false, warning: formatModelCallRequirementMessage(suggestedBuckets)};
+  }
+  return {ok: true, modelRef: picked};
+}
+
+export function autoSelectCapsuleSlot(
+  slot: CapsuleModelSlot,
+  models: readonly DiscoveredModel[],
+): ModelAutoSelectResult {
+  if (enabledModels(models).length === 0) {
+    return {ok: false, warning: noEnabledModelsMessage()};
+  }
+  const picked = pickModelRefForSlotStrict(models, slot);
+  if (!picked || picked.kind !== 'fixed') {
+    return {ok: false, warning: formatSlotModelRequirementMessage(slot)};
+  }
+  return {ok: true, modelRef: picked};
+}
+
 /** Pick the closest available model for a Capsule slot using exact names, then family/size/bucket hints. */
 export function pickModelRefForSlot(
   models: readonly DiscoveredModel[],
   slot: CapsuleModelSlot,
 ): ModelRef | null {
-  const available = models.filter((m) => m.endpointId && m.enabled !== false);
+  const available = enabledModels(models);
   if (available.length === 0) return null;
 
   if (slot.defaultModelRef) {
@@ -157,4 +256,8 @@ function slotModelScore(model: DiscoveredModel, slot: CapsuleModelSlot): number 
 
 function lc(value: string | undefined): string {
   return value?.toLowerCase() ?? '';
+}
+
+function enabledModels(models: readonly DiscoveredModel[]): DiscoveredModel[] {
+  return models.filter((m) => m.endpointId && m.enabled !== false);
 }
