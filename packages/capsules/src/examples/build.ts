@@ -5,6 +5,7 @@ import type {
   PipelineNode,
   PipelineStep,
 } from '@lorca/core';
+import {wireRetryFeedbackOnFirstModelCall} from '@lorca/pipeline';
 
 export const EXAMPLE_TIMESTAMP = '2025-01-01T00:00:00.000Z';
 
@@ -134,5 +135,42 @@ export function buildExampleCapsule(spec: ExampleCapsuleSpec): CapsuleDefinition
     createdAt: EXAMPLE_TIMESTAMP,
     updatedAt: EXAMPLE_TIMESTAMP,
     lockedAt: EXAMPLE_TIMESTAMP,
+  };
+}
+
+/** Wrap consecutive answer → verify model-call steps in a retry loop. */
+export function withAnswerVerifyRetryLoop(
+  capsule: CapsuleDefinition,
+  options?: {maxIterations?: number},
+): CapsuleDefinition {
+  const steps = capsule.steps ?? [];
+  const answerIdx = steps.findIndex((s) => s.id === 'answer');
+  const verifyIdx = steps.findIndex((s) => s.id === 'verify');
+  if (answerIdx < 0 || verifyIdx !== answerIdx + 1) return capsule;
+
+  const inner = wireRetryFeedbackOnFirstModelCall(
+    steps.slice(answerIdx, verifyIdx + 1).map((s) => structuredClone(s)),
+  );
+
+  const loopStep: PipelineStep = {
+    id: 'answer_verify_retry',
+    type: 'loop-group',
+    label: 'Answer & verify',
+    enabled: true,
+    outputNamespace: 'verify',
+    primaryOutputName: 'text',
+    lastEditedAt: EXAMPLE_TIMESTAMP,
+    config: {
+      type: 'loop-group',
+      maxIterations: options?.maxIterations ?? 3,
+      exitCondition: {type: 'json-field-equals', fieldPath: 'passed', value: true},
+      steps: inner,
+      outputNames: ['text'],
+    },
+  };
+
+  return {
+    ...capsule,
+    steps: [...steps.slice(0, answerIdx), loopStep],
   };
 }

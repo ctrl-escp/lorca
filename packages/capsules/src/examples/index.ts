@@ -17,7 +17,7 @@ export {
   EXAMPLE_BEST_OF_TWO,
   EXAMPLE_EXPERT,
 } from './definitions.js';
-export {buildExampleCapsule, linearEdges, EXAMPLE_TIMESTAMP} from './build.js';
+export {buildExampleCapsule, withAnswerVerifyRetryLoop, linearEdges, EXAMPLE_TIMESTAMP} from './build.js';
 export type {ExampleCapsuleSpec} from './build.js';
 
 export function isBuiltinExampleId(id: string): boolean {

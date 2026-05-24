@@ -1,6 +1,6 @@
 import type {CapsuleDefinition} from '@lorca/core';
 import {ALL_SUGGESTIONS} from '../suggestions/index.js';
-import {buildExampleCapsule, withGeneratedSteps} from './build.js';
+import {buildExampleCapsule, withAnswerVerifyRetryLoop, withGeneratedSteps} from './build.js';
 
 const INPUT_NODE = {id: 'input', type: 'input' as const};
 
@@ -838,10 +838,10 @@ export const EXAMPLE_BEST_OF_TWO: CapsuleDefinition = withGeneratedSteps({
   lockedAt: '2025-01-01T00:00:00.000Z',
 });
 
-export const EXAMPLE_EXPERT = buildExampleCapsule({
+export const EXAMPLE_EXPERT = withAnswerVerifyRetryLoop(buildExampleCapsule({
   id: 'example-expert',
   name: 'The Expert',
-  description: 'Route the prompt to a domain expert, answer it, and verify the answer against criteria.',
+  description: 'Route the prompt to a domain expert, answer it, and verify the answer against criteria. Retries up to 3 times until verification passes.',
   interface: {
     inputs: [],
     outputs: [
@@ -1037,7 +1037,7 @@ export const EXAMPLE_EXPERT = buildExampleCapsule({
       },
     },
   ],
-});
+}));
 
 export const BUILTIN_EXAMPLES: CapsuleDefinition[] = [
   LORCA_PIPELINE_GENERATOR,

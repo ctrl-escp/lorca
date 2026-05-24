@@ -8,6 +8,7 @@ export {
   compileStepChainToExecutionPlan,
   compileActiveStepsToExecutionPlan,
   compilePipelineToLegacyGraph,
+  expandLoopGroupsForLegacyCompile,
   migrateLegacyPipeline,
   migrateManualTextSteps,
   makeEmptyPipeline,

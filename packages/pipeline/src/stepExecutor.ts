@@ -486,7 +486,12 @@ async function executeLoopGroupStep(
   }
 
   const outputKey = `${step.outputNamespace}.${step.primaryOutputName}`;
-  return {ok: true, value: [makeArtifact(outputKey, step.id, 'text', finalOutputText)]};
+  const produced: PipelineArtifact[] = [makeArtifact(outputKey, step.id, 'text', finalOutputText)];
+  for (const [key, artifact] of Object.entries(loopArtifacts)) {
+    if (key === LOOP_PREV_ARTIFACT_REF || key in outerSnapshot) continue;
+    produced.push(artifact);
+  }
+  return {ok: true, value: produced};
 }
 
 async function executePromptStep(

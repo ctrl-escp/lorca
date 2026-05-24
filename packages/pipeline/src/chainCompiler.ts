@@ -130,6 +130,19 @@ export function compileActiveStepsToExecutionPlan(
 
 // ── V2 → V1 bridge (compiles step chain to legacy node graph for execution) ──
 
+/** Flatten loop-group inner chains for legacy graph sync (loops use the native executor). */
+export function expandLoopGroupsForLegacyCompile(steps: PipelineStep[]): PipelineStep[] {
+  const flat: PipelineStep[] = [];
+  for (const step of steps) {
+    if (step.config.type === 'loop-group') {
+      flat.push(...expandLoopGroupsForLegacyCompile(step.config.steps));
+    } else {
+      flat.push(step);
+    }
+  }
+  return flat;
+}
+
 export function compilePipelineToLegacyGraph(
   pipeline: PipelineDefinition,
   options: ExecutePipelineOptions = {},
@@ -142,6 +155,7 @@ export function compilePipelineToLegacyGraph(
     ? activeSteps.findIndex((s) => s.id === options.stopAtStepId)
     : -1;
   const slicedSteps = stopIdx >= 0 ? activeSteps.slice(0, stopIdx + 1) : activeSteps;
+  const legacySteps = expandLoopGroupsForLegacyCompile(slicedSteps);
 
   const inputNodeId = 'pipeline-input-node';
   const inputNode: PipelineNode = {id: inputNodeId, type: 'input'};
@@ -152,9 +166,9 @@ export function compilePipelineToLegacyGraph(
   let prevNodeId = inputNodeId;
   let prevOutput = 'xml';
 
-  for (let i = 0; i < slicedSteps.length; i++) {
-    const step = slicedSteps[i]!;
-    const node = stepToLegacyNode(step, pipeline, slicedSteps, i);
+  for (let i = 0; i < legacySteps.length; i++) {
+    const step = legacySteps[i]!;
+    const node = stepToLegacyNode(step, pipeline, legacySteps, i);
     nodes.push(node);
 
     edges.push({
@@ -169,7 +183,7 @@ export function compilePipelineToLegacyGraph(
     prevOutput = step.primaryOutputName;
   }
 
-  const lastStep = slicedSteps.at(-1);
+  const lastStep = legacySteps.at(-1);
   const outputRef = lastStep
     ? {nodeId: lastStep.id, outputName: lastStep.primaryOutputName}
     : {nodeId: inputNodeId, outputName: 'xml'};

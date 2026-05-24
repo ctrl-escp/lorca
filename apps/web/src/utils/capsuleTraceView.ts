@@ -32,7 +32,9 @@ function syntheticFromSnapshot(
     capsuleInstanceId,
     status: snapshot.status === 'failed' ? 'failed' : 'completed',
     timestamp: snapshot.completedAt,
-    outputArtifactNames: snapshot.outputArtifactRefs.length > 0 ? [...snapshot.outputArtifactRefs] : undefined,
+    ...(snapshot.outputArtifactRefs.length > 0
+      ? {outputArtifactNames: [...snapshot.outputArtifactRefs]}
+      : {}),
   };
 }
 

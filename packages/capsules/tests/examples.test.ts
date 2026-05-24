@@ -1,5 +1,6 @@
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {renderTemplate} from '@lorca/prompt';
 import {
   BUILTIN_EXAMPLES,
@@ -84,15 +85,35 @@ describe('builtin examples', () => {
     }
   });
 
+  it('wraps The Expert answer and verify steps in a retry loop', () => {
+    const expert = getBuiltinExample('example-expert')!;
+    const retryLoop = expert.steps?.find((s) => s.id === 'answer_verify_retry');
+    expect(retryLoop?.config.type).toBe('loop-group');
+    if (retryLoop?.config.type !== 'loop-group') return;
+    expect(retryLoop.config.maxIterations).toBe(3);
+    expect(retryLoop.config.exitCondition).toEqual({type: 'json-field-equals', fieldPath: 'passed', value: true});
+    expect(retryLoop.config.steps.map((s) => s.id)).toEqual(['answer', 'verify']);
+    const answer = retryLoop.config.steps[0];
+    expect(answer?.prompt?.historyReads.some((r) => r.sourceArtifactRef === 'loop.prev.text')).toBe(true);
+  });
+
   it('defines executable step-chain prompts for every built-in example', () => {
-    for (const def of BUILTIN_EXAMPLES) {
-      expect(def.steps?.length, `${def.id} should define canonical steps`).toBeGreaterThan(0);
-      for (const step of def.steps ?? []) {
+    function assertStepPrompts(def: CapsuleDefinition, steps: PipelineStep[]) {
+      for (const step of steps) {
+        if (step.config.type === 'loop-group') {
+          assertStepPrompts(def, step.config.steps);
+          continue;
+        }
         expect(step.type, `${def.id}:${step.id} should not expose legacy prompt text as a separate step`).toBe('model-call');
         if (step.config.type === 'model-call') {
           expect(step.prompt?.blocks.length || step.prompt?.previousOutput.enabled, `${def.id}:${step.id} should have a prompt`).toBeTruthy();
         }
       }
+    }
+
+    for (const def of BUILTIN_EXAMPLES) {
+      expect(def.steps?.length, `${def.id} should define canonical steps`).toBeGreaterThan(0);
+      assertStepPrompts(def, def.steps ?? []);
     }
   });
 

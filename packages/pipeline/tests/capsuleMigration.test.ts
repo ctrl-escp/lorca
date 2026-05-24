@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import type {CapsuleDefinition, PipelineNode} from '@lorca/core';
+import {getBuiltinExample} from '@lorca/capsules';
 import {ensureCapsuleStepChain} from '../src/capsuleExtraction.js';
 
 function makeGraphCapsule(nodes: PipelineNode[]): CapsuleDefinition {
@@ -62,5 +63,12 @@ describe('ensureCapsuleStepChain', () => {
     const result = ensureCapsuleStepChain(capsule);
     expect(result.steps).toHaveLength(1);
     expect(result.steps![0]!.label).toBe('Note');
+  });
+
+  it('syncs legacy graph for capsules with loop-group steps', () => {
+    const expert = getBuiltinExample('example-expert')!;
+    const loaded = ensureCapsuleStepChain(expert);
+    expect(loaded.steps?.some((s) => s.config.type === 'loop-group')).toBe(true);
+    expect((loaded.nodes ?? []).filter((n) => n.type === 'model-call').length).toBeGreaterThanOrEqual(4);
   });
 });

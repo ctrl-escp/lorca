@@ -94,7 +94,6 @@ import {
   enrichTraceWithCapsuleSnapshots,
   filterTraceEvents,
   isPriorRunTraceEvent,
-  listInlineCapsuleTraceScopes,
   type CapsuleTraceScope,
 } from '../../utils/capsuleTraceView.js';
 
@@ -130,9 +129,9 @@ const displayTrace = computed(() => {
     scopes,
   );
   return filterTraceEvents(enriched, {
-    capsuleInstanceId: props.capsuleInstanceId,
-    selectedStepId: props.selectedStepId,
     filterToSelected: filterToSelected.value,
+    ...(props.capsuleInstanceId !== undefined ? {capsuleInstanceId: props.capsuleInstanceId} : {}),
+    ...(props.selectedStepId !== undefined ? {selectedStepId: props.selectedStepId} : {}),
   });
 });
 

@@ -169,6 +169,24 @@ describe('loop-group execution', () => {
     if (!result.ok) expect(result.error.message).toContain('at least one enabled inner step');
   });
 
+  it('promotes final inner-step artifacts to the outer artifact store', async () => {
+    const pipeline = makeLoopPipeline([
+      makeManualStep('answer', 'final answer text', 'answer'),
+      makeManualStep('verify', JSON.stringify({passed: true}), 'verify'),
+    ]);
+
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+    const result = await executeStepChain(pipeline, 'hello', {}, () => undefined, {
+      onTraceEvent() {},
+      onArtifact(a) { artifacts[a.name] = a; },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(artifacts['answer.text']?.value).toBe('final answer text');
+    expect(artifacts['verify.text']?.value).toBe('{"passed":true}');
+    expect(artifacts['loop_out.text']?.value).toBe('{"passed":true}');
+  });
+
   it('exposes loop.prev.text to inner steps from the second iteration onward', async () => {
     const pipeline = makeLoopPipeline([
       makeManualStep('gen', 'first-output'),
