@@ -48,6 +48,8 @@
               dragging: draggingStepId === step.id,
               'output-expanded': outputPreviewValueFor(step) !== null && !isStepOutputCollapsed(step.id),
               'partial-run-target': step.id === props.partialRunTargetStepId,
+              'has-exec-chip': !!executionChipByStepId[step.id],
+              'exec-running': executionChipByStepId[step.id]?.phase === 'running',
               [traceStatusClass(step.id)]: true,
             }"
             @click="onStepClick(step.id, $event)"
@@ -85,6 +87,20 @@
                   :title="jsonValidPassed(step) ? 'Last run parsed as JSON' : 'Last run output was not valid JSON'"
                 >{{ jsonValidPassed(step) ? 'JSON✓' : 'JSON✗' }}</span>
                 <span class="step-title" :class="{disabled: !step.enabled}">{{ step.label }}</span>
+                <span
+                  v-if="executionChipByStepId[step.id]"
+                  class="step-exec-chip"
+                  :class="`exec-${executionChipByStepId[step.id]!.phase}`"
+                  :title="executionChipByStepId[step.id]!.title"
+                  aria-live="polite"
+                >
+                  <span
+                    v-if="executionChipByStepId[step.id]!.phase === 'running'"
+                    class="exec-spinner"
+                    aria-hidden="true"
+                  />
+                  {{ executionChipByStepId[step.id]!.label }}
+                </span>
                 <span v-if="stepHasModelError(step)" class="step-badge step-badge-warn" title="No model selected">no model</span>
                 <span v-if="props.disabledModelStepIds?.has(step.id)" class="step-badge step-badge-model-off" title="This step's model or endpoint is disabled">model off</span>
                 <div class="step-actions">
@@ -186,11 +202,28 @@
                   <span>Up to {{ step.config.maxIterations }}×</span>
                   <span class="loop-group-dot">·</span>
                   <span class="loop-group-exit">{{ loopExitSummary(step) }}</span>
+                  <span
+                    v-if="executionChipByStepId[step.id]"
+                    class="step-exec-chip step-exec-chip-compact"
+                    :class="`exec-${executionChipByStepId[step.id]!.phase}`"
+                    :title="executionChipByStepId[step.id]!.title"
+                  >
+                    <span
+                      v-if="executionChipByStepId[step.id]!.phase === 'running'"
+                      class="exec-spinner"
+                      aria-hidden="true"
+                    />
+                    {{ executionChipByStepId[step.id]!.label }}
+                  </span>
                 </div>
                 <div v-if="step.config.steps.length === 0" class="loop-inner-empty">
                   Empty loop — add inner steps in the Inspector
                 </div>
-                <ol v-else class="loop-inner-list">
+                <ol
+                  v-else
+                  class="loop-inner-list"
+                  :class="{'loop-inner-active-run': executionChipByStepId[step.id]?.phase === 'running'}"
+                >
                   <li
                     v-for="(inner, ii) in step.config.steps"
                     :key="inner.id"
@@ -198,6 +231,7 @@
                     :class="{
                       'loop-inner-selected': selectedLoopInnerStepId === inner.id && selectedStepId === step.id,
                       'loop-inner-last': ii === step.config.steps.length - 1,
+                      'loop-inner-active-run': executionChipByStepId[step.id]?.phase === 'running',
                     }"
                     :title="ii === step.config.steps.length - 1 ? 'Last step — its JSON output controls loop exit' : 'Click to configure inner step'"
                     @click.stop="$emit('select-loop-inner', step.id, inner.id)"
@@ -231,13 +265,29 @@
                     v-for="(inner, ii) in step.config.inlineSteps"
                     :key="inner.id"
                     class="capsule-inline-step-item"
-                    :class="{'capsule-inline-selected': selectedInlineCapsuleInnerStepId === inner.id && selectedStepId === step.id}"
+                    :class="[
+                      {'capsule-inline-selected': selectedInlineCapsuleInnerStepId === inner.id && selectedStepId === step.id},
+                      innerExecutionClass(step.id, inner.id),
+                    ]"
                     title="Click to configure inline step"
                     @click.stop="$emit('select-inline-capsule-inner', step.id, inner.id)"
                   >
                     <span class="loop-inner-index">{{ ii + 1 }}</span>
                     <span class="loop-inner-type">{{ stepTypeLabel(inner.type) }}</span>
                     <span class="capsule-inline-step-label">{{ inner.label }}</span>
+                    <span
+                      v-if="innerExecutionChipByKey[`${step.id}:${inner.id}`]"
+                      class="step-exec-chip step-exec-chip-compact"
+                      :class="`exec-${innerExecutionChipByKey[`${step.id}:${inner.id}`]!.phase}`"
+                      :title="innerExecutionChipByKey[`${step.id}:${inner.id}`]!.title"
+                    >
+                      <span
+                        v-if="innerExecutionChipByKey[`${step.id}:${inner.id}`]!.phase === 'running'"
+                        class="exec-spinner"
+                        aria-hidden="true"
+                      />
+                      {{ innerExecutionChipByKey[`${step.id}:${inner.id}`]!.label }}
+                    </span>
                   </li>
                 </ol>
               </div>
@@ -392,6 +442,13 @@ import {
 import {JsonViewer} from '@lorca/ui-kit';
 import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
 import {formatDurationMs} from '../../utils/formatDuration.js';
+import {
+  resolveCapsuleInnerStepExecution,
+  resolveTopLevelStepExecution,
+  traceStatusClassForChip,
+  type ResolveStepExecutionOptions,
+  type StepExecutionChip,
+} from '../../utils/stepExecutionDisplay.js';
 
 type DragKind = 'step-reorder' | 'suggestion';
 
@@ -500,6 +557,53 @@ const props = defineProps<{
 const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() =>
   Object.fromEntries(props.steps.map((step, index) => [step.id, dataSourceBadges(step, index)])),
 );
+
+const executionChipByStepId = computed((): Record<string, StepExecutionChip> => {
+  const chips: Record<string, StepExecutionChip> = {};
+  for (const step of props.steps) {
+    const options: ResolveStepExecutionOptions = {
+      finalArtifactKey: props.finalArtifactKey,
+      outputNamespace: step.outputNamespace,
+      capsuleHasInnerFailure: step.config.type === 'capsule-instance',
+    };
+    if (props.runStatus !== undefined) options.runStatus = props.runStatus;
+    if (props.runError !== undefined) options.runError = props.runError;
+    const snapshot = props.runSnapshots?.[step.id];
+    if (snapshot) options.runSnapshot = snapshot;
+
+    const chip = resolveTopLevelStepExecution(step.id, props.trace, options);
+    if (chip) chips[step.id] = chip;
+  }
+  return chips;
+});
+
+const innerExecutionChipByKey = computed((): Record<string, StepExecutionChip> => {
+  const chips: Record<string, StepExecutionChip> = {};
+  for (const step of props.steps) {
+    if (step.config.type !== 'capsule-instance' || step.config.displayMode !== 'inline') continue;
+    for (const inner of step.config.inlineSteps ?? []) {
+      const chip = resolveCapsuleInnerStepExecution(
+        step.id,
+        inner.id,
+        props.trace,
+        props.runSnapshots,
+        props.runStatus,
+      );
+      if (chip) chips[`${step.id}:${inner.id}`] = chip;
+    }
+  }
+  return chips;
+});
+
+function innerExecutionChip(capsuleStepId: string, innerStepId: string): StepExecutionChip | null {
+  return innerExecutionChipByKey.value[`${capsuleStepId}:${innerStepId}`] ?? null;
+}
+
+function innerExecutionClass(capsuleStepId: string, innerStepId: string): string {
+  const chip = innerExecutionChip(capsuleStepId, innerStepId);
+  if (!chip) return '';
+  return `inner-exec-${chip.phase}`;
+}
 
 const emit = defineEmits<{
   select: [stepId: string, extendRange?: boolean];
@@ -688,6 +792,8 @@ function traceFor(stepId: string): PipelineTraceEvent | undefined {
 }
 
 function traceStatusClass(stepId: string): string {
+  const chip = executionChipByStepId.value[stepId];
+  if (chip) return traceStatusClassForChip(chip);
   const t = traceFor(stepId);
   return t ? `trace-${t.status}` : '';
 }
@@ -1127,6 +1233,43 @@ function runStateTitle(stepId: string): string {
 .trace-running .step-card, .trace-started .step-card { border-left: 3px solid #e8a020; }
 .trace-skipped .step-card { opacity: 0.4; }
 .trace-cancelled .step-card { border-left: 3px solid #666; }
+
+.chain-step.has-exec-chip:not(.selected) .step-card { opacity: 0.92; }
+.chain-step.exec-running:not(.selected) .step-card {
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(232, 160, 32, 0.22);
+}
+
+.step-exec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: clamp(0.68rem, 1.3cqh, 0.85rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.step-exec-chip-compact {
+  margin-left: auto;
+  font-size: 0.68rem;
+  padding: 0.08rem 0.4rem;
+}
+.exec-running { background: #3a2808; color: #f0b040; border: 1px solid #805010; }
+.exec-completed { background: #1a2e1a; color: #5a9d5a; border: 1px solid #2a5a3a; }
+.exec-failed { background: #2e1a1a; color: #e07070; border: 1px solid #7a3030; }
+.exec-skipped, .exec-cancelled { background: #1a1a1a; color: var(--text-secondary); border: 1px solid #333; }
+.exec-spinner {
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: exec-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes exec-spin { to { transform: rotate(360deg); } }
 
 .chain-step.partial-run-target {
   border-bottom: 2px solid var(--color-run-accent, #4a9eff);
@@ -1745,6 +1888,15 @@ function runStateTitle(stepId: string): string {
 }
 .loop-inner-item:hover { border-color: #3a5068; background: #121820; }
 .loop-inner-selected { border-color: #4a7090; background: #152030; }
+.loop-inner-active-run:not(.loop-inner-selected) {
+  border-color: #805010;
+  border-style: dashed;
+  background: #1a1408;
+}
+.loop-inner-list.loop-inner-active-run {
+  box-shadow: inset 0 0 0 1px rgba(232, 160, 32, 0.15);
+  border-radius: 6px;
+}
 .loop-inner-index { color: var(--text-secondary); min-width: 1.1rem; font-family: monospace; }
 .loop-inner-type {
   font-size: 0.62rem;
@@ -1847,6 +1999,9 @@ function runStateTitle(stepId: string): string {
 }
 .capsule-inline-step-item:hover { border-color: #4a3f5a; background: #15121a; }
 .capsule-inline-selected { border-color: #7d5aa0; background: #1d1628; }
+.inner-exec-running:not(.capsule-inline-selected) { border-color: #805010; background: #241a08; }
+.inner-exec-completed:not(.capsule-inline-selected) { border-color: #2a5a3a; }
+.inner-exec-failed:not(.capsule-inline-selected) { border-color: #7a3030; background: #2a1414; }
 .capsule-inline-step-label { flex: 1; color: #ccc; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @container (max-width: 620px) {
