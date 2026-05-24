@@ -2,6 +2,23 @@ import {defineStore} from 'pinia';
 import {ref} from 'vue';
 import type {AiEndpointConfig, EndpointSecretRef} from '@lorca/core';
 import {getDb} from '@lorca/storage';
+import {cloneForStorage} from '../utils/storage.js';
+import {newId} from '../utils/id.js';
+
+export function createDefaultEndpoint(preserveId?: string): AiEndpointConfig {
+  const now = new Date().toISOString();
+  return {
+    id: preserveId ?? newId('ep'),
+    name: 'Local Ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    kind: 'ollama',
+    enabled: false,
+    browserAccess: 'unknown',
+    authKind: 'none',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export const useEndpointsStore = defineStore('endpoints', () => {
   const endpoints = ref<AiEndpointConfig[]>([]);
@@ -10,7 +27,14 @@ export const useEndpointsStore = defineStore('endpoints', () => {
 
   async function load() {
     if (loaded.value) return;
-    endpoints.value = await getDb().endpoints.toArray();
+    const stored = await getDb().endpoints.toArray();
+    if (stored.length > 0) {
+      endpoints.value = stored;
+    } else {
+      const def = createDefaultEndpoint();
+      await getDb().endpoints.put(cloneForStorage(def));
+      endpoints.value = [def];
+    }
     loaded.value = true;
   }
 
