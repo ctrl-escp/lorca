@@ -28,7 +28,8 @@
       >{{ endpoint.enabled ? 'Disable' : 'Enable' }}</button>
       <button class="btn btn-sm btn-danger" title="Remove this endpoint and its discovered models" @click="$emit('remove', endpoint.id)">Remove</button>
     </div>
-    <div v-if="endpoint.browserAccess === 'blocked'" class="ep-cors-warn">
+    <div v-if="actionError" class="ep-action-error">{{ actionError }}</div>
+    <div v-else-if="endpoint.browserAccess === 'blocked'" class="ep-cors-warn">
       Browser cannot reach this endpoint. Check CORS headers or use a local proxy.
     </div>
   </div>
@@ -42,6 +43,7 @@ const props = defineProps<{
   modelCount: number;
   isTesting: boolean;
   isDiscovering: boolean;
+  actionError?: string;
 }>();
 
 defineEmits<{
@@ -87,7 +89,8 @@ const accessLabel = {
 .ep-meta { display: flex; gap: 0.85rem; font-size: 0.82rem; color: var(--text-label); }
 .ep-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.1rem; }
 
-.ep-cors-warn {
+.ep-cors-warn,
+.ep-action-error {
   font-size: 0.82rem;
   color: #e07070;
   background: #2d1a1a;

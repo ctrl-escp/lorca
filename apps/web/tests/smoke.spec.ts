@@ -43,7 +43,7 @@ test.beforeEach(async ({page}) => {
   await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible({timeout: 10000});
 });
 
-// Helper: add endpoint and make it available
+// Helper: add endpoint, auto-test access, and auto-discover models
 async function addEndpoint(page: import('@playwright/test').Page, name = 'Test Ollama') {
   await expandLeftSection(page, 'Endpoints');
   await page.getByTitle('Add a new AI endpoint').click();
@@ -51,9 +51,7 @@ async function addEndpoint(page: import('@playwright/test').Page, name = 'Test O
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
   await expect(page.getByText(name)).toBeVisible();
-  // Test access so browserAccess becomes 'available' (enables Discover models)
-  await page.getByRole('button', {name: 'Test access'}).click();
-  await expect(page.getByRole('button', {name: 'Discover models'})).toBeEnabled({timeout: 5000});
+  await expect(page.getByRole('button', {name: 'Discover models'})).toBeEnabled({timeout: 10000});
 }
 
 async function expandLeftSection(
@@ -85,8 +83,7 @@ test('smoke: add endpoint', async ({page}) => {
 // 2. Discover models
 test('smoke: discover models', async ({page}) => {
   await addEndpoint(page);
-  await page.getByRole('button', {name: 'Discover models'}).click();
-  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 5000});
+  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 10000});
 });
 
 // 3. Enter target prompt

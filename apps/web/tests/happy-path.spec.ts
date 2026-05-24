@@ -60,10 +60,7 @@ async function addEndpoint(page: import('@playwright/test').Page) {
   await page.getByPlaceholder('Local Ollama').fill('Test Ollama');
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
-  await page.getByRole('button', {name: 'Test access'}).click();
-  await expect(page.getByRole('button', {name: 'Discover models'})).toBeEnabled({timeout: 5000});
-  await page.getByRole('button', {name: 'Discover models'}).click();
-  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 5000});
+  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 10000});
 }
 
 function stepCard(page: import('@playwright/test').Page, label: string) {

@@ -266,6 +266,7 @@
               :model-count="(modelsStore.modelsByEndpoint.get(ep.id) ?? []).length"
               :is-testing="epActions.testing.value.has(ep.id)"
               :is-discovering="epActions.discovering.value.has(ep.id)"
+              :action-error="epActions.actionErrors.value.get(ep.id) ?? ''"
               @test="epActions.testAccess"
               @discover="epActions.discoverModels"
               @edit="editingEndpointId = ep.id"
@@ -559,6 +560,11 @@ function openAddModel() {
 async function onAddEndpoint(config: AiEndpointConfig) {
   await endpointsStore.addEndpoint(config);
   showAddEndpoint.value = false;
+  const testResult = await epActions.testAccess(config);
+  if (testResult.ok) {
+    const saved = endpointsStore.getEndpoint(config.id) ?? config;
+    await epActions.discoverModels(saved);
+  }
 }
 
 async function onSaveEndpoint(config: AiEndpointConfig) {
