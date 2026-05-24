@@ -256,6 +256,15 @@ export function applyModelRemapsToSteps(
         },
       };
     }
+    if (step.config.type === 'capsule-instance' && step.config.inlineSteps) {
+      return {
+        ...step,
+        config: {
+          ...step.config,
+          inlineSteps: applyModelRemapsToSteps(step.config.inlineSteps, remaps),
+        },
+      };
+    }
     return step;
   });
 }
@@ -355,6 +364,9 @@ function collectModelRefsFromSteps(
     }
     if (step.config.type === 'loop-group') {
       for (const inner of step.config.steps) visit(inner);
+    }
+    if (step.config.type === 'capsule-instance') {
+      for (const inner of step.config.inlineSteps ?? []) visit(inner);
     }
   };
   for (const step of steps) visit(step);

@@ -24,19 +24,17 @@
           <button class="btn btn-secondary" type="button" title="Generate a pipeline from a natural-language description" @click="handleBuildFromDescription">✨ Build from description…</button>
           <!-- Progressive overflow buttons: each revealed at a wider breakpoint -->
           <button class="btn btn-secondary ovf-inline ovf-1" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-          <button class="btn btn-secondary ovf-inline ovf-2" type="button" title="Save selected steps as a draft Capsule" @click="handleExtractSelection">Extract to Capsule</button>
-          <button class="btn btn-secondary ovf-inline ovf-3" type="button" title="Replace all steps with one Capsule instance" @click="handleConvertPipeline">Convert to Capsule</button>
-          <button class="btn btn-secondary ovf-inline ovf-4" type="button" @click="handleExport">Export</button>
-          <button class="btn btn-secondary ovf-inline ovf-5" type="button" @click="handleImport">Import</button>
+          <button class="btn btn-secondary ovf-inline ovf-2" type="button" title="Lock selected steps, or the whole pipeline, as a Capsule" @click="handleLockSelectionAsCapsule">Lock as Capsule</button>
+          <button class="btn btn-secondary ovf-inline ovf-3" type="button" @click="handleExport">Export</button>
+          <button class="btn btn-secondary ovf-inline ovf-4" type="button" @click="handleImport">Import</button>
           <!-- More dropdown: contains only the buttons not yet shown inline -->
           <div class="more-menu-wrap" ref="moreMenuRef">
             <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
             <div v-if="moreMenuOpen" class="more-menu-dropdown">
               <button class="more-menu-item ovf-drop ovf-drop-1" type="button" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-              <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleExtractSelection">Extract to Capsule</button>
-              <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleConvertPipeline">Convert to Capsule</button>
-              <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleExport">Export</button>
-              <button class="more-menu-item ovf-drop ovf-drop-5" type="button" @click="handleImport">Import</button>
+              <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleLockSelectionAsCapsule">Lock as Capsule</button>
+              <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleExport">Export</button>
+              <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleImport">Import</button>
             </div>
           </div>
         </div>
@@ -82,6 +80,7 @@
       :steps="editorStore.steps"
       :selected-step-id="editorStore.selectedStepId"
       :selected-loop-inner-step-id="editorStore.selectedLoopInnerStepId"
+      :selected-inline-capsule-inner-step-id="editorStore.selectedInlineCapsuleInnerStepId"
       :trace="runStore.trace"
       :step-states="stepStates"
       :run-partial="runStore.partial"
@@ -100,6 +99,11 @@
       :partial-run-target-step-id="runStore.partialRunTargetStepId"
       @select="handleSelectStep"
       @select-loop-inner="handleSelectLoopInner"
+      @select-inline-capsule-inner="handleSelectInlineCapsuleInner"
+      @spread-capsule="handleSpreadCapsule"
+      @collapse-inline-capsule="editorStore.collapseInlineCapsule"
+      @lock-inline-capsule="handleLockInlineCapsule"
+      @detach-capsule="handleDetachCapsule"
       @reorder="handleReorder"
       @drop-suggestion="handleDropSuggestion"
       @append="handleAppend"
@@ -448,6 +452,10 @@ function handleSelectLoopInner(loopStepId: string, innerStepId: string) {
   editorStore.selectLoopInnerStep(loopStepId, innerStepId);
 }
 
+function handleSelectInlineCapsuleInner(capsuleStepId: string, innerStepId: string) {
+  editorStore.selectInlineCapsuleInnerStep(capsuleStepId, innerStepId);
+}
+
 function handleBuildFromDescription() {
   moreMenuOpen.value = false;
   generatorError.value = null;
@@ -542,61 +550,83 @@ function handleWrapInRetryLoop() {
   uiStore.setRightPaneTab('inspector');
 }
 
-async function handleExtractSelection() {
-  moreMenuOpen.value = false;
-  const range = editorStore.getSelectionRange();
-  if (!range) {
-    inlineError.value = 'Select steps to extract. Shift+click another step to define a range.';
-    return;
-  }
-  const stepCount = range.endIndex - range.startIndex + 1;
-  const confirmed = await showConfirm({
-    title: 'Extract to Capsule',
-    message: `Replace ${stepCount} selected step(s) with a single Capsule instance?\n\nThe original steps will be saved as a new Capsule definition.`,
-    confirmLabel: 'Extract',
-    destructive: true,
-  });
-  if (!confirmed) return;
-  const defaultName = editorStore.selectedStep?.label ?? 'Extracted Capsule';
-  const name = await showPrompt({title: 'Name this Capsule', label: 'Capsule name', defaultValue: defaultName});
-  if (!name) return;
-  const result = editorStore.extractSelectionToCapsule(name);
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  capsulesStore.addCapsule(result.capsule);
-  await pipelinesStore.save(editorStore.pipeline);
-  uiStore.openCapsuleEditor(result.capsule.id);
-}
-
-async function handleConvertPipeline() {
+async function handleLockSelectionAsCapsule() {
   moreMenuOpen.value = false;
   if (editorStore.steps.length === 0) {
-    inlineError.value = 'Add steps before converting the pipeline to a Capsule.';
+    inlineError.value = 'Add steps before locking a Capsule.';
     return;
   }
-  const name = await showPrompt({
-    title: 'Name this Capsule',
-    label: 'Capsule name',
-    defaultValue: editorStore.pipeline.name || 'Pipeline Capsule',
-  });
-  if (!name) return;
+  const range = editorStore.getSelectionRange();
+  const stepCount = range ? range.endIndex - range.startIndex + 1 : editorStore.steps.length;
   const confirmed = await showConfirm({
-    title: 'Convert to Capsule',
-    message: `Replace all ${editorStore.steps.length} step(s) with a single Capsule instance?`,
-    confirmLabel: 'Convert',
+    title: 'Lock as Capsule',
+    message: range
+      ? `Replace ${stepCount} selected step(s) with a locked Capsule instance?`
+      : `Replace all ${stepCount} pipeline step(s) with a locked Capsule instance?`,
+    confirmLabel: 'Lock',
     destructive: true,
   });
   if (!confirmed) return;
-  const result = editorStore.convertPipelineToCapsule(name);
+  const defaultName = range ? editorStore.selectedStep?.label ?? 'Pipeline Capsule' : editorStore.pipeline.name || 'Pipeline Capsule';
+  const name = await showPrompt({title: 'Name this Capsule', label: 'Capsule name', defaultValue: defaultName});
+  if (!name) return;
+  const result = editorStore.lockSelectionAsCapsule(name);
   if (!result.ok) {
     inlineError.value = result.message;
     return;
   }
   capsulesStore.addCapsule(result.capsule);
   await pipelinesStore.save(editorStore.pipeline);
-  uiStore.openCapsuleEditor(result.capsule.id);
+  inlineError.value = null;
+  uiStore.setRightPaneTab('inspector');
+}
+
+function handleSpreadCapsule(stepId: string) {
+  const result = editorStore.spreadCapsule(stepId);
+  if (!result.ok) {
+    inlineError.value = result.message;
+    return;
+  }
+  inlineError.value = null;
+  uiStore.setRightPaneTab('inspector');
+}
+
+async function handleLockInlineCapsule(stepId: string) {
+  const step = editorStore.steps.find((s) => s.id === stepId);
+  const defaultName = step?.label ?? 'Inline Capsule';
+  const name = await showPrompt({title: 'Name this Capsule', label: 'Capsule name', defaultValue: defaultName});
+  if (!name) return;
+  const confirmed = await showConfirm({
+    title: 'Lock inline Capsule',
+    message: 'Save these inline steps as a locked Capsule and point this instance at it?',
+    confirmLabel: 'Lock',
+  });
+  if (!confirmed) return;
+  const result = editorStore.lockInlineCapsuleAsCapsule(stepId, name);
+  if (!result.ok) {
+    inlineError.value = result.message;
+    return;
+  }
+  capsulesStore.addCapsule(result.capsule);
+  await pipelinesStore.save(editorStore.pipeline);
+  inlineError.value = null;
+}
+
+async function handleDetachCapsule(stepId: string) {
+  const confirmed = await showConfirm({
+    title: 'Detach Capsule',
+    message: 'Replace this Capsule instance with its inline steps and break the link?',
+    confirmLabel: 'Detach',
+    destructive: true,
+  });
+  if (!confirmed) return;
+  const result = editorStore.detachCapsule(stepId);
+  if (!result.ok) {
+    inlineError.value = result.message;
+    return;
+  }
+  await pipelinesStore.save(editorStore.pipeline);
+  inlineError.value = null;
 }
 
 function commitPipelineName() {

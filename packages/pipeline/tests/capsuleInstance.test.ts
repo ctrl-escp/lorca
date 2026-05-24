@@ -1,11 +1,17 @@
-import {describe, it, expect} from 'vitest';
-import type {LegacyPipelineDefinition, CapsuleDefinition, AiEndpointConfig} from '@lorca/core';
+// @vitest-environment node
+import {describe, it, expect, beforeAll, afterAll, afterEach} from 'vitest';
+import {http, HttpResponse} from 'msw';
+import {setupServer} from 'msw/node';
+import type {LegacyPipelineDefinition, CapsuleDefinition, AiEndpointConfig, PipelineDefinition, PipelineStep} from '@lorca/core';
 import {executePipeline} from '../src/executor.js';
+import {executeStepChain} from '../src/stepExecutor.js';
+
+const BASE = 'http://localhost:11436';
 
 const ENDPOINT: AiEndpointConfig = {
   id: 'ep1',
   name: 'Test',
-  baseUrl: 'http://localhost:11434',
+  baseUrl: BASE,
   kind: 'ollama',
   enabled: true,
   browserAccess: 'available',
@@ -13,6 +19,21 @@ const ENDPOINT: AiEndpointConfig = {
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
 };
+
+const modelCallBodies: unknown[] = [];
+const server = setupServer(
+  http.post(`${BASE}/api/generate`, async ({request}) => {
+    modelCallBodies.push(await request.json());
+    return HttpResponse.json({response: 'model output', done: true, model: 'bound-model'});
+  }),
+);
+
+beforeAll(() => server.listen({onUnhandledRequest: 'error'}));
+afterEach(() => {
+  modelCallBodies.length = 0;
+  server.resetHandlers();
+});
+afterAll(() => server.close());
 
 function makePipeline(nodes: LegacyPipelineDefinition['nodes'], outputNodeId: string, outputName = 'text'): LegacyPipelineDefinition {
   const edges = [];
@@ -62,6 +83,73 @@ function makeCtx(runId = 'run1') {
     input: {userPromptRaw: 'hello', userPromptXml: '<user_prompt>hello</user_prompt>'},
     artifacts: {} as Record<string, import('@lorca/core').PipelineArtifact>,
     trace: [] as import('@lorca/core').PipelineTraceEvent[],
+  };
+}
+
+function makeTextStep(id: string, text: string, outputNamespace = id): PipelineStep {
+  return {
+    id,
+    type: 'presentation',
+    label: id,
+    enabled: true,
+    outputNamespace,
+    primaryOutputName: 'text',
+    lastEditedAt: '2025-01-01T00:00:00.000Z',
+    config: {type: 'presentation', text, outputNames: ['text']},
+  };
+}
+
+function makeSlotModelStep(id: string, slotName: string, outputNamespace = id): PipelineStep {
+  return {
+    id,
+    type: 'model-call',
+    label: id,
+    enabled: true,
+    outputNamespace,
+    primaryOutputName: 'text',
+    lastEditedAt: '2025-01-01T00:00:00.000Z',
+    config: {
+      type: 'model-call',
+      modelRef: {kind: 'slot', slotName},
+      mode: 'generate',
+      outputNames: ['text', 'rawResponse'],
+    },
+  };
+}
+
+function makeStepChainCapsule(text: string): CapsuleDefinition {
+  return {
+    schemaVersion: 1,
+    id: 'cap-chain',
+    name: 'Step Chain Capsule',
+    version: 'v1',
+    status: 'locked',
+    interface: {
+      inputs: [],
+      outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+      parameters: [],
+      modelSlots: [],
+    },
+    nodes: [],
+    edges: [],
+    outputRef: {nodeId: 'body', outputName: 'text'},
+    steps: [makeTextStep('body', text, 'body')],
+    input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+    tests: [],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  };
+}
+
+function makeStepChainPipeline(step: PipelineStep): PipelineDefinition {
+  return {
+    schemaVersion: 2,
+    id: 'pipe-chain',
+    name: 'Step Chain Pipeline',
+    input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+    steps: [step],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
   };
 }
 
@@ -252,5 +340,118 @@ describe('CapsuleInstanceNode execution', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(ctx.artifacts['ctx-cap.text']?.value).toBe('seeded value');
+  });
+});
+
+describe('capsule-instance step-chain execution', () => {
+  it('runs the saved capsule body in opaque mode', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        displayMode: 'opaque',
+        inlineSteps: [makeTextStep('body', 'inline body', 'body')],
+        inlineModified: true,
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      () => ENDPOINT,
+      {onArtifact(a) { artifacts[a.name] = a; }, onTraceEvent() {}},
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(artifacts['cap.text']?.value).toBe('saved body');
+  });
+
+  it('runs inlineSteps in inline mode while keeping public output bindings', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        displayMode: 'inline',
+        inlineSteps: [makeTextStep('body', 'inline body', 'body')],
+        inlineModified: true,
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      () => ENDPOINT,
+      {onArtifact(a) { artifacts[a.name] = a; }, onTraceEvent() {}},
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.value.finalOutputKey : '').toBe('cap.text');
+    expect(artifacts['cap.text']?.value).toBe('inline body');
+  });
+
+  it('applies model slot bindings before running inlineSteps', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        modelSlotBindings: {main: {kind: 'fixed', endpointId: ENDPOINT.id, modelName: 'bound-model'}},
+        displayMode: 'inline',
+        inlineSteps: [makeSlotModelStep('body', 'main', 'body')],
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      (id) => id === ENDPOINT.id ? ENDPOINT : undefined,
+      {onArtifact(a) { artifacts[a.name] = a; }, onTraceEvent() {}},
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(artifacts['cap.text']?.value).toBe('model output');
+    expect(modelCallBodies).toHaveLength(1);
+    expect(modelCallBodies[0]).toMatchObject({model: 'bound-model'});
   });
 });

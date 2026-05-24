@@ -66,6 +66,12 @@ async function expandLeftSection(
   }
 }
 
+function stepCard(page: import('@playwright/test').Page, label: string) {
+  return page.locator('.chain-step').filter({
+    has: page.locator('.step-title', {hasText: label}),
+  }).first();
+}
+
 // 1. Add endpoint
 test('smoke: add endpoint', async ({page}) => {
   await expandLeftSection(page, 'Endpoints');
@@ -134,6 +140,89 @@ test('smoke: insert capsule instance into pipeline', async ({page}) => {
   // Add capsule instance
   await page.getByRole('button', {name: '+ Capsule'}).click();
   await expect(page.locator('.step-type-badge').filter({hasText: 'Capsule'}).last()).toBeVisible();
+});
+
+test('smoke: spread and collapse inline capsule', async ({page}) => {
+  await page.evaluate(async () => {
+    const now = '2026-01-01T00:00:00.000Z';
+    const capsule = {
+      schemaVersion: 1,
+      id: 'cap-inline-smoke',
+      name: 'Inline Smoke Capsule',
+      version: 'v1',
+      status: 'locked',
+      interface: {
+        inputs: [],
+        outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+        parameters: [],
+        modelSlots: [],
+      },
+      nodes: [],
+      edges: [],
+      outputRef: {nodeId: 'body', outputName: 'text'},
+      steps: [{
+        id: 'body',
+        type: 'presentation',
+        label: 'Body Text',
+        enabled: true,
+        outputNamespace: 'body',
+        primaryOutputName: 'text',
+        lastEditedAt: now,
+        config: {type: 'presentation', text: 'inline body', outputNames: ['text']},
+      }],
+      input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+      tests: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    const pipeline = {
+      schemaVersion: 2,
+      id: 'pipe-inline-smoke',
+      name: 'Inline Smoke Pipeline',
+      input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+      steps: [{
+        id: 'inst',
+        type: 'capsule-instance',
+        label: 'Inline Smoke Capsule',
+        enabled: true,
+        outputNamespace: 'cap',
+        primaryOutputName: 'text',
+        lastEditedAt: now,
+        config: {
+          type: 'capsule-instance',
+          capsuleId: capsule.id,
+          capsuleVersion: capsule.version,
+          inputBindings: {},
+          outputBindings: {result: 'cap.text'},
+          boundContentSignature: 'seeded',
+        },
+      }],
+      createdAt: now,
+      updatedAt: now,
+    };
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('lorca');
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['pipelines', 'capsules'], 'readwrite');
+      tx.objectStore('capsules').put(capsule);
+      tx.objectStore('pipelines').put(pipeline);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    localStorage.setItem('lorca:activePipelineId', pipeline.id);
+  });
+
+  await page.reload();
+  const card = stepCard(page, 'Inline Smoke Capsule');
+  await expect(card).toBeVisible({timeout: 10000});
+  await card.getByRole('button', {name: 'Spread'}).click();
+  await expect(card.locator('.capsule-inline-body')).toBeVisible();
+  await expect(card.locator('.capsule-inline-step-label')).toHaveText('Body Text');
+  await card.getByRole('button', {name: 'Collapse'}).click();
+  await expect(card.locator('.capsule-inline-body')).not.toBeVisible();
 });
 
 // 9. Configure loop-group max iterations

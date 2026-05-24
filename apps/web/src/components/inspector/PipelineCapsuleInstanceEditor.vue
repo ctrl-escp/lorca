@@ -1,6 +1,6 @@
 <template>
   <div class="pci-editor">
-    <div v-if="definitionStale" class="pci-stale-banner" role="status">
+    <div v-if="props.step.config.displayMode !== 'inline' && definitionStale" class="pci-stale-banner" role="status">
       <p class="pci-stale-text">
         The saved Capsule definition changed since this instance was bound. Outputs may be stale until you rebind.
       </p>
@@ -9,6 +9,20 @@
       </button>
     </div>
 
+    <div v-if="props.step.config.displayMode === 'inline'" class="pci-inline-panel">
+      <div class="pci-inline-row">
+        <span>Inline working copy</span>
+        <span v-if="props.step.config.inlineModified" class="pci-inline-badge">modified</span>
+      </div>
+      <p v-if="definitionStale" class="pci-inline-warning">
+        Saved Capsule changed after this inline copy was created.
+      </p>
+      <button type="button" class="btn btn-sm" @click="collapseInline">
+        Collapse
+      </button>
+    </div>
+
+    <template v-else>
     <div class="inspector-field">
       <FieldLabel label="Capsule" required title="Capsule definition for this instance" />
       <select v-model="localCapsuleKey" title="Select a saved Capsule" @change="onCapsuleSelect">
@@ -45,6 +59,11 @@
           />
         </div>
       </div>
+    </template>
+
+    <button type="button" class="btn btn-sm btn-inline" @click="spreadInline">
+      Spread / Edit inline
+    </button>
     </template>
   </div>
 </template>
@@ -132,6 +151,14 @@ function rebindDefinition() {
     },
   }, 'Rebind Capsule definition');
 }
+
+function spreadInline() {
+  pipelineEditor.spreadCapsule(props.step.id);
+}
+
+function collapseInline() {
+  pipelineEditor.collapseInlineCapsule(props.step.id);
+}
 </script>
 
 <style scoped>
@@ -153,6 +180,44 @@ function rebindDefinition() {
   cursor: pointer;
 }
 .btn-rebind:hover { background: #3d3822; }
+.btn-inline {
+  align-self: flex-start;
+  background: #17131c;
+  border: 1px solid #3a3245;
+  color: #c6b4d8;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-inline:hover { background: #21182a; }
+.pci-inline-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid #3a3245;
+  background: #151119;
+  border-radius: 4px;
+}
+.pci-inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  color: #c6b4d8;
+  font-size: 0.78rem;
+}
+.pci-inline-badge {
+  color: #d0a85a;
+  font-size: 0.68rem;
+}
+.pci-inline-warning {
+  margin: 0;
+  color: #c8a050;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
 .binding-edit-row {
   display: flex; align-items: center; gap: 0.35rem;
   margin-bottom: 0.25rem;

@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {PipelineDefinition, PipelineStep, StepRunSnapshot} from '@lorca/core';
+import type {CapsuleDefinition, PipelineDefinition, PipelineStep, StepRunSnapshot} from '@lorca/core';
 import {
   computeStepConfigSignature,
   computeStepInputSignature,
@@ -7,6 +7,7 @@ import {
   computeStepStaleStates,
   computeUserPromptSignature,
 } from '../src/staleState.js';
+import {computeCapsuleContentSignature} from '../src/capsuleExtraction.js';
 
 function makeStep(id: string, label: string, overrides?: Partial<PipelineStep>): PipelineStep {
   return {
@@ -44,6 +45,45 @@ function snapshotFor(step: PipelineStep, pipeline: PipelineDefinition, userSig: 
     completedAt: new Date().toISOString(),
     status: 'completed',
   };
+}
+
+function makeCapsule(text: string): CapsuleDefinition {
+  return {
+    schemaVersion: 1,
+    id: 'cap',
+    name: 'Capsule',
+    version: 'v1',
+    status: 'locked',
+    interface: {
+      inputs: [],
+      outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+      parameters: [],
+      modelSlots: [],
+    },
+    nodes: [],
+    edges: [],
+    outputRef: {nodeId: 'body', outputName: 'text'},
+    steps: [makeStep('body', text, {outputNamespace: 'body'})],
+    tests: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function makeCapsuleInstance(capsule: CapsuleDefinition, overrides?: Partial<PipelineStep>): PipelineStep {
+  return makeStep('inst', 'Capsule', {
+    type: 'capsule-instance',
+    outputNamespace: 'cap',
+    config: {
+      type: 'capsule-instance',
+      capsuleId: capsule.id,
+      capsuleVersion: capsule.version,
+      inputBindings: {},
+      outputBindings: {result: 'cap.text'},
+      boundContentSignature: computeCapsuleContentSignature(capsule),
+    },
+    ...overrides,
+  });
 }
 
 describe('computeStepStaleStates', () => {
@@ -137,5 +177,64 @@ describe('computeStepStaleStates', () => {
     );
     expect(states.find((s) => s.stepId === 'a')?.state).toBe('current');
     expect(states.find((s) => s.stepId === 'b')?.state).toBe('skipped-partial');
+  });
+
+  it('marks opaque capsule stale when the saved source changes', () => {
+    const capsule = makeCapsule('old');
+    const changed = makeCapsule('new');
+    const instance = makeCapsuleInstance(capsule);
+    const pipeline = makePipeline([instance]);
+    const userSig = computeUserPromptSignature('prompt');
+
+    const states = computeStepStaleStates(
+      pipeline,
+      {
+        snapshots: {inst: snapshotFor(instance, pipeline, userSig)},
+        userPromptSignature: userSig,
+        partial: false,
+        executedStepIds: ['inst'],
+      },
+      'prompt',
+      () => changed,
+    );
+
+    const state = states.find((s) => s.stepId === 'inst');
+    expect(state?.state).toBe('stale');
+    expect(state?.capsuleSourceChanged).toBe(true);
+  });
+
+  it('does not stale inline capsules solely because the saved source changes', () => {
+    const capsule = makeCapsule('old');
+    const changed = makeCapsule('new');
+    const instance = makeCapsuleInstance(capsule, {
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        boundContentSignature: computeCapsuleContentSignature(capsule),
+        displayMode: 'inline',
+        inlineSteps: capsule.steps ?? [],
+      },
+    });
+    const pipeline = makePipeline([instance]);
+    const userSig = computeUserPromptSignature('prompt');
+
+    const states = computeStepStaleStates(
+      pipeline,
+      {
+        snapshots: {inst: snapshotFor(instance, pipeline, userSig)},
+        userPromptSignature: userSig,
+        partial: false,
+        executedStepIds: ['inst'],
+      },
+      'prompt',
+      () => changed,
+    );
+
+    const state = states.find((s) => s.stepId === 'inst');
+    expect(state?.state).toBe('current');
+    expect(state?.capsuleSourceChanged).toBe(true);
   });
 });

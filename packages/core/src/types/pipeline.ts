@@ -116,6 +116,12 @@ export interface CapsuleInstanceStepConfig {
   modelSlotBindings?: Record<string, ModelRef>;
   /** Content signature captured when the instance was created or rebound. */
   boundContentSignature?: string;
+  /** Opaque runs the saved capsule; inline runs an embedded working copy. */
+  displayMode?: 'opaque' | 'inline';
+  /** Embedded working copy of the capsule body when displayMode is inline. */
+  inlineSteps?: PipelineStep[];
+  /** True once inlineSteps diverge from the saved capsule version. */
+  inlineModified?: boolean;
 }
 
 export type LoopExitCondition =

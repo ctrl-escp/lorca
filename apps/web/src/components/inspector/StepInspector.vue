@@ -39,7 +39,13 @@
             <code class="ns-value">{{ step.primaryOutputName }}</code>
           </div>
 
-          <template v-if="step.config.type === 'model-call'">
+          <CapsuleInlineStepEditor
+            v-if="selectedInlineCapsuleInnerStep"
+            :capsule-step-id="step.id"
+            :inner-step="selectedInlineCapsuleInnerStep"
+          />
+
+          <template v-else-if="step.config.type === 'model-call'">
             <div class="inspector-field">
               <FieldLabel label="Model" required title="Which model to call for this step" />
               <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
@@ -291,12 +297,15 @@ import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
+import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
+import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 
 type InspectorTab = 'config' | 'prompt' | 'inputs' | 'outputs' | 'last-run' | 'validation';
 type SplitMode = 'full' | 'collapsed' | 'tabs';
 
 const uiStore = useUiStore();
 const editorStore = useActiveStepEditor();
+const pipelineEditorStore = usePipelineEditorStore();
 const pipelineRunStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
 const runStore = computed(() => uiStore.editorContext === 'capsule' ? capsuleRunStore : pipelineRunStore);
@@ -379,6 +388,14 @@ const capsuleInstanceStep = computed((): (PipelineStep & {config: CapsuleInstanc
   const s = step.value;
   if (!s || s.config.type !== 'capsule-instance') return null;
   return s as PipelineStep & {config: CapsuleInstanceStepConfig};
+});
+
+const selectedInlineCapsuleInnerStep = computed((): PipelineStep | null => {
+  const s = step.value;
+  const innerId = pipelineEditorStore.selectedInlineCapsuleInnerStepId;
+  if (uiStore.editorContext !== 'pipeline' || !s || s.config.type !== 'capsule-instance' || !innerId) return null;
+  if (s.config.displayMode !== 'inline') return null;
+  return s.config.inlineSteps?.find((inner) => inner.id === innerId) ?? null;
 });
 
 const visibleTabs = computed(() => {

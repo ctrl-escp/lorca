@@ -2,7 +2,7 @@
   <div class="prompt-composition">
     <div class="pce-toolbar">
       <button
-        v-if="loopGroupStepId"
+        v-if="nestedEditTarget?.kind === 'loop'"
         type="button"
         class="pce-retry-btn"
         title="Wire loop.prev and instructions so this step improves on failed verification"
@@ -273,6 +273,7 @@ import {
 } from '@lorca/pipeline';
 import {wireRetryFeedback} from '@lorca/pipeline';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
+import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import HelpDialog from '../help/HelpDialog.vue';
 import XmlPreview from '../shared/XmlPreview.vue';
@@ -280,15 +281,20 @@ import FullPromptModal from './FullPromptModal.vue';
 import PromptImproverModal from './PromptImproverModal.vue';
 import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
 
+export type NestedEditTarget =
+  | {kind: 'loop'; parentStepId: string}
+  | {kind: 'inline-capsule'; parentStepId: string};
+
 const props = defineProps<{
   stepId: string;
   config: PromptCompositionConfig | undefined;
   /** When editing a step inside a loop group, prior steps from outer + inner chain. */
   contextSteps?: PipelineStep[];
-  loopGroupStepId?: string;
+  nestedEditTarget?: NestedEditTarget;
 }>();
 
 const editorStore = useActiveStepEditor();
+const pipelineEditorStore = usePipelineEditorStore();
 const runStore = useActiveRunStore();
 
 const EMPTY_CONFIG: PromptCompositionConfig = {
@@ -356,11 +362,19 @@ function buildConfig(): PromptCompositionConfig {
 }
 
 function applyStepPatch(patch: Partial<PipelineStep>, label?: string) {
-  if (props.loopGroupStepId) {
+  if (props.nestedEditTarget?.kind === 'inline-capsule') {
     if (label) {
-      editorStore.commitLoopInnerStepEdit(props.loopGroupStepId, props.stepId, patch, label);
+      pipelineEditorStore.commitInlineCapsuleInnerStepEdit(props.nestedEditTarget.parentStepId, props.stepId, patch, label);
     } else {
-      editorStore.updateLoopInnerStep(props.loopGroupStepId, props.stepId, patch);
+      pipelineEditorStore.updateInlineCapsuleInnerStep(props.nestedEditTarget.parentStepId, props.stepId, patch);
+    }
+    return;
+  }
+  if (props.nestedEditTarget?.kind === 'loop') {
+    if (label) {
+      editorStore.commitLoopInnerStepEdit(props.nestedEditTarget.parentStepId, props.stepId, patch, label);
+    } else {
+      editorStore.updateLoopInnerStep(props.nestedEditTarget.parentStepId, props.stepId, patch);
     }
     return;
   }
@@ -372,7 +386,7 @@ function applyStepPatch(patch: Partial<PipelineStep>, label?: string) {
 }
 
 function beginPromptEdit() {
-  if (props.loopGroupStepId) return;
+  if (props.nestedEditTarget) return;
   editorStore.beginStepEdit(props.stepId);
 }
 

@@ -200,6 +200,54 @@ function makePipeline(): PipelineDefinition {
   };
 }
 
+function makeInlineCapsulePipeline(): PipelineDefinition {
+  return {
+    schemaVersion: 2,
+    id: 'pipe-inline',
+    name: 'Inline Capsule Pipeline',
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+    steps: [
+      {
+        id: 'cap-step',
+        type: 'capsule-instance',
+        label: 'Inline Capsule',
+        enabled: true,
+        outputNamespace: 'cap',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'capsule-instance',
+          capsuleId: 'cap-1',
+          capsuleVersion: 'v1',
+          inputBindings: {},
+          outputBindings: {result: 'cap.text'},
+          displayMode: 'inline',
+          inlineModified: true,
+          inlineSteps: [
+            {
+              id: 'inline-model',
+              type: 'model-call',
+              label: 'Inline Model',
+              enabled: true,
+              outputNamespace: 'inline_model',
+              primaryOutputName: 'text',
+              lastEditedAt: '2026-01-01T00:00:00Z',
+              config: {
+                type: 'model-call',
+                modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
+                mode: 'generate',
+                outputNames: ['text', 'rawResponse'],
+              },
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
+
 function makeCapsule(): CapsuleDefinition {
   return {
     schemaVersion: 1,
@@ -372,6 +420,43 @@ describe('importExport', () => {
         });
       }
     }
+  });
+
+  it('round-trips inline capsule working copies through pipeline export', () => {
+    const file = exportPipeline(makeInlineCapsulePipeline(), [makeCapsule()]);
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+
+    const step = parsed.pipeline.steps[0];
+    expect(step?.config.type).toBe('capsule-instance');
+    if (step?.config.type !== 'capsule-instance') return;
+    expect(step.config.displayMode).toBe('inline');
+    expect(step.config.inlineModified).toBe(true);
+    expect(step.config.inlineSteps?.[0]?.id).toBe('inline-model');
+  });
+
+  it('detects and remaps model references inside inline capsule steps', () => {
+    const file = exportPipeline(makeInlineCapsulePipeline(), [makeCapsule()]);
+    const parsed = parsePipelineExport(file);
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+    const preview = previewPipelineImport(parsed, localCtx);
+    if ('errors' in preview) throw new Error(preview.errors.join(', '));
+    expect(preview.missingModels.some((m) => m.key === 'inline-model')).toBe(true);
+
+    const remapped = prepareImportedPipeline(parsed.pipeline, 'pipe-inline-imported', {
+      'inline-model': {endpointId: 'ep-local', modelName: 'llama3:latest'},
+    });
+    const step = remapped.steps[0];
+    expect(step?.config.type).toBe('capsule-instance');
+    if (step?.config.type !== 'capsule-instance') return;
+    const inner = step.config.inlineSteps?.[0];
+    expect(inner?.config.type).toBe('model-call');
+    if (inner?.config.type !== 'model-call') return;
+    expect(inner.config.modelRef).toEqual({
+      kind: 'fixed',
+      endpointId: 'ep-local',
+      modelName: 'llama3:latest',
+    });
   });
 
   it('exports and imports a capsule file', () => {

@@ -627,8 +627,12 @@ async function executeCapsuleStep(
     return {ok: false, error: {code: 'missing_capsule', message: `Capsule not found: ${capsuleId} ${capsuleVersion}`, nodeId: step.id}};
   }
 
-  if (capsule.steps && capsule.steps.length > 0) {
-    return executeCapsuleStepChain(step, capsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
+  const executionCapsule = step.config.displayMode === 'inline' && step.config.inlineSteps?.length
+    ? {...capsule, steps: step.config.inlineSteps}
+    : capsule;
+
+  if (executionCapsule.steps && executionCapsule.steps.length > 0) {
+    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, resolveEndpointForModel);
   }
 
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};

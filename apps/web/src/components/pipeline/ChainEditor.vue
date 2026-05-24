@@ -142,6 +142,15 @@
                   >
                     <StepIcon name="message-square" />
                   </button>
+                  <button
+                    v-if="step.config.type === 'capsule-instance' && step.config.displayMode !== 'inline'"
+                    class="inline-action-btn"
+                    type="button"
+                    title="Spread this Capsule into editable inline steps"
+                    @click.stop="$emit('spread-capsule', step.id)"
+                  >
+                    Edit inline
+                  </button>
                 </div>
               </div>
 
@@ -167,6 +176,8 @@
                   >{{ stepRunUiStateLabel(runStateFor(step.id)!) }}</span>
                 </span>
                 <span v-if="!step.enabled" class="step-disabled-badge">disabled</span>
+                <span v-if="capsuleSourceChanged(step.id)" class="step-capsule-status source-changed">source changed</span>
+                <span v-if="inlineModified(step.id)" class="step-capsule-status inline-modified">modified</span>
               </div>
 
               <div v-if="step.config.type === 'loop-group'" class="loop-group-body">
@@ -198,6 +209,37 @@
                   </li>
                 </ol>
                 <p class="loop-prev-hint">On retry: <code>loop.prev.text</code> = previous iteration's verifier output</p>
+              </div>
+
+              <div v-if="step.config.type === 'capsule-instance' && step.config.displayMode === 'inline'" class="capsule-inline-body">
+                <div class="capsule-inline-banner">
+                  <span class="capsule-inline-icon">Capsule</span>
+                  <span class="capsule-inline-title">{{ step.label }}</span>
+                  <span class="capsule-inline-version">{{ step.config.capsuleVersion }}</span>
+                  <span v-if="step.config.inlineModified" class="capsule-inline-modified-badge">modified</span>
+                  <div class="capsule-inline-actions">
+                    <button type="button" @click.stop="$emit('collapse-inline-capsule', step.id)">Collapse</button>
+                    <button type="button" @click.stop="$emit('lock-inline-capsule', step.id)">Lock as Capsule</button>
+                    <button type="button" @click.stop="$emit('detach-capsule', step.id)">Detach</button>
+                  </div>
+                </div>
+                <div v-if="!step.config.inlineSteps?.length" class="capsule-inline-empty">
+                  No inline steps
+                </div>
+                <ol v-else class="capsule-inline-step-list">
+                  <li
+                    v-for="(inner, ii) in step.config.inlineSteps"
+                    :key="inner.id"
+                    class="capsule-inline-step-item"
+                    :class="{'capsule-inline-selected': selectedInlineCapsuleInnerStepId === inner.id && selectedStepId === step.id}"
+                    title="Click to configure inline step"
+                    @click.stop="$emit('select-inline-capsule-inner', step.id, inner.id)"
+                  >
+                    <span class="loop-inner-index">{{ ii + 1 }}</span>
+                    <span class="loop-inner-type">{{ stepTypeLabel(inner.type) }}</span>
+                    <span class="capsule-inline-step-label">{{ inner.label }}</span>
+                  </li>
+                </ol>
               </div>
 
               <div v-if="step.description || isCommentExpanded(step.id)" class="step-comment-wrap">
@@ -432,6 +474,7 @@ const props = defineProps<{
   steps: PipelineStep[];
   selectedStepId: string | null;
   selectedLoopInnerStepId?: string | null;
+  selectedInlineCapsuleInnerStepId?: string | null;
   selectionRange?: {startIndex: number; endIndex: number; stepIds: string[]} | null;
   trace: PipelineTraceEvent[];
   stepStates?: Record<string, StepStaleState>;
@@ -457,6 +500,11 @@ const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() 
 const emit = defineEmits<{
   select: [stepId: string, extendRange?: boolean];
   'select-loop-inner': [loopStepId: string, innerStepId: string];
+  'select-inline-capsule-inner': [capsuleStepId: string, innerStepId: string];
+  'spread-capsule': [stepId: string];
+  'collapse-inline-capsule': [stepId: string];
+  'lock-inline-capsule': [stepId: string];
+  'detach-capsule': [stepId: string];
   'insert-after': [anchorStepId: string];
   'insert-at': [index: number];
   reorder: [stepId: string, targetIndex: number];
@@ -725,6 +773,14 @@ function jsonValidPassed(step: PipelineStep): boolean {
 
 function runStateFor(stepId: string) {
   return props.stepStates?.[stepId]?.state;
+}
+
+function capsuleSourceChanged(stepId: string): boolean {
+  return props.stepStates?.[stepId]?.capsuleSourceChanged ?? false;
+}
+
+function inlineModified(stepId: string): boolean {
+  return props.stepStates?.[stepId]?.inlineModified ?? false;
 }
 
 function outputPreviewValueFor(step: PipelineStep): unknown | null {
@@ -1254,6 +1310,22 @@ function runStateTitle(stepId: string): string {
 }
 .step-namespace { color: #666; font-family: monospace; }
 .step-disabled-badge { background: #2a2a1a; color: #888; border-radius: 2px; padding: 0 4px; }
+.step-capsule-status {
+  border-radius: 2px;
+  padding: 0 5px;
+  font-size: clamp(0.64rem, 1.25cqh, 0.85rem);
+  text-transform: lowercase;
+}
+.step-capsule-status.source-changed {
+  background: #2a2418;
+  color: #d0a85a;
+  border: 1px solid #4a3d1a;
+}
+.step-capsule-status.inline-modified {
+  background: #21182a;
+  color: #c6b4d8;
+  border: 1px solid #3a3245;
+}
 .step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
 .step-badge { font-size: clamp(0.74rem, 1.45cqh, 1rem); padding: 1px 6px; border-radius: 2px; }
 .step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
@@ -1549,6 +1621,25 @@ function runStateTitle(stepId: string): string {
   border-top: 1px solid #2a2510;
   background: #0b0a03;
 }
+.inline-action-btn {
+  grid-column: span 2;
+  min-width: calc(var(--step-action-size) * 2 + 0.35rem);
+  height: var(--step-action-size);
+  border: 1px solid #3a4452;
+  background: #151a20;
+  color: #9fb7d0;
+  border-radius: 4px;
+  padding: 0 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.inline-action-btn:hover {
+  border-color: #4d6680;
+  background: #1a222b;
+  color: #c8d8e8;
+}
 
 /* Loop group inline visualization */
 .loop-group-body {
@@ -1619,6 +1710,86 @@ function runStateTitle(stepId: string): string {
   color: #555;
 }
 .loop-prev-hint code { color: #6a8ab0; font-size: 0.65rem; }
+
+.capsule-inline-body {
+  margin: 0.45rem 0 0.2rem;
+  padding: 0.55rem 0.65rem;
+  background: #111316;
+  border: 1px solid #333842;
+  border-left: 3px solid #8e6db2;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.capsule-inline-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  color: #c6b4d8;
+  font-size: clamp(0.72rem, 1.4cqh, 0.88rem);
+}
+.capsule-inline-icon {
+  color: #b78bd8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.capsule-inline-title { color: #ddd; }
+.capsule-inline-version {
+  color: #8b7a9c;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+.capsule-inline-modified-badge {
+  padding: 1px 6px;
+  background: #2a2418;
+  color: #d0a85a;
+  border-radius: 3px;
+  font-size: 0.64rem;
+}
+.capsule-inline-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.capsule-inline-actions button {
+  border: 1px solid #3a3245;
+  background: #17131c;
+  color: #c6b4d8;
+  border-radius: 4px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.capsule-inline-actions button:hover {
+  border-color: #5a4770;
+  background: #21182a;
+}
+.capsule-inline-empty { font-size: 0.78rem; color: #555; margin: 0; }
+.capsule-inline-step-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.capsule-inline-step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: #0e0f12;
+  border: 1px solid #25262c;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: clamp(0.75rem, 1.45cqh, 0.92rem);
+}
+.capsule-inline-step-item:hover { border-color: #4a3f5a; background: #15121a; }
+.capsule-inline-selected { border-color: #7d5aa0; background: #1d1628; }
+.capsule-inline-step-label { flex: 1; color: #ccc; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @container (max-width: 620px) {
   .chain-scroll {

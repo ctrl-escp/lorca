@@ -70,7 +70,7 @@
           :step-id="selectedInnerStep.id"
           :config="selectedInnerStep.prompt"
           :context-steps="contextSteps"
-          :loop-group-step-id="loopStepId"
+          :nested-edit-target="{kind: 'loop', parentStepId: loopStepId}"
         />
       </div>
     </template>

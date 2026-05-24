@@ -110,6 +110,8 @@ export interface StepStaleState {
   stepId: string;
   state: StepRunUiState;
   blockReasons?: string[];
+  capsuleSourceChanged?: boolean;
+  inlineModified?: boolean;
 }
 
 export interface RunSnapshotContext {
@@ -122,7 +124,7 @@ export interface RunSnapshotContext {
   rerunSingleStepId?: string;
 }
 
-function isCapsuleDefinitionStale(
+function isCapsuleSourceChanged(
   step: PipelineStep,
   resolveCapsule?: CapsuleSignatureResolver,
 ): boolean {
@@ -132,6 +134,17 @@ function isCapsuleDefinitionStale(
   const capsule = resolveCapsule(step.config.capsuleId, step.config.capsuleVersion);
   if (!capsule) return true;
   return computeCapsuleContentSignature(capsule) !== bound;
+}
+
+function capsuleStateExtras(
+  step: PipelineStep,
+  resolveCapsule?: CapsuleSignatureResolver,
+): Pick<StepStaleState, 'capsuleSourceChanged' | 'inlineModified'> {
+  if (step.config.type !== 'capsule-instance') return {};
+  return {
+    ...(isCapsuleSourceChanged(step, resolveCapsule) ? {capsuleSourceChanged: true} : {}),
+    ...(step.config.displayMode === 'inline' && step.config.inlineModified ? {inlineModified: true} : {}),
+  };
 }
 
 function isDirectlyStale(
@@ -145,7 +158,9 @@ function isDirectlyStale(
   const userSig = computeUserPromptSignature(userPromptRaw);
   if (userSig !== runUserPromptSignature) return true;
 
-  if (isCapsuleDefinitionStale(step, resolveCapsule)) return true;
+  if (step.config.type === 'capsule-instance' && step.config.displayMode !== 'inline') {
+    if (isCapsuleSourceChanged(step, resolveCapsule)) return true;
+  }
 
   const configSig = computeStepConfigSignature(step);
   if (configSig !== snapshot.configSignature) return true;
@@ -173,12 +188,13 @@ export function computeStepStaleStates(
 ): StepStaleState[] {
   if (!runContext) {
     return pipeline.steps.map((step) => {
-      if (!step.enabled) return {stepId: step.id, state: 'disabled'};
+      const extras = capsuleStateExtras(step, resolveCapsule);
+      if (!step.enabled) return {stepId: step.id, state: 'disabled', ...extras};
       const blockReasons = getStepBlockReasons(step, pipeline.steps);
       if (blockReasons.length > 0) {
-        return {stepId: step.id, state: 'blocked', blockReasons};
+        return {stepId: step.id, state: 'blocked', blockReasons, ...extras};
       }
-      return {stepId: step.id, state: step.enabled ? 'not-run' : 'disabled'};
+      return {stepId: step.id, state: step.enabled ? 'not-run' : 'disabled', ...extras};
     });
   }
 
@@ -199,7 +215,7 @@ export function computeStepStaleStates(
       step.id,
       snapshot
         ? isDirectlyStale(step, snapshot, pipeline, userPromptRaw, userPromptSignature, resolveCapsule)
-        : isCapsuleDefinitionStale(step, resolveCapsule),
+        : step.config.type === 'capsule-instance' && step.config.displayMode !== 'inline' && isCapsuleSourceChanged(step, resolveCapsule),
     );
   }
 
@@ -212,19 +228,20 @@ export function computeStepStaleStates(
   }
 
   return pipeline.steps.map((step) => {
-    if (!step.enabled) return {stepId: step.id, state: 'disabled'};
+    const extras = capsuleStateExtras(step, resolveCapsule);
+    if (!step.enabled) return {stepId: step.id, state: 'disabled', ...extras};
 
     const blockReasons = getStepBlockReasons(step, pipeline.steps);
     if (blockReasons.length > 0) {
-      return {stepId: step.id, state: 'blocked', blockReasons};
+      return {stepId: step.id, state: 'blocked', blockReasons, ...extras};
     }
 
     if (partial && !executedSet.has(step.id)) {
-      return {stepId: step.id, state: 'skipped-partial'};
+      return {stepId: step.id, state: 'skipped-partial', ...extras};
     }
 
     const snapshot = snapshots[step.id];
-    if (!snapshot) return {stepId: step.id, state: 'not-run'};
+    if (!snapshot) return {stepId: step.id, state: 'not-run', ...extras};
 
     const activeIdx = activeSteps.findIndex((s) => s.id === step.id);
     const staleByChain = chainStaleFrom !== null && activeIdx >= 0 && activeIdx >= chainStaleFrom;
@@ -232,10 +249,10 @@ export function computeStepStaleStates(
     const stale = directlyStale.get(step.id) || staleByChain || staleByRerun;
 
     if (snapshot.status === 'failed') {
-      return {stepId: step.id, state: stale ? 'failed-stale' : 'failed-current'};
+      return {stepId: step.id, state: stale ? 'failed-stale' : 'failed-current', ...extras};
     }
 
-    return {stepId: step.id, state: stale ? 'stale' : 'current'};
+    return {stepId: step.id, state: stale ? 'stale' : 'current', ...extras};
   });
 }
 

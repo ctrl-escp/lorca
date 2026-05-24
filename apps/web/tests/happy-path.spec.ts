@@ -207,9 +207,7 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   nextCapsulePromptName = 'Mid Steps Capsule';
   await selectStep(page, 'Intent Extraction');
   await stepCard(page, 'Acceptance Criteria').click({modifiers: ['Shift']});
-  await page.getByRole('button', {name: 'Extract to Capsule'}).click();
-  await expect(page.getByRole('button', {name: '← Pipeline'})).toBeVisible({timeout: 5000});
-  await page.getByRole('button', {name: '← Pipeline'}).click();
+  await page.getByRole('button', {name: 'Lock as Capsule'}).click();
   await expect(stepCard(page, 'Mid Steps Capsule')).toBeVisible();
   await expect(stepCard(page, 'Intent Extraction')).not.toBeVisible();
   await expect(stepCard(page, 'Model Call')).toBeVisible();
@@ -290,9 +288,7 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   await page.locator('select:has(option:has-text("select model"))').selectOption({index: 1});
 
   nextCapsulePromptName = 'Happy Path Capsule';
-  await page.getByRole('button', {name: 'Convert to Capsule'}).click();
-  await expect(page.getByRole('button', {name: '← Pipeline'})).toBeVisible({timeout: 5000});
-  await page.getByRole('button', {name: '← Pipeline'}).click();
+  await page.getByRole('button', {name: 'Lock as Capsule'}).click();
   await expect(stepCard(page, 'Happy Path Capsule')).toBeVisible();
 
   await page.getByTitle('Start a new empty pipeline').click();
