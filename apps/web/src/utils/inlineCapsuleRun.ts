@@ -1,4 +1,4 @@
-import type {PipelineStep} from '@lorca/core';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 
 export interface InlineCapsuleRunScope {
   capsuleStepId: string;
@@ -44,4 +44,29 @@ export function inlineCapsuleTraceStepLabels(steps: readonly PipelineStep[]): Re
     }
   }
   return labels;
+}
+
+/** Restore slot model refs on inline steps when the saved capsule body still uses slots. */
+export function reconcileInlineCapsuleSlotRefs(
+  capsule: CapsuleDefinition,
+  inlineSteps: readonly PipelineStep[],
+): PipelineStep[] {
+  const savedById = new Map((capsule.steps ?? []).map((s) => [s.id, s]));
+  let changed = false;
+  const next = inlineSteps.map((step) => {
+    if (step.config.type !== 'model-call') return step;
+    const saved = savedById.get(step.id);
+    if (saved?.config.type !== 'model-call' || saved.config.modelRef.kind !== 'slot') return step;
+    const savedRef = saved.config.modelRef;
+    if (step.config.modelRef.kind === 'slot' && step.config.modelRef.slotName === savedRef.slotName) {
+      return step;
+    }
+    changed = true;
+    return {
+      ...step,
+      config: {...step.config, modelRef: savedRef},
+      lastEditedAt: new Date().toISOString(),
+    };
+  });
+  return changed ? next : [...inlineSteps];
 }

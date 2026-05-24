@@ -4,6 +4,7 @@ import type {CapsuleDefinition, PipelineDefinition, PipelineStep} from '@lorca/c
 import {computeCapsuleContentSignature} from '@lorca/pipeline';
 import {useCapsulesStore} from '../src/stores/capsules.js';
 import {usePipelineEditorStore} from '../src/stores/pipelineEditor.js';
+import {reconcileInlineCapsuleSlotRefs} from '../src/utils/inlineCapsuleRun.js';
 
 const tables = {
   capsules: new Map<string, CapsuleDefinition>(),
@@ -276,5 +277,74 @@ describe('pipeline editor inline capsule actions', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.message).toContain('loop-group');
+  });
+
+  it('reconciles corrupted inline model overrides back to capsule slot refs on load', () => {
+    const domainStep: PipelineStep = {
+      id: 'domain',
+      type: 'model-call',
+      label: 'domain',
+      enabled: true,
+      outputNamespace: 'domain',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'model-call',
+        modelRef: {kind: 'slot', slotName: 'domain_router'},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
+      },
+    };
+    const cap: CapsuleDefinition = {
+      ...capsule(),
+      id: 'cap-slots',
+      interface: {
+        inputs: [],
+        outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'domain.text'}],
+        parameters: [],
+        modelSlots: [{name: 'domain_router', suggestedBuckets: ['general'], required: true}],
+      },
+      steps: [domainStep],
+    };
+    useCapsulesStore().addCapsule(cap);
+    const corruptedInner: PipelineStep = {
+      ...domainStep,
+      config: {
+        ...domainStep.config,
+        modelRef: {kind: 'fixed', endpointId: 'ep1', modelName: 'deepseek-coder-v2:16b'},
+      },
+    };
+    const instance: PipelineStep = {
+      ...capsuleInstance(cap),
+      config: {
+        type: 'capsule-instance',
+        capsuleId: cap.id,
+        capsuleVersion: cap.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        displayMode: 'inline',
+        inlineModified: true,
+        modelSlotBindings: {
+          domain_router: {kind: 'fixed', endpointId: 'ep1', modelName: 'llama3.2:3b'},
+        },
+        inlineSteps: [corruptedInner],
+        boundContentSignature: computeCapsuleContentSignature(cap),
+      },
+    };
+
+    const editor = usePipelineEditorStore();
+    editor.loadPipeline(pipeline([instance]));
+    const loaded = editor.steps[0]!;
+    expect(loaded.config.type).toBe('capsule-instance');
+    if (loaded.config.type !== 'capsule-instance') return;
+    const inner = loaded.config.inlineSteps?.[0];
+    expect(inner?.config.type).toBe('model-call');
+    if (inner?.config.type !== 'model-call') return;
+    expect(inner.config.modelRef).toEqual({kind: 'slot', slotName: 'domain_router'});
+
+    const reconciled = reconcileInlineCapsuleSlotRefs(cap, [corruptedInner]);
+    expect(reconciled[0]?.config.type).toBe('model-call');
+    if (reconciled[0]?.config.type !== 'model-call') return;
+    expect(reconciled[0].config.modelRef).toEqual({kind: 'slot', slotName: 'domain_router'});
   });
 });

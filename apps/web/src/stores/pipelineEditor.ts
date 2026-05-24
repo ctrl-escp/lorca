@@ -17,6 +17,7 @@ import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
 import {usePipelinesStore} from './pipelines.js';
 import {useCapsulesStore} from './capsules.js';
+import {reconcileInlineCapsuleSlotRefs} from '../utils/inlineCapsuleRun.js';
 
 // ── Default step builders ────────────────────────────────────────────────────
 
@@ -499,9 +500,26 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
+  function reconcileAllInlineCapsuleSlotRefs(pipelineSteps: readonly PipelineStep[]): PipelineStep[] {
+    const capsulesStore = useCapsulesStore();
+    return pipelineSteps.map((step) => {
+      if (step.config.type !== 'capsule-instance' || step.config.displayMode !== 'inline') return step;
+      const inline = step.config.inlineSteps;
+      if (!inline?.length) return step;
+      const capsule = capsulesStore.getCapsule(step.config.capsuleId, step.config.capsuleVersion);
+      if (!capsule?.steps?.length) return step;
+      const reconciled = reconcileInlineCapsuleSlotRefs(capsule, inline);
+      if (JSON.stringify(reconciled) === JSON.stringify(inline)) return step;
+      return {...step, config: {...step.config, inlineSteps: reconciled}};
+    });
+  }
+
   function loadPipeline(def: PipelineDefinition) {
     // cloneForStorage strips Vue reactivity (toRaw + JSON round-trip) before storing
-    pipeline.value = cloneForStorage(def);
+    pipeline.value = cloneForStorage({
+      ...def,
+      steps: reconcileAllInlineCapsuleSlotRefs(def.steps),
+    });
     selectedStepId.value = null;
     selectionAnchorId.value = null;
     selectedLoopInnerStepId.value = null;
@@ -666,9 +684,10 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     if (!capsule) return {ok: false, message: 'Capsule definition not found'};
 
     const before = snapshot();
-    const inlineSteps = step.config.inlineSteps?.length
+    let inlineSteps = step.config.inlineSteps?.length
       ? step.config.inlineSteps
       : JSON.parse(JSON.stringify(toRaw(capsule.steps ?? []))) as PipelineStep[];
+    inlineSteps = reconcileInlineCapsuleSlotRefs(capsule, inlineSteps);
     updateStepConfig(stepId, {
       config: {
         ...step.config,

@@ -88,6 +88,7 @@ import {useCapsulesStore} from '../../stores/capsules.js';
 import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {bindingsFromSlotKeys, slotKeysFromBindings} from '../../utils/modelAutoSelect.js';
+import {reconcileInlineCapsuleSlotRefs} from '../../utils/inlineCapsuleRun.js';
 import {FieldLabel} from '@lorca/ui-kit';
 import CapsuleModelSlotFields from '../shared/CapsuleModelSlotFields.vue';
 
@@ -155,12 +156,17 @@ function onCapsuleSelect() {
 
 function onSlotAssignmentsUpdate(keys: Record<string, string>) {
   localSlotKeys.value = keys;
-  editorStore.commitStepConfigEdit(props.step.id, {
-    config: {
-      ...props.step.config,
-      modelSlotBindings: bindingsFromSlotKeys(keys),
-    },
-  }, 'Update Capsule model slots');
+  const nextConfig: CapsuleInstanceStepConfig = {
+    ...props.step.config,
+    modelSlotBindings: bindingsFromSlotKeys(keys),
+  };
+  if (props.step.config.displayMode === 'inline' && props.step.config.inlineSteps?.length) {
+    const cap = resolvedCapsule.value;
+    if (cap) {
+      nextConfig.inlineSteps = reconcileInlineCapsuleSlotRefs(cap, props.step.config.inlineSteps);
+    }
+  }
+  editorStore.commitStepConfigEdit(props.step.id, {config: nextConfig}, 'Update Capsule model slots');
 }
 
 function beginBindingsEdit() {
