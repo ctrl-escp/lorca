@@ -31,6 +31,7 @@
               </div>
               <div class="type-group-actions">
                 <button
+                  v-if="isPipelineContext"
                   class="btn-insert-suggestion"
                   type="button"
                   title="Insert a blank step of this type"
@@ -74,12 +75,12 @@
                     <span class="suggestion-row-category">{{ suggestion.category }}</span>
                   </div>
                   <span class="suggestion-row-desc">{{ suggestion.description }}</span>
-                  <div class="suggestion-row-actions">
+                  <div v-if="isPipelineContext" class="suggestion-row-actions">
                     <button
                       class="btn-insert-suggestion"
                       type="button"
                       title="Insert before selected step"
-                      :disabled="!isPipelineContext || !editorStore.selectedStepId"
+                      :disabled="!editorStore.selectedStepId"
                       @click.stop="onInsertSuggestion(suggestion, 'before')"
                     >↑ Before</button>
                     <button
@@ -177,6 +178,7 @@
               </span>
             </div>
             <button
+              v-if="isPipelineContext"
               class="btn-insert-capsule"
               type="button"
               title="Insert Capsule instance into pipeline"
@@ -642,6 +644,7 @@ function onSuggestionDragEnd() {
 }
 
 function onInsertStepType(type: StepType) {
+  if (!isPipelineContext.value) return;
   let step = editorStore.buildDefaultStep(type);
   const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
   const enabledModels = modelsStore.models.filter((m) => m.enabled !== false && !disabledEpIds.has(m.endpointId));
