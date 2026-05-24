@@ -110,7 +110,7 @@ function handleImport() {
   border-radius: 4px; color: #a8d8a8; font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
   font-size: 0.75rem; padding: 0.6rem; resize: vertical; line-height: 1.5;
 }
-.json-input:focus { outline: none; border-color: #2a5070; }
+.json-input:focus { outline: none; border-color: var(--accent-border); }
 .option-row {
   display: flex; align-items: center; gap: 0.45rem;
   font-size: 0.78rem; color: #bbb; user-select: none;
@@ -134,7 +134,7 @@ function handleImport() {
 }
 .btn-file:hover { background: #222; color: #e8e8e8; }
 .btn-file input { display: none; }
-.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-primary:hover:not(:disabled) { background: #254a62; }
+.btn-primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-bg-hover); }
 .btn-primary:disabled { opacity: 0.4; cursor: default; }
 </style>

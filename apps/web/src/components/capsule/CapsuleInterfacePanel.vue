@@ -3,7 +3,7 @@
     <!-- Inputs -->
     <section class="iface-section">
       <div class="iface-section-header">
-        <span class="iface-section-title" title="Values passed into this Capsule from the parent pipeline">Inputs</span>
+        <span class="iface-section-title hdr-input" title="Values passed into this Capsule from the parent pipeline">Inputs</span>
         <button class="icon-btn" title="Add an input port" @click="addInput">+</button>
       </div>
       <div v-for="(port, i) in localInputs" :key="i" class="port-row">
@@ -23,7 +23,7 @@
     <!-- Outputs -->
     <section class="iface-section">
       <div class="iface-section-header">
-        <span class="iface-section-title" title="Values this Capsule exposes back to the parent pipeline">Outputs</span>
+        <span class="iface-section-title hdr-output" title="Values this Capsule exposes back to the parent pipeline">Outputs</span>
         <button class="icon-btn" title="Add an output port" @click="addOutput">+</button>
       </div>
       <div v-for="(port, i) in localOutputs" :key="i" class="port-row">
@@ -40,7 +40,7 @@
     <!-- Parameters -->
     <section class="iface-section">
       <div class="iface-section-header">
-        <span class="iface-section-title" title="Configurable values callers can set when using this Capsule">Parameters</span>
+        <span class="iface-section-title hdr-config" title="Configurable values callers can set when using this Capsule">Parameters</span>
         <button class="icon-btn" title="Add a parameter" @click="addParam">+</button>
       </div>
       <div v-for="(param, i) in localParams" :key="i" class="port-row">
@@ -62,7 +62,7 @@
     <!-- Model Slots -->
     <section class="iface-section">
       <div class="iface-section-header">
-        <span class="iface-section-title" title="Model placeholders filled in by the caller at runtime">Model Slots</span>
+        <span class="iface-section-title hdr-model" title="Model placeholders filled in by the caller at runtime">Model Slots</span>
         <button class="icon-btn" title="Add a model slot" @click="addSlot">+</button>
       </div>
       <div v-for="(slot, i) in localSlots" :key="i" class="slot-row">
@@ -122,7 +122,7 @@ function removeSlot(i: number) { localSlots.value.splice(i, 1); emitUpdate(); }
 .interface-panel { padding: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; height: 100%; }
 .iface-section { background: #111; border: 1px solid #222; border-radius: 5px; padding: 0.5rem; }
 .iface-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-.iface-section-title { font-size: 0.72rem; font-weight: 600; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.05em; cursor: help; }
+.iface-section-title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; cursor: help; }
 .port-row, .slot-row { display: flex; gap: 0.3rem; align-items: center; margin-bottom: 0.25rem; }
 .port-row input, .slot-row input { flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; }
 .port-row select { background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 4px; font-size: 0.78rem; }

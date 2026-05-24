@@ -252,14 +252,14 @@ const JsonNode: Component = defineComponent({
 }
 
 .jv-tool:hover {
-  border-color: #3a6080;
+  border-color: var(--accent-border);
   color: #c8d8e0;
 }
 
 .jv-tool.active {
-  background: #1a2430;
-  border-color: #2a4a6a;
-  color: #7ec8e3;
+  background: var(--accent-bg-muted);
+  border-color: var(--accent-border-muted);
+  color: var(--accent);
 }
 
 .jv-copy {
@@ -318,7 +318,7 @@ const JsonNode: Component = defineComponent({
   width: 1.1rem;
 }
 
-.jv-key { color: #7ec8e3; }
+.jv-key { color: var(--accent); }
 .jv-string { color: #98c379; }
 .jv-number { color: #d19a66; }
 .jv-bool { color: #e06c75; }

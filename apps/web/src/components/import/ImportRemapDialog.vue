@@ -200,7 +200,7 @@ select {
   font-size: 0.82rem;
 }
 select option.option-relevant {
-  color: #7ec8e3;
+  color: var(--accent);
   background: #0d1e30;
 }
 .dialog-footer {
@@ -218,6 +218,6 @@ select option.option-relevant {
   border: 1px solid #333;
 }
 .btn-secondary { background: #1a1a1a; color: #ccc; }
-.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
+.btn-primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
 .btn-primary:disabled { opacity: 0.4; cursor: default; }
 </style>

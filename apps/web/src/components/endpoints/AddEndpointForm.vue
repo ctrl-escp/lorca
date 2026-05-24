@@ -105,6 +105,6 @@ function submit() {
 .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }
 .btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ccc; border-radius: 4px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; }
 .btn:hover { background: #333; }
-.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-primary:hover { background: #254a62; }
+.btn-primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-primary:hover { background: var(--accent-bg-hover); }
 </style>

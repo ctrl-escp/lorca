@@ -67,6 +67,6 @@ function onMouseDown(e: MouseEvent) {
 .pane-resize-handle:active::after {
   left: 1px;
   width: 3px;
-  background: #3a6080;
+  background: var(--accent-border);
 }
 </style>

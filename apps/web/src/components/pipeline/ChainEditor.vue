@@ -156,19 +156,19 @@
 
               <div class="step-meta">
                 <span v-if="step.type === 'model-call' && step.config.type === 'model-call' && step.config.modelRef.kind !== 'slot'" class="step-meta-item">
-                  <span class="step-meta-label">Model</span>
+                  <span class="step-meta-label hdr-model">Model</span>
                   <span class="step-model">{{ step.config.modelRef.modelName || '— no model —' }}{{ step.config.modelRef.kind === 'any-enabled-endpoint' ? ' (any enabled endpoint)' : '' }}</span>
                 </span>
                 <span class="step-meta-item">
-                  <span class="step-meta-label">Outputs</span>
+                  <span class="step-meta-label hdr-output">Outputs</span>
                   <span class="step-namespace">{{ step.outputNamespace }}.*</span>
                 </span>
                 <span v-if="historyReadCount(step) > 0" class="step-meta-item">
-                  <span class="step-meta-label">History reads</span>
+                  <span class="step-meta-label hdr-history">History reads</span>
                   <span class="step-history-badge" :title="`${historyReadCount(step)} history read(s)`">{{ historyReadCount(step) }}</span>
                 </span>
                 <span v-if="runStateFor(step.id)" class="step-meta-item">
-                  <span class="step-meta-label">Result</span>
+                  <span class="step-meta-label hdr-trace">Result</span>
                   <span
                     class="step-run-badge"
                     :class="`run-${runStateFor(step.id)}`"
@@ -213,7 +213,7 @@
 
               <div v-if="step.config.type === 'capsule-instance' && step.config.displayMode === 'inline'" class="capsule-inline-body">
                 <div class="capsule-inline-banner">
-                  <span class="capsule-inline-icon">Capsule</span>
+                  <span class="capsule-inline-icon hdr-capsule">Capsule</span>
                   <span class="capsule-inline-title">{{ step.label }}</span>
                   <span class="capsule-inline-version">{{ step.config.capsuleVersion }}</span>
                   <span v-if="step.config.inlineModified" class="capsule-inline-modified-badge">modified</span>
@@ -270,7 +270,7 @@
               </div>
 
               <div v-if="sourceBadgesByStepId[step.id]?.length" class="step-source-badges" aria-label="Step data sources">
-                <span class="step-source-label">From</span>
+                <span class="step-source-label hdr-input">From</span>
                 <span
                   v-for="source in sourceBadgesByStepId[step.id]"
                   :key="source.key"
@@ -284,11 +284,11 @@
 
               <div v-if="traceFor(step.id)" class="step-trace">
                 <span class="step-meta-item">
-                  <span class="step-meta-label">Execution status</span>
+                  <span class="step-meta-label hdr-trace">Execution status</span>
                   <span :class="`status-${traceFor(step.id)!.status}`">{{ traceFor(step.id)!.status }}</span>
                 </span>
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-meta-item">
-                  <span class="step-meta-label">Duration</span>
+                  <span class="step-meta-label hdr-config">Duration</span>
                   <span class="step-duration">{{ formatDurationMs(traceFor(step.id)!.durationMs!) }}</span>
                 </span>
               </div>
@@ -302,7 +302,7 @@
                   @click.stop="toggleStepOutput(step.id)"
                 >
                   <span class="step-output-toggle-indicator">{{ isStepOutputCollapsed(step.id) ? '+' : '-' }}</span>
-                  <span class="step-output-preview-label">Output preview</span>
+                  <span class="step-output-preview-label hdr-output">Output preview</span>
                 </button>
                 <JsonViewer
                   v-if="!isStepOutputCollapsed(step.id)"
@@ -367,7 +367,7 @@
 
         <!-- Final output indicator -->
         <div v-if="steps.length > 0" class="chain-output-ref">
-          <span class="output-label">{{ runPartial ? 'Partial output' : 'Output' }}</span>
+          <span class="output-label hdr-output">{{ runPartial ? 'Partial output' : 'Output' }}</span>
           <span class="output-key">{{ finalArtifactKey ?? '(none)' }}</span>
         </div>
 
@@ -1097,9 +1097,9 @@ function runStateTitle(stepId: string): string {
 .chain-step.selected .step-card {
   opacity: 1;
   transform: scale(1);
-  border-color: #2a5070;
+  border-color: var(--accent-border);
   background: #111e2a;
-  box-shadow: 0 0 0 1px #2a5070, 0 6px 18px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 1px var(--accent-border), 0 6px 18px rgba(0,0,0,0.3);
 }
 .chain-step.disabled .step-card { opacity: 0.45; border-style: dashed; }
 
@@ -1150,7 +1150,7 @@ function runStateTitle(stepId: string): string {
 .chain-step:hover .step-drag-handle { color: var(--text-secondary); background: #1c1c1c; }
 .chain-step.selected .step-drag-handle {
   background: #0e1822;
-  border-right-color: #2a5070;
+  border-right-color: var(--accent-border);
   color: #6a9fc8;
 }
 .chain-step.selected:hover .step-drag-handle { background: #152535; color: #8ec8e8; }
@@ -1287,7 +1287,7 @@ function runStateTitle(stepId: string): string {
   padding: 0.5rem 0.75rem;
   font-size: 0.68rem;
   font-weight: 600;
-  color: #7ec8e3;
+  color: var(--accent);
   text-align: center;
   line-height: 1.35;
 }
@@ -1339,7 +1339,7 @@ function runStateTitle(stepId: string): string {
 
 .step-meta { display: flex; gap: 0.55rem 1.25rem; font-size: clamp(0.86rem, 1.7cqh, 1.05rem); color: var(--text-secondary); flex-wrap: wrap; align-items: center; }
 .step-meta-item { display: inline-flex; align-items: center; gap: 0.28rem; min-width: 0; max-width: 100%; }
-.step-meta-label { font-size: clamp(0.6rem, 1.15cqh, 0.75rem); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #3a3a3a; flex-shrink: 0; }
+.step-meta-label { font-size: clamp(0.6rem, 1.15cqh, 0.75rem); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; flex-shrink: 0; }
 .step-model { color: #5a9fd4; }
 .step-model,
 .step-namespace {
@@ -1367,7 +1367,7 @@ function runStateTitle(stepId: string): string {
   color: #c6b4d8;
   border: 1px solid #3a3245;
 }
-.step-history-badge { background: #1a2a3a; color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
+.step-history-badge { background: var(--accent-bg-muted); color: #6a9fc8; border-radius: 2px; padding: 0 4px; font-family: monospace; }
 .step-badge { font-size: clamp(0.74rem, 1.45cqh, 1rem); padding: 1px 6px; border-radius: 2px; }
 .step-badge-warn { background: #2a1a0a; color: #e8a020; border: 1px solid #5a3810; }
 .step-badge-model-off { background: #2a2010; color: #c8a030; border: 1px solid #4a3a10; }
@@ -1399,7 +1399,6 @@ function runStateTitle(stepId: string): string {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
 }
 .step-source-badge {
   max-width: min(100%, 18rem);
@@ -1466,7 +1465,6 @@ function runStateTitle(stepId: string): string {
 }
 .step-output-preview-label {
   flex: 1;
-  color: var(--text-label);
   font-size: clamp(0.68rem, 1.35cqh, 0.9rem);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1550,19 +1548,19 @@ function runStateTitle(stepId: string): string {
   border-radius: 5px; width: 100%; max-width: var(--chain-card-max-width); flex-shrink: 0;
   opacity: 0.75;
 }
-.output-label { font-size: 0.65rem; color: var(--text-secondary); }
-.output-key { font-size: 0.72rem; color: #7ec8e3; font-family: monospace; }
+.output-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.output-key { font-size: 0.72rem; color: var(--accent); font-family: monospace; }
 
 .btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: var(--text-label); border-radius: 4px; cursor: pointer; }
 .btn-sm { padding: 3px 9px; font-size: 0.72rem; }
 .btn:hover:not(:disabled) { background: #222; color: #ccc; border-color: #3a3a3a; }
 .btn:disabled { opacity: 0.35; cursor: default; }
-.btn-accent { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-accent:hover:not(:disabled) { background: #254a62; color: #a8dff5; }
+.btn-accent { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-accent:hover:not(:disabled) { background: var(--accent-bg-hover); color: #a8dff5; }
 .btn-capsule { border-color: #2a3d52; color: #5a9fd4; }
-.btn-capsule:hover:not(:disabled) { background: #1a2a3a; }
-.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-primary:hover:not(:disabled) { background: #254a62; color: #a8dff5; }
+.btn-capsule:hover:not(:disabled) { background: var(--accent-bg-muted); }
+.btn-primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-bg-hover); color: #a8dff5; }
 .btn-ghost { background: none; border-color: transparent; color: var(--text-secondary); }
 .btn-ghost:hover:not(:disabled) { background: #1a1a1a; color: var(--text-label); border-color: #333; }
 
@@ -1702,7 +1700,7 @@ function runStateTitle(stepId: string): string {
   font-size: clamp(0.72rem, 1.4cqh, 0.88rem);
   color: #8ab0d8;
 }
-.loop-group-icon { font-size: 1rem; color: #7ec8e3; }
+.loop-group-icon { font-size: 1rem; color: var(--accent); }
 .loop-group-dot { color: var(--text-muted); }
 .loop-group-exit { color: #9ab8d0; font-family: monospace; font-size: 0.85em; }
 .loop-inner-empty { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
@@ -1731,8 +1729,8 @@ function runStateTitle(stepId: string): string {
 .loop-inner-type {
   font-size: 0.62rem;
   padding: 1px 5px;
-  background: #1a2430;
-  color: #7ec8e3;
+  background: var(--accent-bg-muted);
+  color: var(--accent);
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -1772,7 +1770,6 @@ function runStateTitle(stepId: string): string {
   font-size: clamp(0.72rem, 1.4cqh, 0.88rem);
 }
 .capsule-inline-icon {
-  color: #b78bd8;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;

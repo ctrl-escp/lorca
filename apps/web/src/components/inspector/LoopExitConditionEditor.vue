@@ -37,7 +37,7 @@
     </template>
 
     <div class="exit-summary">
-      <span class="exit-summary-label">Summary</span>
+      <span class="exit-summary-label hdr-loop">Summary</span>
       <code class="exit-summary-code">{{ summary }}</code>
     </div>
 
@@ -142,15 +142,15 @@ defineExpose({loopExitPresetLabel});
   display: flex; flex-direction: column; gap: 0.2rem;
   padding: 0.45rem 0.55rem; background: #111; border: 1px solid #252525; border-radius: 4px;
 }
-.exit-summary-label { font-size: 0.68rem; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.04em; }
-.exit-summary-code { font-size: 0.78rem; color: #7ec8e3; }
+.exit-summary-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+.exit-summary-code { font-size: 0.78rem; color: var(--accent); }
 .loop-help {
   font-size: 0.72rem; color: var(--text-label); border: 1px solid #222; border-radius: 4px; padding: 0.35rem 0.55rem;
 }
 .loop-help summary { cursor: pointer; color: var(--text-secondary); }
 .loop-help ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
 .loop-help li { margin-bottom: 0.25rem; }
-.loop-help code { color: #7ec8e3; font-size: 0.7rem; }
+.loop-help code { color: var(--accent); font-size: 0.7rem; }
 .inspector-field { display: flex; flex-direction: column; gap: 0.25rem; }
 input, select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;

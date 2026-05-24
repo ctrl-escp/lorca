@@ -78,9 +78,9 @@ function dismiss() {
   white-space: pre-wrap;
   word-break: break-all;
 }
-.cors-banner-link { color: #7ec8e3; }
+.cors-banner-link { color: var(--accent); }
 .cors-banner-link:hover { color: #a8dff0; }
-code { font-family: monospace; font-size: 0.78rem; color: #7ec8e3; }
+code { font-family: monospace; font-size: 0.78rem; color: var(--accent); }
 .cors-banner-dismiss {
   flex-shrink: 0;
   background: none;

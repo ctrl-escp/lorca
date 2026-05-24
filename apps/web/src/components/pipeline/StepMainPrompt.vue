@@ -181,7 +181,7 @@ function commit() {
 }
 .step-main-prompt textarea:focus {
   outline: none;
-  border-color: #3a6080;
+  border-color: var(--accent-border);
 }
 .step-main-prompt-hint p {
   margin: 0;

@@ -120,10 +120,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
   color: #e8e8e8; font-size: 0.88rem; font-weight: 500;
   cursor: pointer; padding: 2px 0; max-width: 200px;
 }
-.selector-trigger:hover { border-bottom-color: #3a6080; }
+.selector-trigger:hover { border-bottom-color: var(--accent-border); }
 .selector-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .selector-chevron { font-size: 0.85rem; color: var(--text-secondary); transition: transform 0.15s; flex-shrink: 0; }
-.selector-chevron.open { transform: rotate(90deg); color: #7ec8e3; }
+.selector-chevron.open { transform: rotate(90deg); color: var(--accent); }
 
 .selector-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 300;
@@ -137,7 +137,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
   padding: 6px 10px; cursor: pointer; font-size: 0.82rem;
 }
 .selector-option:hover { background: #222; }
-.selector-option.active { background: #1e2d3d; color: #7ec8e3; }
+.selector-option.active { background: #1e2d3d; color: var(--accent); }
 
 .option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

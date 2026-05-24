@@ -54,8 +54,8 @@ const titleId = computed(() => `confirm-dialog-title-${Math.random().toString(36
 }
 .btn-dialog-cancel { background: #1a1a1a; color: #aaa; }
 .btn-dialog-cancel:hover { background: #222; color: #ccc; }
-.btn-dialog-confirm { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-dialog-confirm:hover { background: #254a62; }
+.btn-dialog-confirm { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-dialog-confirm:hover { background: var(--accent-bg-hover); }
 .btn-dialog-destructive { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-dialog-destructive:hover { background: #3d2222; }
 </style>

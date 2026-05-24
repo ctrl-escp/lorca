@@ -1,7 +1,7 @@
 <template>
   <div class="capsule-slot-fields">
     <div v-if="showAutoSelectAll" class="capsule-slot-header">
-      <span class="capsule-slot-title">{{ headerLabel }}</span>
+      <span class="capsule-slot-title hdr-model">{{ headerLabel }}</span>
       <button
         type="button"
         class="btn btn-secondary btn-auto-all"
@@ -136,9 +136,9 @@ function forceFillAll() {
 }
 .capsule-slot-title {
   font-size: 0.65rem;
-  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  font-weight: 600;
 }
 .capsule-slot-field {
   display: flex;
@@ -162,7 +162,7 @@ function forceFillAll() {
 }
 .model-select-row select:focus {
   outline: none;
-  border-color: #3a6080;
+  border-color: var(--accent-border);
 }
 .btn-autoselect {
   background: #1a1a1a;

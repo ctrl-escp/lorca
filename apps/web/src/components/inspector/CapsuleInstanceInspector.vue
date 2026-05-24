@@ -12,7 +12,7 @@
 
     <template v-if="selectedCapsule">
       <!-- Loop config -->
-      <div class="ci-section-label">Loop</div>
+      <div class="ci-section-label hdr-loop">Loop</div>
       <div class="ci-field-row">
         <label title="Repeat this Capsule instance, carrying output from each iteration into the next">
           <input type="checkbox" v-model="localLoopEnabled" title="Enable iterative execution with carried state" @change="emitConfig" /> Enable loop
@@ -37,7 +37,7 @@
       </template>
 
       <template v-if="selectedCapsule.interface.inputs.length > 0">
-        <div class="ci-section-label">Input bindings</div>
+        <div class="ci-section-label hdr-input">Input bindings</div>
         <div v-for="port in selectedCapsule.interface.inputs" :key="port.name" class="ci-field">
           <label :title="`Pipeline artifact key bound to Capsule input '${port.name}'`">{{ port.name }} <span class="kind-tag">{{ port.kind }}</span></label>
           <input
@@ -51,7 +51,7 @@
       </template>
 
       <template v-if="selectedCapsule.interface.outputs.length > 0">
-        <div class="ci-section-label">Output bindings</div>
+        <div class="ci-section-label hdr-output">Output bindings</div>
         <div v-for="port in selectedCapsule.interface.outputs" :key="port.name" class="ci-field">
           <label :title="`Pipeline artifact key where Capsule output '${port.name}' is stored`">{{ port.name }} <span class="kind-tag">{{ port.kind }}</span></label>
           <input
@@ -65,7 +65,7 @@
       </template>
 
       <template v-if="selectedCapsule.interface.parameters.length > 0">
-        <div class="ci-section-label">Parameter values</div>
+        <div class="ci-section-label hdr-config">Parameter values</div>
         <div v-for="param in selectedCapsule.interface.parameters" :key="param.name" class="ci-field">
           <label :title="`Value for Capsule parameter '${param.name}'`">param: {{ param.name }} <span class="kind-tag">{{ param.kind }}</span></label>
           <input
@@ -79,7 +79,7 @@
       </template>
 
       <template v-if="selectedCapsule.interface.modelSlots.length > 0">
-        <div class="ci-section-label">Model slot assignments</div>
+        <div class="ci-section-label hdr-model">Model slot assignments</div>
         <div v-for="slot in selectedCapsule.interface.modelSlots" :key="slot.name" class="ci-field">
           <FieldLabel :label="slot.name" :required="slot.required" :title="`Model assignment for slot '${slot.name}' (endpointId::modelName)`" />
           <input
@@ -185,7 +185,7 @@ function stringToSlot(value: string): {endpointId: string; modelName: string} {
 .ci-inspector { display: flex; flex-direction: column; gap: 0.5rem; }
 .ci-field-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-label); }
 .ci-field-row label { display: flex; align-items: center; gap: 0.3rem; cursor: help; }
-.ci-section-label { font-size: 0.65rem; color: var(--text-section); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
+.ci-section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; font-weight: 600; }
 .ci-field { display: flex; flex-direction: column; gap: 0.15rem; }
 .ci-field label { font-size: 0.72rem; color: var(--text-label); cursor: help; }
 .kind-tag { font-size: 0.62rem; color: var(--text-secondary); background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
@@ -193,5 +193,5 @@ input, select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 4px; padding: 4px 8px; font-size: 0.82rem; width: 100%;
 }
-input:focus, select:focus { outline: none; border-color: #3a6080; }
+input:focus, select:focus { outline: none; border-color: var(--accent-border); }
 </style>

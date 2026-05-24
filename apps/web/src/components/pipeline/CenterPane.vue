@@ -64,7 +64,7 @@
 
     <!-- User prompt input -->
     <div class="user-prompt-bar">
-      <label class="prompt-label">Prompt</label>
+      <label class="prompt-label hdr-prompt">Prompt</label>
       <textarea
         class="user-prompt-input"
         v-model="userPrompt"
@@ -896,7 +896,7 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
   flex: 1; background: transparent; border: none; color: #e8e8e8;
   font-size: 1rem; font-weight: 500; min-width: 0;
 }
-.pipeline-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
+.pipeline-name:focus { outline: none; border-bottom: 1px solid var(--accent-border); }
 
 .run-controls {
   display: flex; flex: 1 1 auto; gap: 0.4rem; align-items: center;
@@ -908,8 +908,8 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 }
 .execute-controls { flex-shrink: 0; }
 .btn { border-radius: 5px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; border: 1px solid #333; }
-.btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-run:hover:not(:disabled) { background: #254a62; }
+.btn-run { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-run:hover:not(:disabled) { background: var(--accent-bg-hover); }
 .btn-run:disabled { opacity: 0.4; cursor: default; }
 .btn-secondary { background: #1a1a1a; color: #aaa; }
 .btn-secondary:hover { background: #222; color: #ccc; }
@@ -1000,13 +1000,13 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
   display: flex; align-items: flex-start; gap: 0.6rem;
   padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
-.prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); padding-top: 0.35rem; flex-shrink: 0; }
+.prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0.35rem; flex-shrink: 0; font-weight: 600; }
 .user-prompt-input {
   flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 5px;
   color: #ccc; font-size: 0.9rem; padding: 0.5rem 0.65rem; resize: vertical;
   font-family: inherit; line-height: 1.4;
 }
-.user-prompt-input:focus { outline: none; border-color: #2a5070; }
+.user-prompt-input:focus { outline: none; border-color: var(--accent-border); }
 
 @media (max-width: 767px) {
   .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }

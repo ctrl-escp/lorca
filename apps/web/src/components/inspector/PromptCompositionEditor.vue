@@ -34,7 +34,7 @@
     <!-- Previous output -->
     <div class="pce-section">
       <div class="pce-section-header">
-        <span class="pce-section-title">Previous Output</span>
+        <span class="pce-section-title hdr-output">Previous Output</span>
         <label class="pce-toggle-label" title="Include the previous step's primary output in this step's prompt">
           <input type="checkbox" v-model="localPrevEnabled" @change="commitPrev" />
           Include
@@ -65,7 +65,7 @@
     <!-- History inputs -->
     <div class="pce-section">
       <div class="pce-section-header">
-        <span class="pce-section-title">History Inputs</span>
+        <span class="pce-section-title hdr-history">History Inputs</span>
         <button
           class="pce-add-btn"
           type="button"
@@ -187,7 +187,7 @@
     <!-- Prompt blocks -->
     <div class="pce-section">
       <div class="pce-section-header">
-        <span class="pce-section-title">Prompt Blocks</span>
+        <span class="pce-section-title hdr-prompt">Prompt Blocks</span>
         <button class="pce-add-btn" type="button" title="Add a new custom prompt block" @click="addBlock">+ Block</button>
       </div>
 
@@ -245,7 +245,7 @@
     <!-- XML preview -->
     <div class="pce-section">
       <div class="pce-section-header">
-        <span class="pce-section-title">XML Preview</span>
+        <span class="pce-section-title hdr-preview">XML Preview</span>
         <button class="pce-toggle-preview-btn" type="button" @click="showPreview = !showPreview">
           {{ showPreview ? 'Hide' : 'Show' }}
         </button>
@@ -615,7 +615,7 @@ const previewXml = computed(() =>
 .pce-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; }
 .pce-retry-btn {
   font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;
-  background: #1a2430; border: 1px solid #3a5070; color: #8ab8d8;
+  background: var(--accent-bg-muted); border: 1px solid var(--accent-border); color: var(--accent);
 }
 .pce-retry-btn:hover { background: #243040; color: #a8d0f0; }
 .pce-full-prompt-btn {
@@ -625,11 +625,11 @@ const previewXml = computed(() =>
 }
 .pce-full-prompt-btn:hover { background: #222240; color: #b0b0f0; }
 .pce-help-btn {
-  font-size: 0.68rem; padding: 2px 8px; background: #1a2430; border: 1px solid #2a5070;
-  color: #7ec8e3; border-radius: 3px; cursor: pointer;
+  font-size: 0.68rem; padding: 2px 8px; background: var(--accent-bg-muted); border: 1px solid var(--accent-border);
+  color: var(--accent); border-radius: 3px; cursor: pointer;
 }
-.pce-help-btn:hover { background: #254a62; }
-.pce-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-section); }
+.pce-help-btn:hover { background: var(--accent-bg-hover); }
+.pce-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 
 .pce-toggle-label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-label); cursor: pointer; }
 .pce-toggle-label input[type="checkbox"] { width: auto; }
@@ -639,12 +639,12 @@ const previewXml = computed(() =>
 .pce-field-label { font-size: 0.68rem; color: var(--text-label); flex-shrink: 0; width: 4rem; }
 
 .pce-input { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; }
-.pce-input:focus { outline: none; border-color: #3a6080; }
+.pce-input:focus { outline: none; border-color: var(--accent-border); }
 .pce-input.invalid { border-color: #c0392b; }
 .pce-input-sm { flex: 1; }
-.pce-tag-input-inline { font-family: monospace; color: #7ec8e3; }
+.pce-tag-input-inline { font-family: monospace; color: var(--accent); }
 .pce-select { background: #111; border: 1px solid #2a2a2a; color: #e8e8e8; border-radius: 3px; padding: 3px 6px; font-size: 0.78rem; flex: 1; }
-.pce-select:focus { outline: none; border-color: #3a6080; }
+.pce-select:focus { outline: none; border-color: var(--accent-border); }
 
 .pce-add-btn {
   font-size: 0.65rem; padding: 2px 8px;
@@ -692,10 +692,10 @@ const previewXml = computed(() =>
 .pce-block-header input[type="checkbox"] { flex-shrink: 0; }
 
 .pce-tag-input {
-  flex: 1; background: #0d0d0d; border: 1px solid #2a2a2a; color: #7ec8e3;
+  flex: 1; background: #0d0d0d; border: 1px solid #2a2a2a; color: var(--accent);
   border-radius: 3px; padding: 2px 5px; font-size: 0.72rem; font-family: monospace;
 }
-.pce-tag-input:focus { outline: none; border-color: #3a6080; }
+.pce-tag-input:focus { outline: none; border-color: var(--accent-border); }
 .pce-tag-input.invalid { border-color: #c0392b; }
 
 .pce-delete-btn {
@@ -705,22 +705,22 @@ const previewXml = computed(() =>
 
 .pce-improve-btn {
   flex-shrink: 0;
-  background: #1a2430;
-  border: 1px solid #2a5070;
-  color: #7ec8e3;
+  background: var(--accent-bg-muted);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
   border-radius: 3px;
   cursor: pointer;
   font-size: 0.65rem;
   padding: 2px 7px;
 }
-.pce-improve-btn:hover { background: #254a62; color: #a8d8f0; }
+.pce-improve-btn:hover { background: var(--accent-bg-hover); color: #a8d8f0; }
 
 .pce-body {
   width: 100%; background: #0d0d0d; border: 1px solid #222; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.78rem; font-family: monospace;
   resize: vertical; line-height: 1.4; box-sizing: border-box;
 }
-.pce-body:focus { outline: none; border-color: #3a6080; }
+.pce-body:focus { outline: none; border-color: var(--accent-border); }
 
 .pce-toggle-preview-btn {
   font-size: 0.65rem; padding: 1px 6px;

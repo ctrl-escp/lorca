@@ -40,7 +40,7 @@ function escapeHtml(value: string): string {
 }
 
 .xml-preview .xml-punct { color: var(--text-secondary); }
-.xml-preview .xml-tag { color: #7ec8e3; }
+.xml-preview .xml-tag { color: var(--accent); }
 .xml-preview .xml-attr { color: #d19a66; }
 .xml-preview .xml-string { color: #98c379; }
 </style>

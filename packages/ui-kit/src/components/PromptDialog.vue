@@ -72,7 +72,7 @@ function onConfirm() {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 4px; padding: 6px 10px; font-size: 0.88rem; width: 100%;
 }
-.dialog-input:focus { outline: none; border-color: #3a6080; }
+.dialog-input:focus { outline: none; border-color: var(--accent-border); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem; }
 .btn-dialog {
   border-radius: 4px; padding: 5px 14px; font-size: 0.82rem; cursor: pointer;
@@ -80,6 +80,6 @@ function onConfirm() {
 }
 .btn-dialog-cancel { background: #1a1a1a; color: #aaa; }
 .btn-dialog-cancel:hover { background: #222; color: #ccc; }
-.btn-dialog-confirm { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-dialog-confirm:hover { background: #254a62; }
+.btn-dialog-confirm { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-dialog-confirm:hover { background: var(--accent-bg-hover); }
 </style>

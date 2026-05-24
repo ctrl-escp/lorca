@@ -116,7 +116,7 @@ function reset() {
   line-height: 1;
 }
 .bucket-add-btn:hover { color: var(--text-secondary); border-color: var(--text-secondary); }
-.bucket-add-btn.open { color: #7ec8e3; border-color: #2a5070; background: #1e3d52; }
+.bucket-add-btn.open { color: var(--accent); border-color: var(--accent-border); background: var(--accent-bg); }
 
 /* All-buckets picker (shown when expanded) */
 .bucket-all { display: flex; flex-wrap: wrap; gap: 0.25rem; padding-top: 0.15rem; }

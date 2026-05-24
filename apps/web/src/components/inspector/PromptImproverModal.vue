@@ -3,13 +3,13 @@
     <div v-if="open && block" class="pim-backdrop" @click.self="emit('close')">
       <div class="pim-dialog" role="dialog" aria-modal="true" aria-label="AI prompt improver">
         <header class="pim-header">
-          <span class="pim-title">Improve Prompt Block</span>
+          <span class="pim-title hdr-prompt">Improve Prompt Block</span>
           <button class="pim-close" type="button" title="Close" @click="emit('close')">x</button>
         </header>
 
         <div class="pim-body">
           <label class="pim-field">
-            <span>Model</span>
+            <span class="hdr-model">Model</span>
             <select
               v-model="selectedModelKey"
               class="pim-select"
@@ -31,7 +31,7 @@
           </label>
 
           <label class="pim-field">
-            <span>Improvement prompt</span>
+            <span class="hdr-prompt">Improvement prompt</span>
             <textarea
               v-model="instructionText"
               class="pim-textarea"
@@ -54,12 +54,12 @@
           </div>
 
           <div class="pim-original">
-            <span>Current block</span>
+            <span class="hdr-preview">Current block</span>
             <pre>{{ block.body }}</pre>
           </div>
 
           <label v-if="resultText !== null" class="pim-field">
-            <span>Preview</span>
+            <span class="hdr-preview">Preview</span>
             <textarea
               v-model="resultText"
               class="pim-textarea pim-result"
@@ -395,7 +395,7 @@ function applyResult() {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-label);
+  font-weight: 600;
 }
 
 .pim-select,
@@ -412,7 +412,7 @@ function applyResult() {
 .pim-select:focus,
 .pim-textarea:focus {
   outline: none;
-  border-color: #3a6080;
+  border-color: var(--accent-border);
 }
 
 .pim-textarea {
@@ -502,13 +502,13 @@ function applyResult() {
 }
 
 .pim-primary {
-  background: #1e3d52;
-  border-color: #2a5070;
-  color: #7ec8e3;
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .pim-primary:hover:not(:disabled) {
-  background: #254a62;
+  background: var(--accent-bg-hover);
 }
 
 .pim-btn:disabled {

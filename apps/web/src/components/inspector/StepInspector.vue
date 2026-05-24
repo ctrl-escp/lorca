@@ -36,7 +36,7 @@
         <!-- Config -->
         <template v-if="activeTab === 'config'">
           <div class="ns-row">
-            <span class="ns-label" title="Artifact namespace for this step's outputs">namespace</span>
+            <span class="ns-label hdr-config" title="Artifact namespace for this step's outputs">namespace</span>
             <code class="ns-value">{{ effectiveStep?.outputNamespace }}</code>
             <span class="ns-dot">·</span>
             <code class="ns-value">{{ effectiveStep?.primaryOutputName }}</code>
@@ -621,9 +621,9 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .inspector-empty { color: var(--text-muted); font-size: 0.88rem; }
 
 .inspector-header { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
-.step-type-badge { font-size: 0.72rem; padding: 2px 8px; background: #1a2a3a; color: #7ec8e3; border-radius: 4px; flex-shrink: 0; border: 1px solid #2a4a6a; }
+.step-type-badge { font-size: 0.72rem; padding: 2px 8px; background: var(--accent-bg-muted); color: var(--accent); border-radius: 4px; flex-shrink: 0; border: 1px solid var(--accent-border-muted); }
 .step-label-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #2a2a2a; color: #e8e8e8; font-size: 1rem; font-weight: 500; padding: 3px 0; min-width: 0; }
-.step-label-input:focus { outline: none; border-bottom-color: #3a6080; }
+.step-label-input:focus { outline: none; border-bottom-color: var(--accent-border); }
 .step-label-readonly { flex: 1; color: #e8e8e8; font-size: 1rem; font-weight: 500; min-width: 0; }
 .inline-scope-label {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em;
@@ -639,7 +639,7 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
   font-size: 0.78rem; padding: 4px 9px; border-radius: 4px; cursor: pointer;
 }
 .inspector-tab:hover { color: var(--text-tab-hover); }
-.inspector-tab.active { color: #7ec8e3; border-color: #2a4a6a; background: #1a2430; }
+.inspector-tab.active { color: var(--accent); border-color: var(--accent-border-muted); background: var(--accent-bg-muted); }
 
 .inspector-tab-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.65rem; }
 
@@ -663,7 +663,7 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .inspector-split-handle.draggable:active::after {
   top: 1px;
   height: 3px;
-  background: #3a6080;
+  background: var(--accent-border);
 }
 
 .inspector-bottom {
@@ -717,7 +717,7 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 }
 
 .ns-row { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; }
-.ns-label { color: var(--text-section); }
+.ns-label { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; }
 .ns-value { color: #5a8a5a; font-size: 0.75rem; }
 .ns-dot { color: #333; }
 
@@ -760,7 +760,7 @@ input, select, textarea {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 5px; padding: 6px 10px; font-size: 0.88rem; width: 100%;
 }
-input:focus, select:focus, textarea:focus { outline: none; border-color: #3a6080; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-border); }
 textarea { resize: vertical; font-family: monospace; line-height: 1.4; }
 
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; }

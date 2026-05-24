@@ -6,7 +6,7 @@
       <div class="section-header" @click="toggleSection('stepLibrary')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('stepLibrary')" title="Step types and pre-built suggestion templates">
           <span class="chevron" :class="{open: isExpanded('stepLibrary')}">›</span>
-          <span class="section-title">Step library</span>
+          <span class="section-title hdr-library">Step library</span>
         </button>
       </div>
       <div v-if="isExpanded('stepLibrary')" class="section-body">
@@ -111,7 +111,7 @@
 
         <div v-if="isPipelineContext" class="ai-suggestions">
           <div class="ai-suggestions-header">
-            <span class="ai-suggestions-title">AI suggestions</span>
+            <span class="ai-suggestions-title hdr-ai">AI suggestions</span>
             <button
               type="button"
               class="btn-ai-suggest"
@@ -151,7 +151,7 @@
       <div class="section-header" @click="toggleSection('capsules')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('capsules')" title="Your saved reusable mini-pipelines">
           <span class="chevron" :class="{open: isExpanded('capsules')}">›</span>
-          <span class="section-title">Capsules <span class="section-count">({{ visibleCapsules.length }})</span></span>
+          <span class="section-title hdr-capsule">Capsules <span class="section-count">({{ visibleCapsules.length }})</span></span>
         </button>
         <div class="section-actions" @click.stop>
           <button class="icon-btn" @click="onImportCapsule" title="Import a Capsule from a JSON file">↓</button>
@@ -201,7 +201,7 @@
       <div class="section-header" @click="toggleSection('models')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('models')" title="Discovered and manually added models available for pipeline steps">
           <span class="chevron" :class="{open: isExpanded('models')}">›</span>
-          <span class="section-title">Models <span class="section-count">({{ modelsStore.models.length }})</span></span>
+          <span class="section-title hdr-model">Models <span class="section-count">({{ modelsStore.models.length }})</span></span>
         </button>
         <button class="icon-btn" :class="{active: showAddModel}" :disabled="endpointsStore.endpoints.length === 0" title="Add model manually" @click.stop="openAddModel">+</button>
       </div>
@@ -246,7 +246,7 @@
       <div class="section-header" @click="toggleSection('endpoints')">
         <button type="button" class="section-toggle" :aria-expanded="isExpanded('endpoints')" title="AI server connections">
           <span class="chevron" :class="{open: isExpanded('endpoints')}">›</span>
-          <span class="section-title">Endpoints <span class="section-count">({{ endpointsStore.endpoints.length }})</span></span>
+          <span class="section-title hdr-endpoint">Endpoints <span class="section-count">({{ endpointsStore.endpoints.length }})</span></span>
         </button>
         <button class="icon-btn" :class="{active: showAddEndpoint}" title="Add a new AI endpoint" @click.stop="openAddEndpoint">+</button>
       </div>
@@ -787,9 +787,9 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 }
 
 .chevron { display: inline-block; font-size: 1.1rem; color: var(--text-secondary); transition: transform 0.15s; width: 1rem; flex-shrink: 0; }
-.chevron.open { transform: rotate(90deg); color: #7ec8e3; }
+.chevron.open { transform: rotate(90deg); color: var(--accent); }
 
-.section-title { font-size: 1rem; font-weight: 700; color: #bbb; letter-spacing: 0.01em; }
+.section-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.01em; }
 .section-count { font-weight: 500; color: var(--text-secondary); }
 
 .section-actions { display: flex; gap: 0.35rem; }
@@ -799,7 +799,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .icon-btn { background: none; border: 1px solid #333; color: var(--text-label); border-radius: 5px; width: 36px; height: 36px; cursor: pointer; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .icon-btn:hover:not(:disabled) { background: #222; color: #ccc; }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
-.icon-btn.active { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
+.icon-btn.active { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
 
 .ep-list, .model-list, .capsule-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
@@ -814,13 +814,13 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 .capsule-row-meta { font-size: 0.78rem; color: var(--text-secondary); }
 .capsule-status { font-size: 0.72rem; padding: 1px 5px; border-radius: 3px; }
 .cs-draft { color: #c8a050; }
-.cs-locked { color: #7ec8e3; background: #1a2a3a; border: 1px solid #2a4a6a; }
+.cs-locked { color: var(--accent); background: var(--accent-bg-muted); border: 1px solid var(--accent-border-muted); }
 .btn-insert-capsule {
   flex-shrink: 0;
   font-size: 0.82rem;
   padding: 6px 11px;
-  background: #1a2430;
-  border: 1px solid #2a4a6a;
+  background: var(--accent-bg-muted);
+  border: 1px solid var(--accent-border-muted);
   color: #9d6db8;
   border-radius: 5px;
   cursor: pointer;
@@ -848,7 +848,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   font-size: 0.9rem;
   margin-bottom: 0.2rem;
 }
-.palette-search:focus { outline: none; border-color: #2a5070; }
+.palette-search:focus { outline: none; border-color: var(--accent-border); }
 
 /* Step library */
 .step-library-list { display: flex; flex-direction: column; gap: 0.35rem; }
@@ -902,7 +902,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   white-space: nowrap;
 }
 .type-group-expand:hover { background: var(--border-divider); color: var(--text-secondary); border-color: #3a3a3a; }
-.type-group.expanded .type-group-expand { color: #7ec8e3; border-color: #2a5070; background: #0f1a22; }
+.type-group.expanded .type-group-expand { color: var(--accent); border-color: var(--accent-border); background: var(--accent-bg); }
 
 .type-expand-chevron {
   display: inline-block;
@@ -974,7 +974,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   padding-top: 0.45rem;
 }
 .model-row.assignable { cursor: pointer; }
-.model-row.assignable:hover { background: #1a2430; border-radius: 6px; }
+.model-row.assignable:hover { background: var(--accent-bg-muted); border-radius: 6px; }
 .btn-insert-new { background: #2d1a1a; border-color: #4d2a2a; color: #b86d6d; }
 .btn-insert-new:hover { background: #381e1e; color: #da8d8d; }
 .btn-insert-suggestion:disabled { opacity: 0.35; cursor: default; }
@@ -991,10 +991,10 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
 }
 .model-assign-hint {
   font-size: 0.85rem;
-  color: #7ec8e3;
+  color: var(--accent);
   margin: 0 0 0.35rem;
 }
-.model-row.assignable { cursor: pointer; border-color: #2a4a6a; }
+.model-row.assignable { cursor: pointer; border-color: var(--accent-border-muted); }
 .model-row.assignable:hover { background: #1e2d3d; border-color: #3a6a9a; }
 .btn-insert-suggestion {
   font-size: 0.82rem; padding: 5px 11px;
@@ -1021,7 +1021,7 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #8a8a8a;
+  font-weight: 600;
 }
 .btn-ai-suggest {
   font-size: 0.78rem;

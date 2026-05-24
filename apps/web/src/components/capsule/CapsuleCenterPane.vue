@@ -18,7 +18,7 @@
     </div>
 
     <div class="user-prompt-bar" v-if="!editor.isReadOnly">
-      <label class="prompt-label">Test prompt</label>
+      <label class="prompt-label hdr-prompt">Test prompt</label>
       <textarea
         class="user-prompt-input"
         v-model="testPrompt"
@@ -84,7 +84,7 @@
     <!-- Test run panel -->
     <div class="test-panel">
       <div class="test-panel-header">
-        <span class="test-panel-title">Test Run</span>
+        <span class="test-panel-title hdr-trace">Test Run</span>
         <div class="test-run-controls">
           <button class="btn btn-run" :disabled="capsuleRunStore.isRunning" title="Run this Capsule with the test inputs below" @click="handleTestRun">
             {{ capsuleRunStore.isRunning ? 'Running…' : 'Test' }}
@@ -440,7 +440,7 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   flex: 1; background: transparent; border: none;
   color: #e8e8e8; font-size: 0.9rem; font-weight: 500;
 }
-.capsule-name:focus { outline: none; border-bottom: 1px solid #3a6080; }
+.capsule-name:focus { outline: none; border-bottom: 1px solid var(--accent-border); }
 .capsule-version { font-size: 0.68rem; color: var(--text-secondary); background: #1a1a1a; padding: 1px 6px; border-radius: 3px; }
 .capsule-status { font-size: 0.68rem; padding: 1px 6px; border-radius: 3px; }
 .status-draft { background: #2d2a1e; color: #c8a85a; }
@@ -450,12 +450,12 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   display: flex; align-items: flex-start; gap: 0.5rem;
   padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
 }
-.prompt-label { font-size: 0.68rem; color: var(--text-label); text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; }
+.prompt-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; font-weight: 600; }
 .user-prompt-input {
   flex: 1; background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.82rem; resize: vertical; font-family: inherit;
 }
-.user-prompt-input:focus { outline: none; border-color: #3a6080; }
+.user-prompt-input:focus { outline: none; border-color: var(--accent-border); }
 
 .capsule-chain { flex: 1; min-height: 0; }
 
@@ -468,7 +468,7 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   display: flex; justify-content: space-between; align-items: center;
   padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-divider);
 }
-.test-panel-title { font-size: 0.72rem; font-weight: 600; color: var(--text-label); text-transform: uppercase; letter-spacing: 0.05em; }
+.test-panel-title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .test-run-controls { display: flex; gap: 0.4rem; }
 .test-fields { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .test-field { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -476,7 +476,7 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.82rem;
 }
-.test-field input:focus, .test-field textarea:focus, .test-field select:focus { outline: none; border-color: #3a6080; }
+.test-field input:focus, .test-field textarea:focus, .test-field select:focus { outline: none; border-color: var(--accent-border); }
 .test-field textarea { resize: vertical; font-family: inherit; }
 .kind-badge { font-size: 0.65rem; color: var(--text-secondary); background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
 
@@ -493,8 +493,8 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 .test-run-warning { padding: 0 0.75rem 0.5rem; }
 
 .btn { border-radius: 4px; padding: 3px 12px; font-size: 0.78rem; cursor: pointer; border: 1px solid #333; }
-.btn-run { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-run:hover:not(:disabled) { background: #254a62; }
+.btn-run { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-run:hover:not(:disabled) { background: var(--accent-bg-hover); }
 .btn-run:disabled { opacity: 0.4; cursor: default; }
 .btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
 .btn-cancel:hover { background: #3d2222; }

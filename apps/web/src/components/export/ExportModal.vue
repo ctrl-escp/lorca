@@ -111,6 +111,6 @@ function handleStepOutputsChange(event: Event) {
 .btn-secondary:hover { background: #222; color: #ccc; }
 .btn-copy { background: #1e2d1e; border-color: #2a4d2a; color: #5ddb9e; }
 .btn-copy:hover { background: #253d25; }
-.btn-download { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
-.btn-download:hover { background: #254a62; }
+.btn-download { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.btn-download:hover { background: var(--accent-bg-hover); }
 </style>

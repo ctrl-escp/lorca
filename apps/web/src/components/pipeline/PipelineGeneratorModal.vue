@@ -8,7 +8,7 @@
 
       <div class="dialog-body">
         <label class="field">
-          <span>Description</span>
+          <span class="hdr-prompt">Description</span>
           <textarea
             v-model="description"
             rows="5"
@@ -18,7 +18,7 @@
         </label>
 
         <label class="field">
-          <span>Generator</span>
+          <span class="hdr-model">Generator</span>
           <select v-model="selectedCapsuleId" :disabled="loading || generatorCapsules.length === 0">
             <option
               v-for="capsule in generatorCapsules"
@@ -44,7 +44,7 @@
         </div>
 
         <div v-if="previewLabels.length > 0" class="preview">
-          <span class="preview-title">Preview</span>
+          <span class="preview-title hdr-preview">Preview</span>
           <ol>
             <li v-for="(label, index) in previewLabels" :key="`${label}-${index}`">{{ label }}</li>
           </ol>
@@ -175,7 +175,7 @@ function submit() {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-section);
+  font-weight: 600;
 }
 textarea, select {
   background: #111;
@@ -186,7 +186,7 @@ textarea, select {
   font: inherit;
 }
 textarea { resize: vertical; line-height: 1.4; }
-textarea:focus, select:focus { outline: none; border-color: #2a5070; }
+textarea:focus, select:focus { outline: none; border-color: var(--accent-border); }
 .error-box, .warning-box {
   border-radius: 4px;
   padding: 0.5rem 0.6rem;
@@ -209,7 +209,7 @@ textarea:focus, select:focus { outline: none; border-color: #2a5070; }
 .link-btn {
   background: none;
   border: none;
-  color: #7ec8e3;
+  color: var(--accent);
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
@@ -255,5 +255,5 @@ textarea:focus, select:focus { outline: none; border-color: #2a5070; }
 }
 .btn-secondary { background: #1a1a1a; color: #ccc; }
 .btn-secondary:disabled, .btn-primary:disabled { opacity: 0.4; cursor: default; }
-.btn-primary { background: #1e3d52; border-color: #2a5070; color: #7ec8e3; }
+.btn-primary { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
 </style>

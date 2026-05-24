@@ -247,7 +247,7 @@ function autoSelectModel() {
   cursor: pointer;
   font-size: 0.75rem;
 }
-.loop-inner-row.selected { border-color: #4a6a8a; background: #1a2430; }
+.loop-inner-row.selected { border-color: #4a6a8a; background: var(--accent-bg-muted); }
 .loop-inner-index { color: var(--text-secondary); min-width: 1rem; }
 .loop-inner-type {
   font-size: 0.62rem;

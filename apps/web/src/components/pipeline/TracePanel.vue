@@ -32,11 +32,11 @@
       </div>
 
       <div v-if="event.inputArtifactNames?.length" class="ev-artifacts">
-        <span class="ev-artifacts-label">inputs</span>
+        <span class="ev-artifacts-label hdr-input">inputs</span>
         <span v-for="name in event.inputArtifactNames" :key="name" class="artifact-tag">{{ name }}</span>
       </div>
       <div v-if="event.outputArtifactNames?.length" class="ev-artifacts">
-        <span class="ev-artifacts-label">outputs</span>
+        <span class="ev-artifacts-label hdr-output">outputs</span>
         <button
           v-for="name in event.outputArtifactNames"
           :key="name"
@@ -49,7 +49,7 @@
       </div>
 
       <div v-if="expandedArtifactForEvent(event)" class="ev-detail">
-        <div class="ev-detail-title">Artifact: {{ expandedArtifactForEvent(event) }}</div>
+        <div class="ev-detail-title hdr-artifact">Artifact: {{ expandedArtifactForEvent(event) }}</div>
         <JsonViewer
           v-if="artifactFor(expandedArtifactForEvent(event)!)"
           class="ev-json"
@@ -60,7 +60,7 @@
 
       <template v-if="expanded.has(event.stepId ?? event.nodeId ?? '') && hasDetails(event)">
         <div v-if="event.historyReadInputs?.length" class="ev-detail">
-          <div class="ev-detail-title">History reads</div>
+          <div class="ev-detail-title hdr-history">History reads</div>
           <div v-for="(hr, i) in event.historyReadInputs" :key="i" class="ev-history-row">
             <span class="artifact-tag" :class="{omitted: hr.omitted}">{{ hr.sourceArtifactRef }}</span>
             <span v-if="hr.omitted" class="ev-omitted">omitted</span>
@@ -68,11 +68,11 @@
           </div>
         </div>
         <div v-if="event.renderedPromptXml" class="ev-detail">
-          <div class="ev-detail-title">Rendered prompt</div>
+          <div class="ev-detail-title hdr-prompt">Rendered prompt</div>
           <XmlPreview class="ev-prompt" :value="event.renderedPromptXml" />
         </div>
         <div v-if="rawResponseValueFor(event) !== null" class="ev-detail">
-          <div class="ev-detail-title">Model response</div>
+          <div class="ev-detail-title hdr-model">Model response</div>
           <JsonViewer class="ev-json ev-json-full" :value="rawResponseValueFor(event)" />
         </div>
       </template>
@@ -196,7 +196,7 @@ function artifactFor(name: string): PipelineArtifact | null {
   font-size: 0.68rem; color: var(--text-label); display: flex; align-items: center; gap: 0.4rem;
 }
 .trace-filter-clear {
-  background: none; border: none; color: #7ec8e3; cursor: pointer; font-size: 0.68rem; padding: 0;
+  background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.68rem; padding: 0;
 }
 .trace-filter-clear:hover { text-decoration: underline; }
 .trace-empty { color: var(--text-muted); font-size: 0.78rem; }
@@ -208,7 +208,7 @@ function artifactFor(name: string): PipelineArtifact | null {
 .ev-header { display: flex; gap: 0.5rem; align-items: center; font-size: 0.78rem; flex-wrap: wrap; }
 .ev-capsule-id { font-family: monospace; color: #5a9fd4; font-size: 0.68rem; }
 .ev-capsule-id::after { content: ' ›'; }
-.ev-node { font-family: monospace; color: #7ec8e3; }
+.ev-node { font-family: monospace; color: var(--accent); }
 .ev-node-internal { color: #4a8db4; font-size: 0.72rem; }
 .ev-status { color: var(--text-label); }
 .ev-reused {
@@ -223,15 +223,15 @@ function artifactFor(name: string): PipelineArtifact | null {
 }
 .ev-expand:hover { color: #ccc; }
 .ev-artifacts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; align-items: center; }
-.ev-artifacts-label { font-size: 0.62rem; color: var(--text-section); text-transform: uppercase; margin-right: 0.15rem; }
+.ev-artifacts-label { font-size: 0.62rem; text-transform: uppercase; margin-right: 0.15rem; font-weight: 600; }
 .artifact-tag { background: var(--border-divider); border: 1px solid #2a2a2a; border-radius: 3px; padding: 1px 5px; font-size: 0.68rem; color: var(--text-label); font-family: monospace; }
-.artifact-tag.out { color: #7ec8e3; }
+.artifact-tag.out { color: var(--accent); }
 .artifact-link { cursor: pointer; }
-.artifact-link:hover, .artifact-link.active { border-color: #3a6080; background: #1a2430; }
+.artifact-link:hover, .artifact-link.active { border-color: var(--accent-border); background: var(--accent-bg-muted); }
 .ev-missing-artifact { margin: 0; font-size: 0.68rem; color: var(--text-label); font-style: italic; }
 .artifact-tag.omitted { opacity: 0.5; text-decoration: line-through; }
 .ev-detail { margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid var(--border-divider); }
-.ev-detail-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-section); margin-bottom: 0.2rem; }
+.ev-detail-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; font-weight: 600; }
 .ev-history-row { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.25rem; }
 .ev-omitted { font-size: 0.68rem; color: var(--text-label); font-style: italic; }
 .ev-prompt, .ev-preview {

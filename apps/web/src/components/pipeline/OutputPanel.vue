@@ -16,7 +16,7 @@
       </div>
       <div class="output-value" :class="{stale: outputStale}">
         <div class="output-header">
-          <span class="output-state-label" :class="outputStale ? 'stale' : 'current'">
+          <span class="output-state-label hdr-output" :class="outputStale ? 'stale' : 'current'">
             {{ outputStale ? 'Last run output (stale)' : 'Current output' }}
           </span>
           <span v-if="outputKey" class="output-key">{{ outputKey }}</span>
@@ -64,7 +64,6 @@ defineProps<{
 .output-value.stale :deep(.jv-pretty) { border-color: #4a4020; }
 .output-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; }
 .output-state-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-.output-state-label.current { color: #5a9d6e; }
 .output-state-label.stale { color: #c8a050; }
-.output-key { font-family: monospace; font-size: 0.72rem; color: #7ec8e3; }
+.output-key { font-family: monospace; font-size: 0.72rem; color: var(--accent); }
 </style>
