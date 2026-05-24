@@ -22,6 +22,8 @@
         v-else-if="uiStore.rightPaneTab === 'trace'"
         :trace="activeTrace"
         :artifacts="isCapsuleMode ? capsuleRunStore.artifacts : runStore.artifacts"
+        :snapshots="activeSnapshots"
+        :capsule-trace-scopes="capsuleTraceScopes"
         :partial-run="isCapsuleMode ? capsuleRunStore.partial : runStore.partial"
         :selected-step-id="activeSelectedStepId"
         :capsule-instance-id="activeCapsuleInstanceId"
@@ -52,6 +54,10 @@ import {
   inlineCapsuleTraceStepLabels,
   resolveInlineCapsuleRunScope,
 } from '../utils/inlineCapsuleRun.js';
+import {
+  listInlineCapsuleTraceScopes,
+  resolveActiveCapsuleTraceScope,
+} from '../utils/capsuleTraceView.js';
 
 import StepInspector from './inspector/StepInspector.vue';
 import {useCapsuleStepEditorStore} from '../stores/capsuleStepEditor.js';
@@ -99,7 +105,22 @@ const activeSelectedStepId = computed(() => {
   return editorStore.selectedStepId;
 });
 
-const activeCapsuleInstanceId = computed(() => inlineCapsuleScope.value?.capsuleStepId ?? null);
+const activeCapsuleInstanceId = computed(() => {
+  const scope = resolveActiveCapsuleTraceScope(
+    editorStore.steps,
+    editorStore.selectedStep,
+    editorStore.selectedInlineCapsuleInnerStepId,
+  );
+  return scope?.capsuleInstanceId ?? null;
+});
+
+const capsuleTraceScopes = computed(() =>
+  isCapsuleMode.value ? [] : listInlineCapsuleTraceScopes(editorStore.steps),
+);
+
+const activeSnapshots = computed(() =>
+  isCapsuleMode.value ? capsuleRunStore.snapshots : runStore.snapshots,
+);
 
 const traceStepLabels = computed(() => {
   const steps = isCapsuleMode.value ? capsuleEditorStore.steps : editorStore.steps;

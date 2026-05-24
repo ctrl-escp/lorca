@@ -344,7 +344,8 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     }
     const outputBindings: Record<string, string> = {};
     for (const port of capsule.interface.outputs) {
-      outputBindings[port.name] = port.sourceArtifactKey ?? `${ns}.${port.name}`;
+      const suffix = port.sourceArtifactKey?.split('.').pop() ?? port.name;
+      outputBindings[port.name] = `${ns}.${suffix}`;
     }
     const lastOut = capsule.interface.outputs.at(-1);
     const primaryOutputName = lastOut

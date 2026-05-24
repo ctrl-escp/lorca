@@ -132,6 +132,34 @@ describe('pipeline editor inline capsule actions', () => {
     expect(collapsed.config.inlineSteps?.[0]?.label).toBe('Edited');
   });
 
+  it('namespaces capsule output bindings under the instance prefix', () => {
+    const cap: CapsuleDefinition = {
+      ...capsule(),
+      interface: {
+        inputs: [],
+        outputs: [
+          {name: 'expert_answer', kind: 'text', sourceArtifactKey: 'answer.text'},
+          {name: 'verification_json', kind: 'json', sourceArtifactKey: 'verify.json'},
+        ],
+        parameters: [],
+        modelSlots: [],
+      },
+    };
+    useCapsulesStore().addCapsule(cap);
+    const editor = usePipelineEditorStore();
+    editor.loadPipeline(pipeline([]));
+    const stepId = editor.insertCapsuleInstance(cap);
+    expect(stepId).toBeTruthy();
+    const step = editor.steps.find((s) => s.id === stepId)!;
+    expect(step.config.type).toBe('capsule-instance');
+    if (step.config.type !== 'capsule-instance') return;
+    expect(step.primaryOutputName).toBe('json');
+    expect(step.config.outputBindings).toEqual({
+      expert_answer: `${step.outputNamespace}.text`,
+      verification_json: `${step.outputNamespace}.json`,
+    });
+  });
+
   it('detaches inline steps and remaps namespace collisions', () => {
     const cap = capsule();
     useCapsulesStore().addCapsule(cap);

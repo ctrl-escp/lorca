@@ -45,6 +45,8 @@
       :last-redo-label="editor.lastRedoLabel"
       :run-snapshots="capsuleRunStore.snapshots"
       :artifacts="capsuleRunStore.artifacts"
+      :run-status="capsuleRunStore.status"
+      :run-error="capsuleRunStore.error"
       @select="editor.selectStep"
       @append="handleAppend"
       @insert-after="handleInsertAfter"

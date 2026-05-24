@@ -417,6 +417,43 @@ describe('capsule-instance step-chain execution', () => {
     expect(artifacts['cap.text']?.value).toBe('inline body');
   });
 
+  it('resolves legacy internal outputBindings to namespaced parent artifact keys', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-legacy-bindings',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap_inst',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'body.text'},
+        displayMode: 'inline',
+        inlineSteps: [makeTextStep('body', 'inline body', 'body')],
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      () => ENDPOINT,
+      {onArtifact(a) { artifacts[a.name] = a; }, onTraceEvent() {}},
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.value.finalOutputKey : '').toBe('cap_inst.text');
+    expect(artifacts['cap_inst.text']?.value).toBe('inline body');
+    expect(artifacts['body.text']).toBeUndefined();
+  });
+
   it('applies model slot bindings before running inlineSteps', async () => {
     const capsule = makeStepChainCapsule('saved body');
     const instance: PipelineStep = {

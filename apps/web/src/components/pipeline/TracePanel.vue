@@ -4,7 +4,7 @@
     <div v-else-if="trace.length > 0" class="trace-run-banner full">Full pipeline run</div>
 
     <div v-if="selectedStepId && filterToSelected" class="trace-filter-note">
-      Showing events for selected step
+      Showing events for {{ capsuleInstanceId ? 'inline capsule steps' : 'selected step' }}
       <button type="button" class="trace-filter-clear" @click="filterToSelected = false">Show all</button>
     </div>
 
@@ -21,6 +21,7 @@
           {{ stepLabel(event) }}
         </span>
         <span class="ev-status">{{ event.status }}</span>
+        <span v-if="isPriorRunTraceEvent(event)" class="ev-reused">prior run</span>
         <span v-if="event.durationMs !== undefined" class="ev-duration">{{ event.durationMs }}ms</span>
         <button
           v-if="hasDetails(event)"
@@ -86,9 +87,16 @@
 
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import type {PipelineArtifact, PipelineTraceEvent} from '@lorca/core';
+import type {PipelineArtifact, PipelineTraceEvent, StepRunSnapshot} from '@lorca/core';
 import {JsonViewer} from '@lorca/ui-kit';
 import XmlPreview from '../shared/XmlPreview.vue';
+import {
+  enrichTraceWithCapsuleSnapshots,
+  filterTraceEvents,
+  isPriorRunTraceEvent,
+  listInlineCapsuleTraceScopes,
+  type CapsuleTraceScope,
+} from '../../utils/capsuleTraceView.js';
 
 const props = defineProps<{
   trace: PipelineTraceEvent[];
@@ -99,6 +107,10 @@ const props = defineProps<{
   capsuleInstanceId?: string | null;
   /** stepId → display label for trace rows */
   stepLabels?: Record<string, string>;
+  /** Nested run snapshots (includes `${capsuleStepId}:${innerStepId}` keys). */
+  snapshots?: Record<string, StepRunSnapshot>;
+  /** Inline capsule scopes used to back-fill missing inner-step rows. */
+  capsuleTraceScopes?: CapsuleTraceScope[];
 }>();
 
 const filterToSelected = ref(false);
@@ -111,15 +123,17 @@ watch(() => props.selectedStepId, (id) => {
 });
 
 const displayTrace = computed(() => {
-  let events = props.trace;
-  if (props.capsuleInstanceId) {
-    events = events.filter((e) => e.capsuleInstanceId === props.capsuleInstanceId);
-  }
-  if (!filterToSelected.value || !props.selectedStepId) return events;
-  const id = props.selectedStepId;
-  return events.filter(
-    (e) => e.nodeId === id || e.stepId === id,
+  const scopes = props.capsuleTraceScopes ?? [];
+  const enriched = enrichTraceWithCapsuleSnapshots(
+    props.trace,
+    props.snapshots,
+    scopes,
   );
+  return filterTraceEvents(enriched, {
+    capsuleInstanceId: props.capsuleInstanceId,
+    selectedStepId: props.selectedStepId,
+    filterToSelected: filterToSelected.value,
+  });
 });
 
 function stepLabel(event: PipelineTraceEvent): string {
@@ -197,6 +211,12 @@ function artifactFor(name: string): PipelineArtifact | null {
 .ev-node { font-family: monospace; color: #7ec8e3; }
 .ev-node-internal { color: #4a8db4; font-size: 0.72rem; }
 .ev-status { color: #888; }
+.ev-reused {
+  font-size: 0.62rem;
+  color: #8080c0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .ev-duration { color: #555; font-size: 0.72rem; margin-left: auto; }
 .ev-expand {
   background: none; border: none; color: #666; cursor: pointer; font-size: 0.7rem; padding: 0 4px;

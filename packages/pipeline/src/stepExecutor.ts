@@ -233,6 +233,7 @@ export async function executeStepChain(
       abortSignal,
       resolveEndpointForModel,
       options.params,
+      options,
     );
 
     if (!result.ok) {
@@ -295,7 +296,14 @@ export async function executeStepChain(
   const finalKey = `${finalStep.outputNamespace}.${finalStep.primaryOutputName}`;
 
   if (!(finalKey in artifacts)) {
-    return {ok: false, error: {code: 'final_output_missing', message: `Final output artifact not found: ${finalKey}`}};
+    return {
+      ok: false,
+      error: {
+        code: 'final_output_missing',
+        message: `Final output artifact not found: ${finalKey}`,
+        nodeId: finalStepId,
+      },
+    };
   }
 
   return {
@@ -321,6 +329,7 @@ export async function executeStepInternal(
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
   params?: Record<string, unknown>,
+  runOptions?: ExecutePipelineOptions,
 ): Promise<Result<StepExecutionResult, PipelineError>> {
   const {config} = step;
   const inputArtifactNames = compiledStep.inputArtifactRefs;
@@ -347,7 +356,7 @@ export async function executeStepInternal(
     }
 
     case 'capsule-instance': {
-      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel);
+      const capResult = await executeCapsuleStep(step, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel, runOptions);
       if (!capResult.ok) return capResult;
       return {
         ok: true,
@@ -628,6 +637,7 @@ async function executeCapsuleStep(
   pipeline: PipelineDefinition,
   callbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
+  runOptions?: ExecutePipelineOptions,
 ): Promise<Result<{artifacts: PipelineArtifact[]; nestedSnapshots?: Record<string, StepRunSnapshot>}, PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeCapsuleStep called on non-capsule step', nodeId: step.id}};
@@ -648,7 +658,7 @@ async function executeCapsuleStep(
     : capsule;
 
   if (executionCapsule.steps && executionCapsule.steps.length > 0) {
-    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel);
+    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel, runOptions);
   }
 
   const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
@@ -775,6 +785,19 @@ function remapCapsuleInnerSnapshots(
   return remapped;
 }
 
+function unmapSeededInternalArtifacts(
+  instancePrefix: string,
+  artifacts: Record<string, PipelineArtifact>,
+): void {
+  const prefix = `${instancePrefix}.internal.`;
+  for (const [key, artifact] of Object.entries({...artifacts})) {
+    if (!key.startsWith(prefix)) continue;
+    const localName = key.slice(prefix.length);
+    if (localName in artifacts) continue;
+    artifacts[localName] = {...artifact, name: localName};
+  }
+}
+
 async function executeCapsuleStepChain(
   step: PipelineStep,
   capsule: CapsuleDefinition,
@@ -784,6 +807,7 @@ async function executeCapsuleStepChain(
   parentPipeline: PipelineDefinition,
   outerCallbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
+  runOptions?: ExecutePipelineOptions,
 ): Promise<Result<{artifacts: PipelineArtifact[]; nestedSnapshots?: Record<string, StepRunSnapshot>}, PipelineError>> {
   if (step.config.type !== 'capsule-instance') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Not a capsule step', nodeId: step.id}};
@@ -794,6 +818,7 @@ async function executeCapsuleStepChain(
   const innerArtifacts: Record<string, PipelineArtifact> = {
     ...parentArtifacts,
   };
+  unmapSeededInternalArtifacts(instancePrefix, innerArtifacts);
 
   for (const [portName, parentKey] of Object.entries(inputBindings)) {
     const parentArtifact = parentArtifacts[parentKey];
@@ -843,12 +868,18 @@ async function executeCapsuleStepChain(
     },
   };
 
+  const innerStartAtStepId = runOptions?.capsuleInnerStartAtStepId
+    && capsule.steps?.some((s) => s.id === runOptions.capsuleInnerStartAtStepId)
+    ? runOptions.capsuleInnerStartAtStepId
+    : undefined;
+
   const result = await executeStepChain(
     innerPipeline,
     userPromptRaw,
     {
       seedArtifacts: innerArtifacts,
       ...(parameterValues && Object.keys(parameterValues).length > 0 ? {params: parameterValues} : {}),
+      ...(innerStartAtStepId ? {startAtStepId: innerStartAtStepId} : {}),
     },
     resolveEndpoint,
     innerCallbacks,
@@ -863,7 +894,10 @@ async function executeCapsuleStepChain(
       ?? parentKey;
     const internal = innerArtifacts[sourceKey] ?? innerArtifacts[parentKey];
     if (!internal) continue;
-    publicOutputs.push({...internal, name: parentKey, stepId: step.id});
+    const resolvedParentKey = parentKey.startsWith(`${instancePrefix}.`)
+      ? parentKey
+      : `${instancePrefix}.${artifactOutputSuffix(sourceKey)}`;
+    publicOutputs.push({...internal, name: resolvedParentKey, stepId: step.id});
   }
 
   if (publicOutputs.length === 0) {

@@ -47,6 +47,8 @@ export interface ExecutePipelineOptions {
   seedArtifacts?: Record<string, import('@lorca/core').PipelineArtifact>;
   /** Parameter values available while rendering Capsule step prompts. */
   params?: Record<string, unknown>;
+  /** When executing an inline capsule, start the inner chain at this step id. */
+  capsuleInnerStartAtStepId?: string;
 }
 
 export function compileStepChainToExecutionPlan(

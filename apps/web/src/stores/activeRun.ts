@@ -142,7 +142,12 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     });
   }
 
-  async function runOnlyStep(def: PipelineDefinition, userPromptRaw: string, stepId: string) {
+  async function runOnlyStep(
+    def: PipelineDefinition,
+    userPromptRaw: string,
+    stepId: string,
+    capsuleInnerStartAtStepId?: string,
+  ) {
     const endpointsStore = useEndpointsStore();
     const capsulesStore = useCapsulesStore();
 
@@ -169,6 +174,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
         stopAtStepId: stepId,
         startAtStepId: stepId,
         seedArtifacts: prevArtifacts,
+        ...(capsuleInnerStartAtStepId ? {capsuleInnerStartAtStepId} : {}),
       },
       (endpointId) => endpointsStore.getEndpoint(endpointId),
       {
@@ -218,7 +224,12 @@ export const useActiveRunStore = defineStore('activeRun', () => {
     });
   }
 
-  async function runFromStep(def: PipelineDefinition, userPromptRaw: string, stepId: string) {
+  async function runFromStep(
+    def: PipelineDefinition,
+    userPromptRaw: string,
+    stepId: string,
+    capsuleInnerStartAtStepId?: string,
+  ) {
     const endpointsStore = useEndpointsStore();
     const capsulesStore = useCapsulesStore();
 
@@ -242,6 +253,7 @@ export const useActiveRunStore = defineStore('activeRun', () => {
         abortSignal: controller.signal,
         startAtStepId: stepId,
         seedArtifacts: prevArtifacts,
+        ...(capsuleInnerStartAtStepId ? {capsuleInnerStartAtStepId} : {}),
       },
       (endpointId) => endpointsStore.getEndpoint(endpointId),
       {

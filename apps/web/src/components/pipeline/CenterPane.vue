@@ -94,6 +94,8 @@
       :selection-range="selectionRange"
       :run-snapshots="runStore.snapshots"
       :artifacts="runStore.artifacts"
+      :run-status="runStore.status"
+      :run-error="runStore.error"
       :accept-suggestion-drop="true"
       :disabled-model-step-ids="stepsWithDisabledModel"
       :partial-run-target-step-id="runStore.partialRunTargetStepId"
@@ -727,14 +729,33 @@ async function handleRunUpTo(stepId: string) {
   await runStore.run(editorStore.pipeline, userPrompt.value, stepId);
 }
 
+function resolveCapsuleInnerStartAtStepId(capsuleStepId: string): string | undefined {
+  const step = editorStore.steps.find((s) => s.id === capsuleStepId);
+  if (step?.config.type !== 'capsule-instance' || step.config.displayMode !== 'inline') return undefined;
+  const innerStepId = editorStore.selectedInlineCapsuleInnerStepId;
+  if (!innerStepId) return undefined;
+  if (!(step.config.inlineSteps ?? []).some((s) => s.id === innerStepId)) return undefined;
+  return innerStepId;
+}
+
 async function handleRunFromStep(stepId: string) {
   editorStore.updateUserPrompt(userPrompt.value);
-  await runStore.runFromStep(editorStore.pipeline, userPrompt.value, stepId);
+  await runStore.runFromStep(
+    editorStore.pipeline,
+    userPrompt.value,
+    stepId,
+    resolveCapsuleInnerStartAtStepId(stepId),
+  );
 }
 
 async function handleRunOnlyStep(stepId: string) {
   editorStore.updateUserPrompt(userPrompt.value);
-  await runStore.runOnlyStep(editorStore.pipeline, userPrompt.value, stepId);
+  await runStore.runOnlyStep(
+    editorStore.pipeline,
+    userPrompt.value,
+    stepId,
+    resolveCapsuleInnerStartAtStepId(stepId),
+  );
 }
 
 function handleExport() {

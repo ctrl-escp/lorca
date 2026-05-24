@@ -380,7 +380,7 @@
 
 <script setup lang="ts">
 import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
-import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
+import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineError, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
 import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
@@ -488,6 +488,8 @@ const props = defineProps<{
   lastRedoLabel?: string | null;
   runSnapshots?: Record<string, import('@lorca/core').StepRunSnapshot>;
   artifacts?: Record<string, PipelineArtifact>;
+  runStatus?: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
+  runError?: PipelineError | null;
   acceptSuggestionDrop?: boolean;
   disabledModelStepIds?: Set<string>;
   partialRunTargetStepId?: string | null;
@@ -640,8 +642,46 @@ onUnmounted(() => {
 });
 
 function traceFor(stepId: string): PipelineTraceEvent | undefined {
-  return [...props.trace].reverse().find(
-    (e) => e.stepId === stepId || e.nodeId === stepId,
+  const stepEvents = props.trace.filter(
+    (e) => (e.stepId === stepId || e.nodeId === stepId) && !e.capsuleInstanceId,
+  );
+  const failed = stepEvents.find((e) => e.status === 'failed');
+  if (failed) return failed;
+
+  const step = props.steps.find((s) => s.id === stepId);
+  if (step?.config.type === 'capsule-instance') {
+    const innerFailed = props.trace.find(
+      (e) => e.capsuleInstanceId === stepId && e.status === 'failed',
+    );
+    if (innerFailed) return innerFailed;
+  }
+
+  if (
+    props.runStatus === 'failed'
+    && props.runError
+    && props.finalArtifactKey
+    && step
+    && props.finalArtifactKey.startsWith(`${step.outputNamespace}.`)
+    && (props.runError.code === 'final_output_missing' || props.runError.nodeId === stepId)
+  ) {
+    return {
+      runId: '',
+      stepId,
+      nodeId: stepId,
+      status: 'failed',
+      timestamp: '',
+      error: props.runError,
+    };
+  }
+
+  const snapshot = props.runSnapshots?.[stepId];
+  if (snapshot?.status === 'failed') {
+    const snapFailed = stepEvents.find((e) => e.status === 'failed');
+    if (snapFailed) return snapFailed;
+  }
+
+  return [...stepEvents].reverse().find(
+    (e) => e.status === 'completed' || e.status === 'started',
   );
 }
 
