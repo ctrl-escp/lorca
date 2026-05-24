@@ -190,6 +190,13 @@
               title="Duplicate as editable draft"
               @click.stop="onDuplicateCapsule(cap.id)"
             >⊕</button>
+            <button
+              v-if="canDeleteCapsule(cap.id)"
+              class="btn-delete-capsule"
+              type="button"
+              title="Delete this capsule"
+              @click.stop="requestDeleteCapsule(cap.id, cap.name)"
+            >×</button>
           </div>
           <p v-if="visibleCapsules.length === 0" class="empty-hint">No Capsules yet.</p>
         </div>
@@ -301,13 +308,24 @@
     @confirm="resolveDisableWarn(true)"
     @cancel="resolveDisableWarn(false)"
   />
+
+  <!-- Capsule delete confirmation -->
+  <ConfirmDialog
+    :open="deleteCapsuleConfirm.open"
+    title="Delete Capsule"
+    :message="deleteCapsuleConfirm.message"
+    confirm-label="Delete"
+    :destructive="true"
+    @confirm="confirmDeleteCapsule"
+    @cancel="cancelDeleteCapsule"
+  />
 </template>
 
 <script setup lang="ts">
 import {ref, computed, onMounted, onUnmounted, watch} from 'vue';
 import type {AiEndpointConfig, CapsuleDefinition, DiscoveredModel, ModelRef, ModelUsageBucket, StepType} from '@lorca/core';
 import type {LeftPaneSection} from '../stores/ui.js';
-import {ALL_SUGGESTIONS} from '@lorca/capsules';
+import {ALL_SUGGESTIONS, isBuiltinExampleId} from '@lorca/capsules';
 import type {PipelineSuggestion} from '@lorca/capsules';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
@@ -638,6 +656,31 @@ function onDuplicateCapsule(capsuleId: string) {
   if (duplicatedId) uiStore.openCapsuleEditor(duplicatedId);
 }
 
+function canDeleteCapsule(id: string): boolean {
+  return !isBuiltinExampleId(id) && capsulesStore.capsules.some((c) => c.id === id);
+}
+
+const deleteCapsuleConfirm = ref({open: false, message: '', targetId: ''});
+
+function requestDeleteCapsule(id: string, name: string) {
+  deleteCapsuleConfirm.value = {
+    open: true,
+    message: `Delete "${name || 'this capsule'}"? This cannot be undone.`,
+    targetId: id,
+  };
+}
+
+function confirmDeleteCapsule() {
+  const id = deleteCapsuleConfirm.value.targetId;
+  deleteCapsuleConfirm.value = {open: false, message: '', targetId: ''};
+  if (uiStore.activeCapsuleEditId === id) uiStore.closeCapsuleEditor();
+  capsulesStore.removeCapsule(id);
+}
+
+function cancelDeleteCapsule() {
+  deleteCapsuleConfirm.value = {open: false, message: '', targetId: ''};
+}
+
 function onSuggestionDragStart(suggestionId: string, event: DragEvent) {
   if (!isPipelineContext.value) return;
   document.body.classList.add('lorca-dnd-active', DND_BODY_SUGGESTION);
@@ -843,6 +886,17 @@ async function onUpdateBuckets(modelId: string, buckets: ModelUsageBucket[] | un
   cursor: pointer;
 }
 .btn-dup-capsule:hover { color: #ccc; border-color: var(--text-secondary); }
+.btn-delete-capsule {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+.btn-delete-capsule:hover { color: #e07070; }
 
 .palette-search {
   width: 100%;
