@@ -1,6 +1,13 @@
 <template>
   <div v-if="field" class="step-main-prompt">
-    <FieldLabel :label="field.label" :required="!!field.required" :title="field.title" />
+    <div class="step-main-prompt-header">
+      <FieldLabel :label="field.label" :required="!!field.required" :title="field.title" />
+      <PromptLibraryButton
+        v-if="field.kind === 'node'"
+        :current-text="localValue"
+        @select="applyStartingPoint"
+      />
+    </div>
     <textarea
       v-model="localValue"
       :rows="field.rows"
@@ -18,6 +25,7 @@
 import {ref, computed, watch} from 'vue';
 import type {PipelineNode} from '@lorca/core';
 import {FieldLabel} from '@lorca/ui-kit';
+import PromptLibraryButton from '../shared/PromptLibraryButton.vue';
 
 const props = defineProps<{
   node: PipelineNode | null;
@@ -157,6 +165,11 @@ function commit() {
 
   emit('update:node', f.nodePatch(localValue.value));
 }
+
+function applyStartingPoint(text: string) {
+  localValue.value = text;
+  commit();
+}
 </script>
 
 <style scoped>
@@ -167,6 +180,12 @@ function commit() {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+.step-main-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 .step-main-prompt textarea {
   background: #111;

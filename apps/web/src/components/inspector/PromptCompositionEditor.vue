@@ -222,6 +222,11 @@
             title="Improve this prompt block with a local model"
             @click="openPromptImprover(idx)"
           >Improve</button>
+          <PromptLibraryButton
+            class="pce-library-btn"
+            :current-text="block.body"
+            @select="(text) => applyBlockStartingPoint(idx, text)"
+          />
           <button
             class="pce-delete-btn"
             type="button"
@@ -279,6 +284,7 @@ import HelpDialog from '../help/HelpDialog.vue';
 import XmlPreview from '../shared/XmlPreview.vue';
 import FullPromptModal from './FullPromptModal.vue';
 import PromptImproverModal from './PromptImproverModal.vue';
+import PromptLibraryButton from '../shared/PromptLibraryButton.vue';
 import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
 
 export type NestedEditTarget =
@@ -424,6 +430,12 @@ function toggleBlock(idx: number) {
 function deleteBlock(idx: number) {
   localBlocks.value.splice(idx, 1);
   commitBlocks('Delete block');
+}
+
+function applyBlockStartingPoint(idx: number, text: string) {
+  beginPromptEdit();
+  localBlocks.value[idx]!.body = text;
+  commitBlocks('Apply starting prompt');
 }
 
 function addBlock() {
