@@ -13,6 +13,24 @@
         <span v-if="runStatus !== 'idle'" class="run-status" :class="`rs-${runStatus}`" :title="`Run status: ${runStatus}`">
           {{ runStatus }}
         </span>
+        <button
+          type="button"
+          class="btn-header"
+          :disabled="!canUndo"
+          :title="canUndo ? `Undo ${undoLabel}` : 'Undo'"
+          @click="doUndo"
+        >
+          ↩
+        </button>
+        <button
+          type="button"
+          class="btn-header"
+          :disabled="!canRedo"
+          :title="canRedo ? `Redo ${redoLabel}` : 'Redo'"
+          @click="doRedo"
+        >
+          ↪
+        </button>
         <button type="button" class="btn-help" title="Help — UI overview and workflow" @click="showAppHelp = true">?</button>
         <button class="mobile-panel-btn" aria-label="Toggle inspector panel" @click="mobileLeftOpen = false; mobileRightOpen = !mobileRightOpen">⊞</button>
       </div>
@@ -83,6 +101,8 @@ import {usePipelinesStore} from './stores/pipelines.js';
 import {useCapsulesStore} from './stores/capsules.js';
 import {useImportExportStore} from './stores/importExport.js';
 import {useUiStore} from './stores/ui.js';
+import {usePipelineEditorStore} from './stores/pipelineEditor.js';
+import {useCapsuleStepEditorStore} from './stores/capsuleStepEditor.js';
 import LeftPane from './components/LeftPane.vue';
 import CenterPane from './components/pipeline/CenterPane.vue';
 import CapsuleCenterPane from './components/capsule/CapsuleCenterPane.vue';
@@ -110,10 +130,35 @@ const capsulesStore = useCapsulesStore();
 const importStore = useImportExportStore();
 const endpointsStore = useEndpointsStore();
 const modelsStore = useModelsStore();
+const pipelineEditorStore = usePipelineEditorStore();
+const capsuleStepEditorStore = useCapsuleStepEditorStore();
 
 const runStatus = computed(() =>
   uiStore.editorContext === 'capsule' ? capsuleRunStore.status : runStore.status,
 );
+
+const canUndo = computed(() =>
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canUndo : pipelineEditorStore.canUndo
+);
+const canRedo = computed(() =>
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.canRedo : pipelineEditorStore.canRedo
+);
+const undoLabel = computed(() =>
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastUndoLabel : pipelineEditorStore.lastUndoLabel
+);
+const redoLabel = computed(() =>
+  uiStore.editorContext === 'capsule' ? capsuleStepEditorStore.lastRedoLabel : pipelineEditorStore.lastRedoLabel
+);
+
+function doUndo() {
+  if (uiStore.editorContext === 'capsule') capsuleStepEditorStore.undo();
+  else pipelineEditorStore.undo();
+}
+
+function doRedo() {
+  if (uiStore.editorContext === 'capsule') capsuleStepEditorStore.redo();
+  else pipelineEditorStore.redo();
+}
 
 type NodeEditorPane = {updateNode: (nodeId: string, patch: Record<string, unknown>) => void};
 
@@ -224,6 +269,16 @@ body {
 .breadcrumb-label { font-size: 0.88rem; color: #888; }
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
 .run-status { font-size: 0.82rem; padding: 3px 10px; border-radius: 4px; }
+.btn-header {
+  width: 2rem; height: 2rem; border-radius: 6px;
+  background: #1a1a1a; border: 1px solid #333; color: #ccc;
+  font-size: 1.1rem; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s ease;
+}
+.btn-header:hover:not(:disabled) { background: #2a2a2a; color: #fff; }
+.btn-header:disabled { opacity: 0.3; cursor: not-allowed; }
+
 .btn-help {
   width: 2rem; height: 2rem; border-radius: 50%;
   background: #1a2a3a; border: 1px solid #2a5070; color: #7ec8e3;
