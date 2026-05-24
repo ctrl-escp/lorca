@@ -289,7 +289,7 @@
                 </span>
                 <span v-if="traceFor(step.id)!.durationMs !== undefined" class="step-meta-item">
                   <span class="step-meta-label">Duration</span>
-                  <span class="step-duration">{{ traceFor(step.id)!.durationMs }}ms</span>
+                  <span class="step-duration">{{ formatDurationMs(traceFor(step.id)!.durationMs!) }}</span>
                 </span>
               </div>
 
@@ -391,6 +391,7 @@ import {
 } from '../../utils/dragDrop.js';
 import {JsonViewer} from '@lorca/ui-kit';
 import {formatArtifactDisplay} from '../../utils/formatArtifact.js';
+import {formatDurationMs} from '../../utils/formatDuration.js';
 
 type DragKind = 'step-reorder' | 'suggestion';
 

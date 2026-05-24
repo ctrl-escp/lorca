@@ -22,7 +22,7 @@
         </span>
         <span class="ev-status">{{ event.status }}</span>
         <span v-if="isPriorRunTraceEvent(event)" class="ev-reused">prior run</span>
-        <span v-if="event.durationMs !== undefined" class="ev-duration">{{ event.durationMs }}ms</span>
+        <span v-if="event.durationMs !== undefined" class="ev-duration">{{ formatDurationMs(event.durationMs) }}</span>
         <button
           v-if="hasDetails(event)"
           type="button"
@@ -96,6 +96,7 @@ import {
   isPriorRunTraceEvent,
   type CapsuleTraceScope,
 } from '../../utils/capsuleTraceView.js';
+import {formatDurationMs} from '../../utils/formatDuration.js';
 
 const props = defineProps<{
   trace: PipelineTraceEvent[];
