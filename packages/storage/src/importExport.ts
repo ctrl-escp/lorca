@@ -5,7 +5,6 @@ import type {
   PipelineStep,
   PipelineExportFile,
   CapsuleExportFile,
-  PipelineNode,
   ModelRef,
   StepOutputsExport,
 } from '@lorca/core';
@@ -20,8 +19,13 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/** Migrate graph-only capsules and drop legacy graph fields for persistence/export/import. */
+function normalizeCapsuleBody(capsule: CapsuleDefinition): CapsuleDefinition {
+  return stripCapsuleLegacyGraphFields(ensureCapsuleStepChain(capsule));
+}
+
 function cloneCapsuleForExport(capsule: CapsuleDefinition): CapsuleDefinition {
-  return stripCapsuleLegacyGraphFields(deepClone(capsule));
+  return deepClone(normalizeCapsuleBody(capsule));
 }
 
 export interface ImportContext {
@@ -141,17 +145,18 @@ export function parseCapsuleExport(data: unknown): CapsuleExportFile | ImportPar
   const schemaErr = schemaVersionError(file.capsule.schemaVersion, 'capsule', CAPSULE_SCHEMA_VERSION);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
 
-  const graph = validateCapsule(file.capsule);
-  if (!graph.ok) return {ok: false, errors: [graph.error.message]};
+  const capsule = normalizeCapsuleBody(file.capsule);
+  const validation = validateCapsule(capsule);
+  if (!validation.ok) return {ok: false, errors: [validation.error.message]};
 
-  return file;
+  return {...file, capsule};
 }
 
 export function previewPipelineImport(
   file: PipelineExportFile,
   ctx: ImportContext,
 ): PipelineImportPreview | ImportParseError {
-  const includedCapsules = file.includedCapsules ?? [];
+  const includedCapsules = (file.includedCapsules ?? []).map((cap) => deepClone(normalizeCapsuleBody(cap)));
   const missingModels = findMissingModels(
     collectModelRefsFromSteps(file.pipeline.steps, includedCapsules),
     ctx,
@@ -171,52 +176,14 @@ export function previewCapsuleImport(
   file: CapsuleExportFile,
   ctx: ImportContext,
 ): CapsuleImportPreview | ImportParseError {
-  const cap = file.capsule;
-  const modelRefs = cap.steps
-    ? collectModelRefsFromSteps(cap.steps, [cap])
-    : collectModelRefs(cap.nodes ?? []);
+  const capsule = deepClone(normalizeCapsuleBody(file.capsule));
+  const modelRefs = collectModelRefsFromSteps(capsule.steps ?? [], [capsule]);
   return {
     ok: true,
     kind: 'capsule',
-    capsule: deepClone(cap),
+    capsule,
     missingModels: findMissingModels(modelRefs, ctx),
   };
-}
-
-// Used for capsule nodes (CapsuleDefinition still uses the legacy node model)
-export function applyModelRemapsToNodes(
-  nodes: PipelineNode[],
-  remaps: Record<string, ModelRemap>,
-): PipelineNode[] {
-  return nodes.map((node) => {
-    if (node.type === 'model-call' && node.config.modelRef.kind !== 'slot') {
-      const remap = remaps[node.id];
-      if (remap) {
-        return {
-          ...node,
-          config: {
-            ...node.config,
-            modelRef: {kind: 'fixed', endpointId: remap.endpointId, modelName: remap.modelName},
-          },
-        };
-      }
-    }
-    if (node.type === 'capsule-instance') {
-      const assignments = {...node.config.modelSlotAssignments};
-      let changed = false;
-      for (const [slotName] of Object.entries(assignments)) {
-        const remap = remaps[`${node.id}::${slotName}`];
-        if (remap) {
-          assignments[slotName] = {endpointId: remap.endpointId, modelName: remap.modelName};
-          changed = true;
-        }
-      }
-      if (changed) {
-        return {...node, config: {...node.config, modelSlotAssignments: assignments}};
-      }
-    }
-    return node;
-  });
 }
 
 // Used for V2 pipeline steps
@@ -294,12 +261,12 @@ export function prepareImportedCapsule(
   remaps: Record<string, ModelRemap>,
 ): CapsuleDefinition {
   const now = new Date().toISOString();
-  const migrated = ensureCapsuleStepChain(capsule);
+  const migrated = normalizeCapsuleBody(capsule);
   const withRemaps: CapsuleDefinition = {
     ...migrated,
-    ...(migrated.steps ? {steps: applyModelRemapsToSteps(migrated.steps, remaps)} : {}),
+    steps: applyModelRemapsToSteps(migrated.steps ?? [], remaps),
   };
-  return stripCapsuleLegacyGraphFields({...withRemaps, id: newId, updatedAt: now, createdAt: now});
+  return {...withRemaps, id: newId, updatedAt: now, createdAt: now};
 }
 
 export function collectPipelineCapsuleRefs(
@@ -373,39 +340,6 @@ function collectModelRefsFromSteps(
     }
   };
   for (const step of steps) visit(step);
-  return refs;
-}
-
-function collectModelRefs(nodes: PipelineNode[]): MissingModelReference[] {
-  const refs: MissingModelReference[] = [];
-  for (const node of nodes) {
-    if (node.type === 'model-call' && node.config.modelRef.kind !== 'slot') {
-      const {modelName} = node.config.modelRef;
-      const endpointId = node.config.modelRef.kind === 'fixed' ? node.config.modelRef.endpointId : '';
-      if (!endpointId && !modelName) continue;
-      refs.push({
-        key: node.id,
-        nodeId: node.id,
-        endpointId,
-        modelName,
-        label: `Model call ${node.title ?? node.id}`,
-        suggestedBuckets: ['general'],
-      });
-    }
-    if (node.type === 'capsule-instance') {
-      for (const [slotName, assignment] of Object.entries(node.config.modelSlotAssignments)) {
-        if (!assignment.endpointId && !assignment.modelName) continue;
-        refs.push({
-          key: `${node.id}::${slotName}`,
-          nodeId: node.id,
-          endpointId: assignment.endpointId,
-          modelName: assignment.modelName,
-          label: `Capsule slot ${slotName} (${node.title ?? node.id})`,
-          suggestedBuckets: ['general'],
-        });
-      }
-    }
-  }
   return refs;
 }
 

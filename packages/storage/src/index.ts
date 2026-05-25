@@ -7,7 +7,6 @@ export {
   parseCapsuleExport,
   previewPipelineImport,
   previewCapsuleImport,
-  applyModelRemapsToNodes,
   applyModelRemapsToSteps,
   prepareImportedPipeline,
   prepareImportedCapsule,

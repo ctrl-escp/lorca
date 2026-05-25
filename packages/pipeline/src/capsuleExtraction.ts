@@ -457,18 +457,12 @@ export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefin
 
 /** Stable hash of capsule body for instance staleness when definition changes. */
 export function computeCapsuleContentSignature(capsule: CapsuleDefinition): string {
-  const json = capsule.steps
-    ? JSON.stringify({
-      interface: capsule.interface,
-      steps: capsule.steps,
-      input: capsule.input,
-    })
-    : JSON.stringify({
-      interface: capsule.interface,
-      nodes: capsule.nodes,
-      edges: capsule.edges,
-      outputRef: capsule.outputRef,
-    });
+  const canonical = ensureCapsuleStepChain(capsule);
+  const json = JSON.stringify({
+    interface: canonical.interface,
+    steps: canonical.steps ?? [],
+    input: canonical.input,
+  });
   let h = 5381;
   for (let i = 0; i < json.length; i++) h = ((h << 5) + h) ^ json.charCodeAt(i);
   return (h >>> 0).toString(36);

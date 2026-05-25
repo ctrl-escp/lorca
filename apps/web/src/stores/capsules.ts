@@ -130,7 +130,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
     const locked = getCapsule(id);
     if (locked?.status !== 'locked') return null;
     const newCapsuleId = newId('cap');
-    const draft = createDraftFromLocked(locked, newCapsuleId);
+    const draft = stripCapsuleLegacyGraphFields(ensureCapsuleStepChain(createDraftFromLocked(locked, newCapsuleId)));
     capsules.value.push(draft);
     void getDb().capsules.put(cloneForStorage(draft));
     return newCapsuleId;

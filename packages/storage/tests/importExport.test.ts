@@ -10,7 +10,6 @@ import {
   previewCapsuleImport,
   prepareImportedPipeline,
   prepareImportedCapsule,
-  applyModelRemapsToNodes,
   applyModelRemapsToSteps,
 } from '../src/importExport.js';
 
@@ -549,35 +548,6 @@ describe('importExport', () => {
     expect(cap?.outputRef).toBeUndefined();
   });
 
-  it('applyModelRemapsToNodes updates capsule instance slot assignments', () => {
-    const nodes = applyModelRemapsToNodes(
-      [{
-        id: 'cap-node',
-        type: 'capsule-instance',
-        artifactPrefix: 'verifier',
-        config: {
-          capsuleDefinitionId: 'cap-1',
-          capsuleVersion: 'v1',
-          inputBindings: {},
-          outputBindings: {},
-          parameterValues: {},
-          modelSlotAssignments: {
-            judge: {endpointId: 'ep-old', modelName: 'big-model'},
-          },
-        },
-      }],
-      {'cap-node::judge': {endpointId: 'ep-local', modelName: 'llama3:latest'}},
-    );
-    const node = nodes[0];
-    expect(node?.type).toBe('capsule-instance');
-    if (node?.type === 'capsule-instance') {
-      expect(node.config.modelSlotAssignments.judge).toEqual({
-        endpointId: 'ep-local',
-        modelName: 'llama3:latest',
-      });
-    }
-  });
-
   it('prepareImportedCapsule assigns a new id', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
     expect(next.id).toBe('cap-imported');
@@ -590,6 +560,23 @@ describe('importExport', () => {
     expect(next.nodes).toBeUndefined();
     expect(next.edges).toBeUndefined();
     expect(next.outputRef).toBeUndefined();
+  });
+
+  it('parseCapsuleExport normalizes step-chain capsules and drops stale graph fields', () => {
+    const parsed = parseCapsuleExport({...exportCapsule(makeStepChainCapsule())});
+    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
+    expect(parsed.capsule.steps).toHaveLength(1);
+    expect(parsed.capsule.nodes).toBeUndefined();
+    expect(parsed.capsule.edges).toBeUndefined();
+    expect(parsed.capsule.outputRef).toBeUndefined();
+  });
+
+  it('exports graph-only capsules as migrated step-chain bodies', () => {
+    const file = exportCapsule(makeCapsule());
+    expect(file.capsule.steps).toBeDefined();
+    expect(file.capsule.nodes).toBeUndefined();
+    expect(file.capsule.edges).toBeUndefined();
+    expect(file.capsule.outputRef).toBeUndefined();
   });
 
   it('round-trips prompt blocks, history reads, enabled flags, and primaryOutputName', () => {
