@@ -122,7 +122,7 @@
 <script setup lang="ts">
 import {ref, watch, computed, onMounted, onUnmounted} from 'vue';
 import type {PipelineStep, CapsuleInstanceStepConfig, LoopExitCondition} from '@lorca/core';
-import {stepRunUiStateLabel, resolvePreviousOutputArtifactRef} from '@lorca/pipeline';
+import {resolvePreviousOutputArtifactRef} from '@lorca/pipeline';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';

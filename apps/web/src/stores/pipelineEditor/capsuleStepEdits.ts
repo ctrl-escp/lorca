@@ -1,5 +1,5 @@
 import {toRaw} from 'vue';
-import type {CapsuleDefinition, PipelineDefinition, PipelineStep} from '@lorca/core';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {
   computeCapsuleContentSignature,
   extractStepsToCapsule,
@@ -15,7 +15,7 @@ import {
 } from '../../utils/inlineCapsulePipelineOps.js';
 import {reconcileInlineCapsuleSlotRefs} from '../../utils/inlineCapsuleRun.js';
 import {useCapsulesStore} from '../capsules.js';
-import type {PipelineEditorSnapshot, PipelineEditorSelectionRefs} from './snapshot.js';
+import type {PipelineEditorSelectionRefs} from './snapshot.js';
 import type {NestedStepEditContext} from './nestedStepEdits.js';
 
 export interface CapsuleStepEditContext extends NestedStepEditContext {
