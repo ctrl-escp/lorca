@@ -34,67 +34,22 @@
 
       <div class="inspector-tab-panel">
         <!-- Config -->
-        <template v-if="activeTab === 'config'">
-          <div class="ns-row">
-            <span class="ns-label hdr-config" title="Artifact namespace for this step's outputs">namespace</span>
-            <code class="ns-value">{{ effectiveStep?.outputNamespace }}</code>
-            <span class="ns-dot">·</span>
-            <code class="ns-value">{{ effectiveStep?.primaryOutputName }}</code>
-          </div>
-
-          <CapsuleInlineStepEditor
-            v-if="inlineCapsuleScope"
-            :capsule-step-id="inlineCapsuleScope.capsuleStepId"
-            :inner-step="inlineCapsuleScope.innerStep"
-          />
-
-          <ModelCallConfigPanel
-            v-else-if="effectiveStep.config.type === 'model-call'"
-            :step="effectiveStep"
-            @begin-edit="onTextFieldFocus"
-            @commit-config="(config, label) => effectiveStep && editorStore.commitStepConfigEdit(effectiveStep.id, {config}, label)"
-          />
-
-          <template v-else-if="effectiveStep.config.type === 'presentation'">
-            <div class="inspector-field">
-              <FieldLabel label="Text" title="Free-form text with optional {{artifact.key}} interpolation" />
-              <TextEditor
-                v-model="localTemplate"
-                :rows="6"
-                :artifact-refs="templateArtifactRefs"
-                placeholder="{{artifact.user_prompt.raw}}"
-                title="Text with optional artifact placeholders"
-                @focus="onTextFieldFocus"
-                @blur="commitTemplate"
-              />
-            </div>
-          </template>
-
-          <PipelineCapsuleInstanceEditor
-            v-else-if="capsuleInstanceStep"
-            :step="capsuleInstanceStep"
-          />
-
-          <template v-else-if="effectiveStep.config.type === 'loop-group'">
-            <div class="inspector-field">
-              <FieldLabel label="Max iterations" required title="Maximum number of times the inner chain will run" />
-              <input
-                type="number" min="1" max="20" step="1"
-                v-model="localMaxIterations"
-                title="Maximum iterations"
-                @blur="() => commitLoopGroup()"
-              />
-            </div>
-            <LoopExitConditionEditor
-              :exit-condition="effectiveStep.config.exitCondition"
-              @update="onLoopExitUpdate"
-            />
-            <LoopInnerChainEditor
-              :loop-step-id="effectiveStep.id"
-              :inner-steps="effectiveStep.config.steps"
-            />
-          </template>
-        </template>
+        <StepInspectorConfigTab
+          v-if="activeTab === 'config' && effectiveStep"
+          :effective-step="effectiveStep"
+          :inline-capsule-scope="inlineCapsuleScope"
+          :capsule-instance-step="capsuleInstanceStep"
+          :template-artifact-refs="templateArtifactRefs"
+          :local-template="localTemplate"
+          :local-max-iterations="localMaxIterations"
+          @begin-edit="onTextFieldFocus"
+          @commit-config="(config, label) => editorStore.commitStepConfigEdit(effectiveStep!.id, {config}, label)"
+          @update:template="localTemplate = $event"
+          @commit-template="commitTemplate"
+          @update:max-iterations="localMaxIterations = $event"
+          @commit-loop="commitLoopGroup()"
+          @loop-exit-update="onLoopExitUpdate"
+        />
 
         <!-- Prompt -->
         <template v-else-if="activeTab === 'prompt'">
@@ -148,37 +103,18 @@
         />
       </div>
 
-      <!-- bottom last-run section (full / collapsed split modes) -->
-      <template v-if="showBottomSection">
-        <div
-          class="inspector-split-handle"
-          :class="{draggable: splitMode === 'full'}"
-          @mousedown="splitMode === 'full' ? onSplitHandleMouseDown($event) : undefined"
-        />
-        <div
-          class="inspector-bottom"
-          :style="splitMode === 'full' ? {height: bottomHeight + 'px'} : {}"
-        >
-          <div
-            v-if="splitMode === 'collapsed'"
-            class="inspector-bottom-header"
-            @click="isBottomExpanded = !isBottomExpanded"
-          >
-            <span class="bottom-status-dot" :class="`dot-${stepStatus?.state ?? 'not-run'}`" />
-            <span class="bottom-status-label">{{ stepStatus ? stepRunUiStateLabel(stepStatus.state) : 'No run data' }}</span>
-            <span v-if="lastSnapshot?.completedAt" class="bottom-status-time">{{ formatTime(lastSnapshot.completedAt) }}</span>
-            <span class="bottom-chevron">{{ isBottomExpanded ? '▾' : '▴' }}</span>
-          </div>
-          <div v-show="splitMode === 'full' || isBottomExpanded" class="inspector-bottom-content">
-            <StepLastRunPanel
-              :step-status="stepStatus"
-              :last-snapshot="lastSnapshot"
-              :last-run-output-value="lastRunOutputValue"
-              :format-time="formatTime"
-            />
-          </div>
-        </div>
-      </template>
+      <StepInspectorBottomSection
+        :show-bottom-section="showBottomSection"
+        :split-mode="splitMode"
+        :bottom-height="bottomHeight"
+        :is-bottom-expanded="isBottomExpanded"
+        :step-status="stepStatus"
+        :last-snapshot="lastSnapshot"
+        :last-run-output-value="lastRunOutputValue"
+        :format-time="formatTime"
+        @split-handle-mousedown="onSplitHandleMouseDown"
+        @toggle-bottom-expanded="isBottomExpanded = !isBottomExpanded"
+      />
     </template>
   </div>
 </template>
@@ -192,19 +128,14 @@ import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
-import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
-import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
-import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
-import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
-import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
-import ModelCallConfigPanel from './ModelCallConfigPanel.vue';
+import StepInspectorConfigTab from './StepInspectorConfigTab.vue';
+import StepInspectorBottomSection from './StepInspectorBottomSection.vue';
 import StepInputsPanel from './StepInputsPanel.vue';
 import StepOutputsPanel from './StepOutputsPanel.vue';
 import StepValidationPanel from './StepValidationPanel.vue';
 import StepLastRunPanel from './StepLastRunPanel.vue';
-import TextEditor from '../shared/TextEditor.vue';
 import {stepTypeInspectorLabel} from '../../utils/stepTypeLabels.js';
 import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 import {

@@ -1,15 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
 import type {PipelineDefinition, PipelineStep, StepType} from '@lorca/core';
-import {
-  makeEmptyPipeline,
-  extractStepsToCapsule,
-  computeCapsuleContentSignature,
-  inferLoopExitCondition,
-  wireRetryFeedbackOnFirstModelCall,
-} from '@lorca/pipeline';
-import {lockCapsule} from '@lorca/capsules';
-import type {CapsuleExtractionResult} from '@lorca/pipeline';
+import {makeEmptyPipeline} from '@lorca/pipeline';
 import type {CapsuleDefinition} from '@lorca/core';
 import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
@@ -19,13 +11,17 @@ import {
   defaultTemplateText,
 } from '../utils/stepBuilders.js';
 import {buildCapsuleInstanceStep as buildCapsuleInstanceStepCore} from '../utils/capsuleInstanceStep.js';
-import {
-  remapDetachedSteps,
-  validateInlineCapsuleLock,
-} from '../utils/inlineCapsulePipelineOps.js';
 import {usePipelinesStore} from './pipelines.js';
 import {useCapsulesStore} from './capsules.js';
 import {reconcileInlineCapsuleSlotRefs} from '../utils/inlineCapsuleRun.js';
+import {
+  applyPipelineSnapshot,
+  snapshotPipeline,
+  snapshotsEqual,
+  type PipelineEditorSnapshot,
+} from './pipelineEditor/snapshot.js';
+import {createNestedStepEditors} from './pipelineEditor/nestedStepEdits.js';
+import {createCapsuleStepEditors} from './pipelineEditor/capsuleStepEdits.js';
 
 export function buildDefaultStep(
   type: StepType,
@@ -36,13 +32,6 @@ export function buildDefaultStep(
 }
 
 // ── Undo/redo snapshot ───────────────────────────────────────────────────────
-
-interface PipelineEditorSnapshot {
-  steps: PipelineStep[];
-  outputStepId?: string;
-  pipelineName: string;
-  inputRaw: string;
-}
 
 interface UndoEntry {
   label: string;
@@ -89,149 +78,12 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     return ns;
   }
 
-  function findLoopGroup(loopStepId: string): PipelineStep | undefined {
-    const step = pipeline.value.steps.find((s) => s.id === loopStepId);
-    return step?.config.type === 'loop-group' ? step : undefined;
-  }
-
-  function findInlineCapsuleStep(capsuleStepId: string): PipelineStep | undefined {
-    const step = pipeline.value.steps.find((s) => s.id === capsuleStepId);
-    return step?.config.type === 'capsule-instance' ? step : undefined;
-  }
-
-  function contextStepsForLoopInner(loopStepId: string, innerStepId: string): PipelineStep[] {
-    const loopIdx = pipeline.value.steps.findIndex((s) => s.id === loopStepId);
-    const loop = findLoopGroup(loopStepId);
-    if (!loop || loop.config.type !== 'loop-group' || loopIdx < 0) return pipeline.value.steps;
-
-    const innerIdx = loop.config.steps.findIndex((s) => s.id === innerStepId);
-    const outerBefore = pipeline.value.steps.slice(0, loopIdx);
-    const innerBefore = innerIdx >= 0 ? loop.config.steps.slice(0, innerIdx) : loop.config.steps;
-    return [...outerBefore, ...innerBefore];
-  }
-
-  function contextStepsForInlineCapsuleInner(capsuleStepId: string, innerStepId: string): PipelineStep[] {
-    const capsuleIdx = pipeline.value.steps.findIndex((s) => s.id === capsuleStepId);
-    const capsule = findInlineCapsuleStep(capsuleStepId);
-    if (!capsule || capsule.config.type !== 'capsule-instance' || capsuleIdx < 0) return pipeline.value.steps;
-
-    const inlineSteps = capsule.config.inlineSteps ?? [];
-    const innerIdx = inlineSteps.findIndex((s) => s.id === innerStepId);
-    const outerBefore = pipeline.value.steps.slice(0, capsuleIdx);
-    const innerBefore = innerIdx >= 0 ? inlineSteps.slice(0, innerIdx) : inlineSteps;
-    return [...outerBefore, ...innerBefore];
-  }
-
-  function mutateLoopInnerSteps(
-    loopStepId: string,
-    mutate: (steps: PipelineStep[]) => PipelineStep[],
-    label: string,
-  ) {
-    const loop = findLoopGroup(loopStepId);
-    if (!loop || loop.config.type !== 'loop-group') return;
-    const before = snapshot();
-    const innerSteps = mutate(loop.config.steps.map((s) => JSON.parse(JSON.stringify(toRaw(s)))));
-    updateStepConfig(loopStepId, {
-      config: {...loop.config, steps: innerSteps},
-    });
-    recordUndo(label, before);
-  }
-
-  function mutateInlineCapsuleSteps(
-    capsuleStepId: string,
-    mutate: (steps: PipelineStep[]) => PipelineStep[],
-    label: string,
-  ) {
-    const capsule = findInlineCapsuleStep(capsuleStepId);
-    if (!capsule || capsule.config.type !== 'capsule-instance') return;
-    const before = snapshot();
-    const inlineSteps = mutate((capsule.config.inlineSteps ?? []).map((s) => JSON.parse(JSON.stringify(toRaw(s)))));
-    updateStepConfig(capsuleStepId, {
-      config: {...capsule.config, inlineSteps, inlineModified: true},
-    });
-    recordUndo(label, before);
-  }
-
-  function updateLoopInnerStep(
-    loopStepId: string,
-    innerStepId: string,
-    patch: Partial<PipelineStep>,
-  ) {
-    const loop = findLoopGroup(loopStepId);
-    if (!loop || loop.config.type !== 'loop-group') return;
-    const innerSteps = loop.config.steps.map((s) =>
-      s.id === innerStepId ? {...s, ...patch, lastEditedAt: new Date().toISOString()} : s,
-    );
-    updateStepConfig(loopStepId, {config: {...loop.config, steps: innerSteps}});
-  }
-
-  function updateInlineCapsuleInnerStep(
-    capsuleStepId: string,
-    innerStepId: string,
-    patch: Partial<PipelineStep>,
-  ) {
-    const capsule = findInlineCapsuleStep(capsuleStepId);
-    if (!capsule || capsule.config.type !== 'capsule-instance') return;
-    const innerSteps = (capsule.config.inlineSteps ?? []).map((s) =>
-      s.id === innerStepId ? {...s, ...patch, lastEditedAt: new Date().toISOString()} : s,
-    );
-    updateStepConfig(capsuleStepId, {config: {...capsule.config, inlineSteps: innerSteps, inlineModified: true}});
-  }
-
-  function commitLoopInnerStepEdit(
-    loopStepId: string,
-    innerStepId: string,
-    patch: Partial<PipelineStep>,
-    label: string,
-  ) {
-    const before = snapshot();
-    updateLoopInnerStep(loopStepId, innerStepId, patch);
-    recordUndo(label, before);
-  }
-
-  function commitInlineCapsuleInnerStepEdit(
-    capsuleStepId: string,
-    innerStepId: string,
-    patch: Partial<PipelineStep>,
-    label: string,
-  ) {
-    const before = snapshot();
-    updateInlineCapsuleInnerStep(capsuleStepId, innerStepId, patch);
-    recordUndo(label, before);
-  }
-
-  function appendLoopInnerStep(loopStepId: string, type: StepType): string | null {
-    const loop = findLoopGroup(loopStepId);
-    if (!loop || loop.config.type !== 'loop-group') return null;
-    if (type === 'loop-group' || type === 'capsule-instance') return null;
-    const draft = buildDefaultStep(type, getExistingNamespaces());
-    mutateLoopInnerSteps(loopStepId, (innerSteps) => [...innerSteps, draft], `Add inner "${draft.label}"`);
-    return draft.id;
-  }
-
-  function deleteLoopInnerStep(loopStepId: string, innerStepId: string) {
-    const loop = findLoopGroup(loopStepId);
-    if (!loop || loop.config.type !== 'loop-group') return;
-    const inner = loop.config.steps.find((s) => s.id === innerStepId);
-    if (!inner) return;
-    mutateLoopInnerSteps(
-      loopStepId,
-      (innerSteps) => innerSteps.filter((s) => s.id !== innerStepId),
-      `Delete inner "${inner.label}"`,
-    );
-  }
-
-  function moveLoopInnerStep(loopStepId: string, innerStepId: string, direction: 'up' | 'down') {
-    mutateLoopInnerSteps(loopStepId, (innerSteps) => {
-      const idx = innerSteps.findIndex((s) => s.id === innerStepId);
-      if (idx < 0) return innerSteps;
-      const swap = direction === 'up' ? idx - 1 : idx + 1;
-      if (swap < 0 || swap >= innerSteps.length) return innerSteps;
-      const next = [...innerSteps];
-      [next[idx], next[swap]] = [next[swap]!, next[idx]!];
-      return next;
-    }, 'Move inner step');
-  }
+  const selectionRefs = {
+    selectedStepId,
+    selectionAnchorId,
+    selectedLoopInnerStepId,
+    selectedInlineCapsuleInnerStepId,
+  };
 
   function buildCapsuleInstanceStep(
     capsule: CapsuleDefinition,
@@ -248,38 +100,11 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
   }
 
   function snapshot(): PipelineEditorSnapshot {
-    return {
-      steps: JSON.parse(JSON.stringify(toRaw(pipeline.value.steps))),
-      pipelineName: pipeline.value.name,
-      inputRaw: pipeline.value.input.raw,
-      ...(pipeline.value.outputStepId !== undefined ? {outputStepId: pipeline.value.outputStepId} : {}),
-    };
+    return snapshotPipeline(pipeline.value);
   }
 
   function applySnapshot(snap: PipelineEditorSnapshot) {
-    pipeline.value = {
-      ...pipeline.value,
-      steps: snap.steps,
-      name: snap.pipelineName,
-      input: {...pipeline.value.input, raw: snap.inputRaw},
-      updatedAt: new Date().toISOString(),
-    };
-    if (snap.outputStepId !== undefined) pipeline.value.outputStepId = snap.outputStepId;
-    else delete (pipeline.value as Partial<PipelineDefinition>).outputStepId;
-    if (selectedStepId.value && !pipeline.value.steps.find((s) => s.id === selectedStepId.value)) {
-      selectedStepId.value = null;
-    }
-    const selected = selectedStepId.value ? pipeline.value.steps.find((s) => s.id === selectedStepId.value) : null;
-    if (selected?.config.type !== 'loop-group') selectedLoopInnerStepId.value = null;
-    if (selected?.config.type !== 'capsule-instance') selectedInlineCapsuleInnerStepId.value = null;
-    if (selected?.config.type === 'loop-group' && selectedLoopInnerStepId.value) {
-      if (!selected.config.steps.some((s) => s.id === selectedLoopInnerStepId.value)) selectedLoopInnerStepId.value = null;
-    }
-    if (selected?.config.type === 'capsule-instance' && selectedInlineCapsuleInnerStepId.value) {
-      if (!(selected.config.inlineSteps ?? []).some((s) => s.id === selectedInlineCapsuleInnerStepId.value)) {
-        selectedInlineCapsuleInnerStepId.value = null;
-      }
-    }
+    pipeline.value = applyPipelineSnapshot(pipeline.value, snap, selectionRefs);
   }
 
   function recordUndo(label: string, before: PipelineEditorSnapshot) {
@@ -287,10 +112,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     undoStack.value = [...undoStack.value.slice(-MAX_UNDO + 1), {label, before, after}];
     redoStack.value = [];
     persistPipeline();
-  }
-
-  function snapshotsEqual(a: PipelineEditorSnapshot, b: PipelineEditorSnapshot): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
   }
 
   /** Finish a batched text edit (one undo entry if the pipeline changed). */
@@ -508,6 +329,27 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     recordUndo(label, before);
   }
 
+  const storeBuildDefaultStep = (type: StepType, overrides?: Partial<PipelineStep>) =>
+    buildDefaultStep(type, getExistingNamespaces(), overrides);
+
+  const stepEditCtx = {
+    getPipeline: () => pipeline.value,
+    setPipeline: (next: PipelineDefinition) => { pipeline.value = next; },
+    getExistingNamespaces,
+    snapshot,
+    recordUndo,
+    updateStepConfig,
+    buildDefaultStep: storeBuildDefaultStep,
+  };
+
+  const nestedStepEdits = createNestedStepEditors(stepEditCtx);
+  const capsuleStepEdits = createCapsuleStepEditors({
+    ...stepEditCtx,
+    selection: selectionRefs,
+    buildCapsuleInstanceStep,
+    findInlineCapsuleStep: nestedStepEdits.findInlineCapsuleStep,
+  });
+
   function selectStep(stepId: string | null, options?: {extendRange?: boolean}) {
     if (stepId && stepId !== pendingStepEdit?.stepId) finishPendingStepEdit();
     if (!stepId) {
@@ -542,220 +384,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     selectedStepId.value = capsuleStepId;
     selectedLoopInnerStepId.value = null;
     selectedInlineCapsuleInnerStepId.value = innerStepId;
-  }
-
-  function spreadCapsule(stepId: string): {ok: true} | {ok: false; message: string} {
-    const step = findInlineCapsuleStep(stepId);
-    if (!step || step.config.type !== 'capsule-instance') return {ok: false, message: 'Capsule step not found'};
-    const capsule = useCapsulesStore().getCapsule(step.config.capsuleId, step.config.capsuleVersion);
-    if (!capsule) return {ok: false, message: 'Capsule definition not found'};
-
-    const before = snapshot();
-    let inlineSteps = step.config.inlineSteps?.length
-      ? step.config.inlineSteps
-      : JSON.parse(JSON.stringify(toRaw(capsule.steps ?? []))) as PipelineStep[];
-    inlineSteps = reconcileInlineCapsuleSlotRefs(capsule, inlineSteps);
-    updateStepConfig(stepId, {
-      config: {
-        ...step.config,
-        displayMode: 'inline',
-        inlineSteps,
-        inlineModified: step.config.inlineSteps?.length ? step.config.inlineModified ?? false : false,
-        boundContentSignature: computeCapsuleContentSignature(capsule),
-      },
-    });
-    selectedStepId.value = stepId;
-    selectionAnchorId.value = stepId;
-    selectedLoopInnerStepId.value = null;
-    selectedInlineCapsuleInnerStepId.value = inlineSteps[0]?.id ?? null;
-    recordUndo(`Spread "${step.label}"`, before);
-    return {ok: true};
-  }
-
-  function collapseInlineCapsule(stepId: string) {
-    const step = findInlineCapsuleStep(stepId);
-    if (!step || step.config.type !== 'capsule-instance') return;
-    const before = snapshot();
-    updateStepConfig(stepId, {config: {...step.config, displayMode: 'opaque'}});
-    selectedInlineCapsuleInnerStepId.value = null;
-    recordUndo(`Collapse "${step.label}"`, before);
-  }
-
-  function detachCapsule(stepId: string): {ok: true} | {ok: false; message: string} {
-    const idx = pipeline.value.steps.findIndex((s) => s.id === stepId);
-    const step = pipeline.value.steps[idx];
-    if (!step || step.config.type !== 'capsule-instance') return {ok: false, message: 'Capsule step not found'};
-    const inlineSteps = step.config.inlineSteps ?? [];
-    if (inlineSteps.length === 0) return {ok: false, message: 'Spread the capsule before detaching it'};
-
-    const before = snapshot();
-    const parentNamespaces = new Set(
-      pipeline.value.steps.filter((s) => s.id !== stepId).map((s) => s.outputNamespace),
-    );
-    const detachedSteps = remapDetachedSteps(inlineSteps, parentNamespaces);
-    pipeline.value = {
-      ...pipeline.value,
-      steps: [
-        ...pipeline.value.steps.slice(0, idx),
-        ...detachedSteps,
-        ...pipeline.value.steps.slice(idx + 1),
-      ],
-      updatedAt: new Date().toISOString(),
-    };
-    selectedStepId.value = detachedSteps[0]?.id ?? null;
-    selectionAnchorId.value = selectedStepId.value;
-    selectedLoopInnerStepId.value = null;
-    selectedInlineCapsuleInnerStepId.value = null;
-    recordUndo(`Detach "${step.label}"`, before);
-    return {ok: true};
-  }
-
-  function lockInlineCapsuleAsCapsule(
-    stepId: string,
-    capsuleName: string,
-    options?: {capsuleId?: string},
-  ): {ok: true; capsule: CapsuleDefinition} | {ok: false; message: string} {
-    const step = findInlineCapsuleStep(stepId);
-    if (!step || step.config.type !== 'capsule-instance') return {ok: false, message: 'Capsule step not found'};
-    const source = useCapsulesStore().getCapsule(step.config.capsuleId, step.config.capsuleVersion);
-    if (!source) return {ok: false, message: 'Source capsule not found'};
-    const inlineSteps = (step.config.inlineSteps ?? []).map((s) => JSON.parse(JSON.stringify(toRaw(s))) as PipelineStep);
-    const validation = validateInlineCapsuleLock(source, inlineSteps);
-    if (!validation.ok) return validation;
-
-    const now = new Date().toISOString();
-    const capsuleId = options?.capsuleId ?? newId('cap');
-    const draft: CapsuleDefinition = {
-      schemaVersion: 1,
-      id: capsuleId,
-      name: capsuleName,
-      version: 'v1',
-      status: 'draft',
-      interface: JSON.parse(JSON.stringify(toRaw(source.interface))),
-      steps: inlineSteps,
-      input: source.input ?? pipeline.value.input,
-      tests: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    const locked = lockCapsule(draft);
-    if (!locked.ok) return {ok: false, message: locked.error.message};
-
-    const before = snapshot();
-    updateStepConfig(stepId, {
-      label: capsuleName,
-      config: {
-        ...step.config,
-        capsuleId: locked.value.id,
-        capsuleVersion: locked.value.version,
-        displayMode: 'opaque',
-        inlineSteps,
-        inlineModified: false,
-        boundContentSignature: computeCapsuleContentSignature(locked.value),
-      },
-    });
-    selectedInlineCapsuleInnerStepId.value = null;
-    recordUndo(`Lock "${capsuleName}"`, before);
-    return {ok: true, capsule: locked.value};
-  }
-
-  function getSelectionRange(): {startIndex: number; endIndex: number} | null {
-    const anchor = selectionAnchorId.value;
-    const end = selectedStepId.value;
-    if (!anchor || !end) return null;
-    const startIndex = pipeline.value.steps.findIndex((s) => s.id === anchor);
-    const endIndex = pipeline.value.steps.findIndex((s) => s.id === end);
-    if (startIndex < 0 || endIndex < 0) return null;
-    return {
-      startIndex: Math.min(startIndex, endIndex),
-      endIndex: Math.max(startIndex, endIndex),
-    };
-  }
-
-  function applyCapsuleExtraction(result: CapsuleExtractionResult, undoLabel: string) {
-    const before = snapshot();
-    pipeline.value = result.pipeline;
-    pipeline.value.updatedAt = new Date().toISOString();
-    selectedStepId.value = result.instanceStep.id;
-    selectionAnchorId.value = result.instanceStep.id;
-    recordUndo(undoLabel, before);
-  }
-
-  function wrapSelectionInRetryLoop(
-    loopLabel?: string,
-  ): {ok: true; loopStepId: string} | {ok: false; message: string} {
-    const range = getSelectionRange();
-    if (!range) {
-      return {ok: false, message: 'Select two or more steps. Shift+click another step to define a range.'};
-    }
-    const count = range.endIndex - range.startIndex + 1;
-    if (count < 2) {
-      return {ok: false, message: 'Select at least two steps: refine step(s) first, verification step last.'};
-    }
-
-    const selected = pipeline.value.steps.slice(range.startIndex, range.endIndex + 1);
-    if (selected.some((s) => s.config.type === 'loop-group')) {
-      return {ok: false, message: 'Cannot wrap a loop group inside another loop.'};
-    }
-
-    const innerSteps = wireRetryFeedbackOnFirstModelCall(
-      selected.map((s) => JSON.parse(JSON.stringify(toRaw(s))) as PipelineStep),
-    );
-    const lastStep = innerSteps.at(-1)!;
-    const exitCondition = inferLoopExitCondition(lastStep);
-    const loopStep = buildDefaultStep('loop-group', getExistingNamespaces(), {
-      label: loopLabel ?? `Retry: ${lastStep.label}`,
-      config: {
-        type: 'loop-group',
-        maxIterations: 3,
-        exitCondition,
-        steps: innerSteps,
-        outputNames: ['text'],
-      },
-    });
-
-    const before = snapshot();
-    pipeline.value = {
-      ...pipeline.value,
-      steps: [
-        ...pipeline.value.steps.slice(0, range.startIndex),
-        loopStep,
-        ...pipeline.value.steps.slice(range.endIndex + 1),
-      ],
-      updatedAt: new Date().toISOString(),
-    };
-    selectedStepId.value = loopStep.id;
-    selectionAnchorId.value = loopStep.id;
-    selectedLoopInnerStepId.value = innerSteps[0]?.id ?? null;
-    recordUndo(`Wrap retry loop "${loopStep.label}"`, before);
-    return {ok: true, loopStepId: loopStep.id};
-  }
-
-  function lockSelectionAsCapsule(
-    capsuleName: string,
-    options?: {capsuleId?: string},
-  ): {ok: true; capsule: CapsuleDefinition; replacedStepCount: number} | {ok: false; message: string} {
-    const range = getSelectionRange() ?? (pipeline.value.steps.length > 0
-      ? {startIndex: 0, endIndex: pipeline.value.steps.length - 1}
-      : null);
-    if (!range) return {ok: false, message: 'Add steps before locking a Capsule'};
-    const capsuleId = options?.capsuleId ?? newId('cap');
-    const result = extractStepsToCapsule({
-      pipeline: pipeline.value,
-      startIndex: range.startIndex,
-      endIndex: range.endIndex,
-      capsuleId,
-      capsuleName,
-    });
-    if (!result.ok) return {ok: false, message: result.error.message};
-    const locked = lockCapsule(result.value.capsule);
-    if (!locked.ok) return {ok: false, message: locked.error.message};
-    applyCapsuleExtraction(result.value, `Lock "${capsuleName}"`);
-    return {
-      ok: true,
-      capsule: locked.value,
-      replacedStepCount: range.endIndex - range.startIndex + 1,
-    };
   }
 
   function updatePipelineName(name: string) {
@@ -804,27 +432,27 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     selectionAnchorId,
     steps,
     selectedStep,
-    getSelectionRange,
-    applyCapsuleExtraction,
-    wrapSelectionInRetryLoop,
-    lockSelectionAsCapsule,
-    contextStepsForLoopInner,
-    contextStepsForInlineCapsuleInner,
-    mutateLoopInnerSteps,
-    mutateInlineCapsuleSteps,
-    updateLoopInnerStep,
-    updateInlineCapsuleInnerStep,
-    commitLoopInnerStepEdit,
-    commitInlineCapsuleInnerStepEdit,
-    appendLoopInnerStep,
-    deleteLoopInnerStep,
-    moveLoopInnerStep,
+    getSelectionRange: capsuleStepEdits.getSelectionRange,
+    applyCapsuleExtraction: capsuleStepEdits.applyCapsuleExtraction,
+    wrapSelectionInRetryLoop: capsuleStepEdits.wrapSelectionInRetryLoop,
+    lockSelectionAsCapsule: capsuleStepEdits.lockSelectionAsCapsule,
+    contextStepsForLoopInner: nestedStepEdits.contextStepsForLoopInner,
+    contextStepsForInlineCapsuleInner: nestedStepEdits.contextStepsForInlineCapsuleInner,
+    mutateLoopInnerSteps: nestedStepEdits.mutateLoopInnerSteps,
+    mutateInlineCapsuleSteps: nestedStepEdits.mutateInlineCapsuleSteps,
+    updateLoopInnerStep: nestedStepEdits.updateLoopInnerStep,
+    updateInlineCapsuleInnerStep: nestedStepEdits.updateInlineCapsuleInnerStep,
+    commitLoopInnerStepEdit: nestedStepEdits.commitLoopInnerStepEdit,
+    commitInlineCapsuleInnerStepEdit: nestedStepEdits.commitInlineCapsuleInnerStepEdit,
+    appendLoopInnerStep: nestedStepEdits.appendLoopInnerStep,
+    deleteLoopInnerStep: nestedStepEdits.deleteLoopInnerStep,
+    moveLoopInnerStep: nestedStepEdits.moveLoopInnerStep,
     buildCapsuleInstanceStep,
     insertCapsuleInstance,
-    spreadCapsule,
-    collapseInlineCapsule,
-    detachCapsule,
-    lockInlineCapsuleAsCapsule,
+    spreadCapsule: capsuleStepEdits.spreadCapsule,
+    collapseInlineCapsule: capsuleStepEdits.collapseInlineCapsule,
+    detachCapsule: capsuleStepEdits.detachCapsule,
+    lockInlineCapsuleAsCapsule: capsuleStepEdits.lockInlineCapsuleAsCapsule,
     canUndo,
     canRedo,
     lastUndoLabel,
