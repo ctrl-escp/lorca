@@ -78,9 +78,6 @@ function makeStepChainCapsule(text: string): CapsuleDefinition {
       parameters: [],
       modelSlots: [],
     },
-    nodes: [],
-    edges: [],
-    outputRef: {nodeId: 'body', outputName: 'text'},
     steps: [makeTextStep('body', text, 'body')],
     input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
     tests: [],
@@ -175,7 +172,7 @@ describe('capsule-instance step-chain execution', () => {
     expect(artifacts['cap.text']?.value).toBe('inline body');
   });
 
-  it('resolves legacy internal outputBindings to namespaced parent artifact keys', async () => {
+  it('namespaces internal outputBindings to parent artifact keys', async () => {
     const capsule = makeStepChainCapsule('saved body');
     const instance: PipelineStep = {
       id: 'inst-legacy-bindings',
@@ -361,7 +358,6 @@ describe('capsule-instance step-chain execution', () => {
         modelSlots: [],
       },
       steps: [loopStep],
-      outputRef: {nodeId: 'loop', outputName: 'text'},
     };
     const instance: PipelineStep = {
       id: 'inst-inline',

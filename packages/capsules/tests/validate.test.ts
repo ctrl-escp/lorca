@@ -3,7 +3,7 @@ import {describe, it, expect} from 'vitest';
 import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {validateCapsule} from '../src/validate.js';
 
-function minimalCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
+function graphCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
   const nodeId = 'model-1';
   return {
     schemaVersion: 1,
@@ -39,34 +39,38 @@ function textStep(id: string, text = 'ok', outputNamespace = id): PipelineStep {
 }
 
 function stepChainCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
-  return minimalCapsule({
-    nodes: [],
-    edges: [],
-    outputRef: {nodeId: 'body', outputName: 'text'},
-    steps: [textStep('body')],
-    input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+  return {
+    schemaVersion: 1,
+    id: 'cap-1',
+    name: 'Test Capsule',
+    version: 'v1',
+    status: 'draft',
     interface: {
       inputs: [],
       outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
       parameters: [],
       modelSlots: [],
     },
+    steps: [textStep('body')],
+    input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
+    tests: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...overrides,
-  });
+  };
 }
 
-describe('validateCapsule', () => {
-  it('passes a minimal valid capsule', () => {
-    expect(validateCapsule(minimalCapsule()).ok).toBe(true);
+describe('validateCapsule (graph-only capsules, migration path)', () => {
+  it('passes a minimal valid graph capsule', () => {
+    expect(validateCapsule(graphCapsule()).ok).toBe(true);
   });
 
   it('allows zero InputNodes', () => {
-    const def = minimalCapsule();
-    expect(validateCapsule(def).ok).toBe(true);
+    expect(validateCapsule(graphCapsule()).ok).toBe(true);
   });
 
   it('rejects two InputNodes', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [
         {id: 'in-1', type: 'input'},
         {id: 'in-2', type: 'input'},
@@ -79,7 +83,7 @@ describe('validateCapsule', () => {
   });
 
   it('rejects duplicate node IDs', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [
         {id: 'dup', type: 'manual-text', text: 'a'},
         {id: 'dup', type: 'manual-text', text: 'b'},
@@ -96,7 +100,7 @@ describe('validateCapsule', () => {
       artifactPrefix: 'result',
       config: {modelRef: {kind: 'fixed' as const, endpointId: 'ep-1', modelName: 'llm'}, mode: 'generate' as const, inputArtifactRef: 'user_prompt.xml', expectedOutput: 'json' as const},
     });
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [jsonModelNode('mc1'), jsonModelNode('mc2')],
       outputRef: {nodeId: 'mc1', outputName: 'text'},
     });
@@ -106,14 +110,14 @@ describe('validateCapsule', () => {
   });
 
   it('rejects invalid outputRef node', () => {
-    const def = minimalCapsule({outputRef: {nodeId: 'nonexistent', outputName: 'text'}});
+    const def = graphCapsule({outputRef: {nodeId: 'nonexistent', outputName: 'text'}});
     const result = validateCapsule(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('invalid_pipeline_graph');
   });
 
   it('rejects capsule-instance nodes (Phase 9)', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [
         {id: 'cap', type: 'capsule-instance', artifactPrefix: 'cap',
           config: {capsuleDefinitionId: 'x', capsuleVersion: 'v1', inputBindings: {}, outputBindings: {}, parameterValues: {}, modelSlotAssignments: {}}},
@@ -126,7 +130,7 @@ describe('validateCapsule', () => {
   });
 
   it('rejects slot ref for undeclared model slot', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [
         {id: 'mc', type: 'model-call', artifactPrefix: 'out',
           config: {modelRef: {kind: 'slot', slotName: 'undeclared_slot'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
@@ -139,7 +143,7 @@ describe('validateCapsule', () => {
   });
 
   it('accepts slot ref when slot is declared', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       interface: {
         inputs: [],
         outputs: [],
@@ -156,7 +160,7 @@ describe('validateCapsule', () => {
   });
 
   it('detects cycles', () => {
-    const def = minimalCapsule({
+    const def = graphCapsule({
       nodes: [
         {id: 'a', type: 'manual-text', text: 'a'},
         {id: 'b', type: 'manual-text', text: 'b'},
@@ -171,7 +175,9 @@ describe('validateCapsule', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('cycle_detected');
   });
+});
 
+describe('validateCapsule (step-chain capsules)', () => {
   it('validates step-chain capsules without legacy graph fields', () => {
     expect(validateCapsule(stepChainCapsule()).ok).toBe(true);
   });

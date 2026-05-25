@@ -1,8 +1,8 @@
 // @vitest-environment node
-import {describe, it, expect, beforeAll, afterAll} from 'vitest';
+import {describe, it, expect, beforeAll, afterAll, afterEach} from 'vitest';
 import {setupServer} from 'msw/node';
 import {http, HttpResponse} from 'msw';
-import type {CapsuleDefinition, AiEndpointConfig} from '@lorca/core';
+import type {CapsuleDefinition, AiEndpointConfig, PipelineStep} from '@lorca/core';
 import {executeCapsuleTestRun} from '../src/executor.js';
 
 const ENDPOINT: AiEndpointConfig = {
@@ -19,25 +19,70 @@ const server = setupServer(
 
 beforeAll(() => server.listen({onUnhandledRequest: 'error'}));
 afterAll(() => server.close());
+afterEach(() => server.resetHandlers());
+
+function modelCallStep(
+  id: string,
+  options?: {
+    outputNamespace?: string;
+    slotName?: string;
+    endpointId?: string;
+    prompt?: string;
+  },
+): PipelineStep {
+  const promptBody = options?.prompt ?? '';
+  return {
+    id,
+    type: 'model-call',
+    label: id,
+    enabled: true,
+    outputNamespace: options?.outputNamespace ?? 'answer',
+    primaryOutputName: 'text',
+    lastEditedAt: new Date().toISOString(),
+    config: {
+      type: 'model-call',
+      modelRef: options?.slotName
+        ? {kind: 'slot', slotName: options.slotName}
+        : {kind: 'fixed', endpointId: options?.endpointId ?? 'ep-1', modelName: 'test'},
+      mode: 'generate',
+      outputNames: ['text', 'rawResponse'],
+    },
+    prompt: {
+      previousOutput: {
+        enabled: promptBody.length === 0,
+        placement: 'afterOwnPrompt',
+        tagName: 'user_prompt',
+      },
+      historyReads: [],
+      blocks: promptBody
+        ? [{
+          id: `prompt-${id}`,
+          label: 'Prompt',
+          tagName: 'system',
+          body: promptBody,
+          enabled: true,
+          source: 'custom',
+        }]
+        : [],
+    },
+  };
+}
 
 function buildCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
-  const nodeId = 'mc-1';
   return {
     schemaVersion: 1,
     id: 'cap-1',
     name: 'Test',
     version: 'v1',
     status: 'draft',
-    interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    nodes: [
-      {id: 'in', type: 'input'},
-      {id: nodeId, type: 'model-call', artifactPrefix: 'answer',
-        config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
-    ],
-    edges: [
-      {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: nodeId, toInput: 'input'},
-    ],
-    outputRef: {nodeId, outputName: 'text'},
+    interface: {
+      inputs: [],
+      outputs: [{name: 'answer', kind: 'text', sourceArtifactKey: 'answer.text'}],
+      parameters: [],
+      modelSlots: [],
+    },
+    steps: [modelCallStep('mc-1')],
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
     tests: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -46,7 +91,7 @@ function buildCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefini
 }
 
 describe('executeCapsuleTestRun', () => {
-  it('produces artifacts and trace for a simple capsule', async () => {
+  it('produces artifacts and trace for a step-chain capsule', async () => {
     const def = buildCapsule();
     const artifacts: string[] = [];
     const trace: string[] = [];
@@ -57,48 +102,17 @@ describe('executeCapsuleTestRun', () => {
       (id) => (id === 'ep-1' ? ENDPOINT : undefined),
       {
         onArtifact(a) { artifacts.push(a.name); },
-        onTraceEvent(e) { trace.push(`${e.nodeId}:${e.status}`); },
+        onTraceEvent(e) { trace.push(`${e.stepId}:${e.status}`); },
       },
     );
 
     expect(result.ok).toBe(true);
     expect(artifacts).toContain('answer.text');
     if (result.ok) expect(result.value.finalOutputKey).toBe('answer.text');
+    expect(trace.some((entry) => entry.startsWith('mc-1:'))).toBe(true);
   });
 
   it('resolves model slot assignments before running', async () => {
-    const def = buildCapsule({
-      interface: {
-        inputs: [],
-        outputs: [],
-        parameters: [],
-        modelSlots: [{name: 'main_model', suggestedBuckets: ['general'], required: true}],
-      },
-      nodes: [
-        {id: 'in', type: 'input'},
-        {id: 'mc-slot', type: 'model-call', artifactPrefix: 'answer',
-          config: {modelRef: {kind: 'slot', slotName: 'main_model'}, mode: 'generate', inputArtifactRef: 'user_prompt.xml'}},
-      ],
-      edges: [{id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc-slot', toInput: 'input'}],
-      outputRef: {nodeId: 'mc-slot', outputName: 'text'},
-    });
-
-    const result = await executeCapsuleTestRun(
-      def,
-      {
-        userPromptRaw: 'hello',
-        inputValues: {},
-        paramValues: {},
-        slotAssignments: {main_model: {endpointId: 'ep-1', modelName: 'test'}},
-      },
-      (id) => (id === 'ep-1' ? ENDPOINT : undefined),
-      {onArtifact() {}, onTraceEvent() {}},
-    );
-
-    expect(result.ok).toBe(true);
-  });
-
-  it('resolves model slot assignments for step-chain capsules before running', async () => {
     const def = buildCapsule({
       interface: {
         inputs: [],
@@ -106,24 +120,7 @@ describe('executeCapsuleTestRun', () => {
         parameters: [],
         modelSlots: [{name: 'main_model', suggestedBuckets: ['general'], required: true}],
       },
-      nodes: [],
-      edges: [],
-      input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
-      steps: [{
-        id: 'intent',
-        type: 'model-call',
-        label: 'Intent',
-        enabled: true,
-        outputNamespace: 'answer',
-        primaryOutputName: 'text',
-        lastEditedAt: new Date().toISOString(),
-        config: {
-          type: 'model-call',
-          modelRef: {kind: 'slot', slotName: 'main_model'},
-          mode: 'generate',
-          outputNames: ['text', 'rawResponse'],
-        },
-      }],
+      steps: [modelCallStep('mc-slot', {slotName: 'main_model'})],
     });
 
     const result = await executeCapsuleTestRun(
@@ -167,7 +164,7 @@ describe('executeCapsuleTestRun', () => {
     expect(artifactNames).toContain('source_text.text');
   });
 
-  it('substitutes params in template nodes', async () => {
+  it('substitutes params in model-call prompt blocks', async () => {
     let capturedPrompt = '';
     server.use(
       http.post('http://localhost:11434/api/generate', async ({request}) => {
@@ -177,8 +174,6 @@ describe('executeCapsuleTestRun', () => {
       }),
     );
 
-    const templateId = 'tmpl-1';
-    const mcId = 'mc-2';
     const def = buildCapsule({
       interface: {
         inputs: [],
@@ -186,18 +181,9 @@ describe('executeCapsuleTestRun', () => {
         parameters: [{name: 'goal', kind: 'text', required: true}],
         modelSlots: [],
       },
-      nodes: [
-        {id: 'in', type: 'input'},
-        {id: templateId, type: 'template', artifactPrefix: 'rendered',
-          template: 'Goal: {{param.goal}}\nPrompt: {{artifact.user_prompt.raw}}'},
-        {id: mcId, type: 'model-call', artifactPrefix: 'answer',
-          config: {modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'}, mode: 'generate', inputArtifactRef: 'rendered.text'}},
-      ],
-      edges: [
-        {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: templateId, toInput: 'input'},
-        {id: 'e2', fromNodeId: templateId, fromOutput: 'text', toNodeId: mcId, toInput: 'input'},
-      ],
-      outputRef: {nodeId: mcId, outputName: 'text'},
+      steps: [modelCallStep('mc-2', {
+        prompt: 'Goal: {{param.goal}}\nPrompt: {{artifact.user_prompt.raw}}',
+      })],
     });
 
     await executeCapsuleTestRun(
@@ -209,5 +195,55 @@ describe('executeCapsuleTestRun', () => {
 
     expect(capturedPrompt).toContain('Goal: extract JSON');
     expect(capturedPrompt).toContain('my prompt');
+  });
+
+  it('migrates graph-only capsules before running', async () => {
+    const def: CapsuleDefinition = {
+      schemaVersion: 1,
+      id: 'cap-graph',
+      name: 'Graph Capsule',
+      version: 'v1',
+      status: 'draft',
+      interface: {
+        inputs: [],
+        outputs: [{name: 'answer', kind: 'text', sourceArtifactKey: 'answer.text'}],
+        parameters: [],
+        modelSlots: [],
+      },
+      nodes: [
+        {id: 'in', type: 'input'},
+        {
+          id: 'mc-1',
+          type: 'model-call',
+          artifactPrefix: 'answer',
+          config: {
+            modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'},
+            mode: 'generate',
+            inputArtifactRef: 'user_prompt.xml',
+          },
+        },
+      ],
+      edges: [
+        {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc-1', toInput: 'input'},
+      ],
+      outputRef: {nodeId: 'mc-1', outputName: 'text'},
+      tests: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const artifacts: string[] = [];
+    const result = await executeCapsuleTestRun(
+      def,
+      {userPromptRaw: 'hello', inputValues: {}, paramValues: {}, slotAssignments: {}},
+      (id) => (id === 'ep-1' ? ENDPOINT : undefined),
+      {
+        onArtifact(a) { artifacts.push(a.name); },
+        onTraceEvent() {},
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(artifacts).toContain('answer.text');
   });
 });
