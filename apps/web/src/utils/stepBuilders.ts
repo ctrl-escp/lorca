@@ -1,9 +1,11 @@
-import type {PipelineStep, StepConfig, StepType} from '@lorca/core';
+import type {CapsuleDefinition, ModelRef, PipelineInputConfig, PipelineStep, StepConfig, StepType} from '@lorca/core';
 
 let _counter = 0;
 export function newStepId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
 }
+
+export type StepIdFactory = (prefix: string) => string;
 
 export function defaultStepConfig(type: StepType): StepConfig {
   switch (type) {
@@ -54,7 +56,10 @@ export function defaultStepLabel(type: StepType): string {
 }
 
 export function defaultOutputNamespace(type: StepType, existingNamespaces: ReadonlySet<string>): string {
-  const base = type.replace(/-/g, '_');
+  return uniqueNamespace(type.replace(/-/g, '_'), existingNamespaces);
+}
+
+export function uniqueNamespace(base: string, existingNamespaces: ReadonlySet<string>): string {
   let ns = base;
   let i = 2;
   while (existingNamespaces.has(ns)) {
@@ -63,14 +68,40 @@ export function defaultOutputNamespace(type: StepType, existingNamespaces: Reado
   return ns;
 }
 
+export function defaultTemplateText(steps: readonly PipelineStep[], input: PipelineInputConfig): string {
+  const lastModelCall = [...steps].reverse().find((s) => s.config.type === 'model-call');
+  const inputRef = `{{artifact.${input.outputNamespace}.raw}}`;
+  if (!lastModelCall) return inputRef;
+  const responseRef = `{{artifact.${lastModelCall.outputNamespace}.text}}`;
+  return `${inputRef}\n\n${responseRef}`;
+}
+
+export function defaultModelSlotBindings(capsule: CapsuleDefinition): Record<string, ModelRef> {
+  const bindings: Record<string, ModelRef> = {};
+  for (const slot of capsule.interface.modelSlots) {
+    if (slot.defaultModelRef) {
+      bindings[slot.name] = {
+        kind: 'fixed',
+        endpointId: slot.defaultModelRef.endpointId,
+        modelName: slot.defaultModelRef.modelName,
+      };
+      continue;
+    }
+    const modelName = slot.preferredModelNames?.[0];
+    if (modelName) bindings[slot.name] = {kind: 'any-enabled-endpoint', modelName};
+  }
+  return bindings;
+}
+
 export function buildDefaultStep(
   type: StepType,
   existingNamespaces: ReadonlySet<string>,
   overrides?: Partial<PipelineStep>,
+  createId: StepIdFactory = newStepId,
 ): PipelineStep {
   const ns = defaultOutputNamespace(type, existingNamespaces);
   return {
-    id: newStepId(type.replace(/-/g, '_')),
+    id: createId(type.replace(/-/g, '_')),
     type,
     label: defaultStepLabel(type),
     enabled: true,

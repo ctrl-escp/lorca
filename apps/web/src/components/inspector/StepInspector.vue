@@ -4,7 +4,7 @@
     <template v-else>
       <div class="inspector-header">
         <span v-if="inlineCapsuleScope" class="inline-scope-label" :title="`Inside inline capsule ${step?.label ?? ''}`">Inline</span>
-        <span class="step-type-badge" :title="`Step type: ${effectiveStep.type}`">{{ TYPE_LABELS[effectiveStep.type] ?? effectiveStep.type }}</span>
+        <span class="step-type-badge" :title="`Step type: ${effectiveStep.type}`">{{ stepTypeInspectorLabel(effectiveStep.type) }}</span>
         <input
           v-if="!inlineCapsuleScope"
           class="step-label-input"
@@ -48,66 +48,12 @@
             :inner-step="inlineCapsuleScope.innerStep"
           />
 
-          <template v-else-if="effectiveStep.config.type === 'model-call'">
-            <div class="inspector-field">
-              <FieldLabel label="Model" required title="Which model to call for this step" />
-              <div class="model-select-row">
-                <select v-model="localModelKey" title="Select a model" @change="commitModelCall">
-                  <option value="">— select model —</option>
-                  <optgroup v-for="ep in endpointsStore.endpoints" :key="ep.id" :label="ep.name">
-                    <option
-                      v-for="m in modelsForEndpoint(ep.id)"
-                      :key="m.id"
-                      :value="`${m.endpointId}::${m.providerModelName}`"
-                    >
-                      {{ m.displayName }}
-                    </option>
-                  </optgroup>
-                </select>
-                <button type="button" class="btn-autoselect" title="Auto-select a suitable model" @click="autoSelectModel">Auto</button>
-              </div>
-              <p v-if="autoSelectWarning" class="model-select-warning">{{ autoSelectWarning }}</p>
-              <label class="checkbox-row" title="Run this model on the first enabled endpoint that has it">
-                <input type="checkbox" v-model="localUseAnyEndpoint" @change="commitModelCall" />
-                <span>Use this model on any enabled endpoint</span>
-              </label>
-            </div>
-            <div class="inspector-field">
-              <FieldLabel label="Mode" title="Generate: single prompt → single response. Chat: system + user message roles." />
-              <select v-model="localMode" title="Inference mode" @change="commitModelCall">
-                <option value="generate">Generate</option>
-                <option value="chat">Chat</option>
-              </select>
-            </div>
-            <div class="inspector-field">
-              <FieldLabel label="Temperature" title="Sampling temperature (leave blank for model default)" />
-              <input
-                type="number" min="0" max="2" step="0.05"
-                v-model="localTemperature"
-                placeholder="default"
-                title="Sampling temperature"
-                @blur="commitModelCall"
-              />
-            </div>
-            <div class="inspector-field">
-              <FieldLabel label="Max tokens" title="Maximum output tokens (leave blank for model default)" />
-              <input
-                type="number" min="1" step="128"
-                v-model="localMaxTokens"
-                placeholder="default"
-                title="Maximum output tokens"
-                @blur="commitModelCall"
-              />
-            </div>
-            <div class="inspector-field">
-              <FieldLabel label="Output format" title="How to handle the model's text output" />
-              <select v-model="localOutputType" title="Output format" @change="commitOutputType">
-                <option value="auto">Auto (try JSON, fall back silently)</option>
-                <option value="text">Text only (no JSON attempt)</option>
-                <option value="json">JSON strict (fail if not valid JSON)</option>
-              </select>
-            </div>
-          </template>
+          <ModelCallConfigPanel
+            v-else-if="effectiveStep.config.type === 'model-call'"
+            :step="effectiveStep"
+            @begin-edit="onTextFieldFocus"
+            @commit-config="(config, label) => effectiveStep && editorStore.commitStepConfigEdit(effectiveStep.id, {config}, label)"
+          />
 
           <template v-else-if="effectiveStep.config.type === 'presentation'">
             <div class="inspector-field">
@@ -312,7 +258,7 @@
 
 <script setup lang="ts">
 import {ref, watch, computed, onMounted, onUnmounted} from 'vue';
-import type {PipelineStep, ModelCallStepConfig, CapsuleInstanceStepConfig, LoopExitCondition, StepHistoryReadConfig} from '@lorca/core';
+import type {PipelineStep, CapsuleInstanceStepConfig, LoopExitCondition, StepHistoryReadConfig} from '@lorca/core';
 import {stepRunUiStateLabel, resolvePreviousOutputArtifactRef, validateHistoryRead, historyReadIssueLabel, REORDER_REF_HINTS} from '@lorca/pipeline';
 import type {HistoryReadIssue} from '@lorca/pipeline';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
@@ -320,17 +266,16 @@ import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
-import {useModelsStore} from '../../stores/models.js';
-import {useEndpointsStore} from '../../stores/endpoints.js';
 import {FieldLabel, JsonViewer} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
-import {modelKeyFromRef, tryAutoSelectModelCallStep} from '../../utils/modelAutoSelect.js';
+import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
+import ModelCallConfigPanel from './ModelCallConfigPanel.vue';
 import TextEditor from '../shared/TextEditor.vue';
-import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {stepTypeInspectorLabel} from '../../utils/stepTypeLabels.js';
 import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 import {
   inlineCapsuleArtifactKey,
@@ -347,9 +292,6 @@ const pipelineEditorStore = usePipelineEditorStore();
 const pipelineRunStore = useActiveRunStore();
 const capsuleRunStore = useCapsuleRunStore();
 const runStore = computed(() => uiStore.editorContext === 'capsule' ? capsuleRunStore : pipelineRunStore);
-const modelsStore = useModelsStore();
-const endpointsStore = useEndpointsStore();
-
 const {stateFor} = useStepStaleStateMap(() => editorStore.pipeline.input.raw);
 
 const step = computed(() => editorStore.selectedStep);
@@ -529,21 +471,7 @@ function formatTime(iso: string): string {
   }
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  'model-call': 'Model Call',
-  'presentation': 'Text',
-  'capsule-instance': 'Capsule',
-  'loop-group': 'Loop',
-};
-
 const localLabel = ref('');
-const localModelKey = ref('');
-const autoSelectWarning = ref('');
-const localUseAnyEndpoint = ref(false);
-const localMode = ref<'generate' | 'chat'>('generate');
-const localTemperature = ref('');
-const localMaxTokens = ref('');
-const localOutputType = ref<'text' | 'auto' | 'json'>('auto');
 const localTemplate = ref('');
 const localMaxIterations = ref(3);
 
@@ -552,38 +480,12 @@ watch(step, (s) => {
   localLabel.value = s.label;
   const cfg = s.config;
 
-  if (cfg.type === 'model-call') {
-    localUseAnyEndpoint.value = cfg.modelRef.kind === 'any-enabled-endpoint';
-    localModelKey.value = cfg.modelRef.kind === 'fixed'
-      ? `${cfg.modelRef.endpointId}::${cfg.modelRef.modelName}`
-      : cfg.modelRef.kind === 'any-enabled-endpoint'
-        ? modelKeyForName(cfg.modelRef.modelName)
-        : '';
-    localMode.value = cfg.mode;
-    localTemperature.value = cfg.temperature !== undefined ? String(cfg.temperature) : '';
-    localMaxTokens.value = cfg.maxTokens !== undefined ? String(cfg.maxTokens) : '';
-    localOutputType.value = cfg.outputType ?? 'auto';
-  }
-
   if (cfg.type === 'presentation') localTemplate.value = cfg.text;
 
   if (cfg.type === 'loop-group') {
     localMaxIterations.value = cfg.maxIterations;
   }
 }, {immediate: true});
-
-function modelsForEndpoint(endpointId: string) {
-  return modelsStore.modelsByEndpoint.get(endpointId) ?? [];
-}
-
-function modelKeyForName(modelName: string): string {
-  const model = modelsStore.models.find((m) => m.providerModelName === modelName);
-  return model ? `${model.endpointId}::${model.providerModelName}` : '';
-}
-
-function modelNameFromKey(key: string): string {
-  return key ? key.split('::').slice(1).join('::') : '';
-}
 
 function onLabelFocus() {
   const s = step.value;
@@ -599,48 +501,6 @@ function commitLabel() {
   const s = step.value;
   if (!s || localLabel.value === s.label) return;
   editorStore.commitStepEdit(s.id, {label: localLabel.value.trim() || s.label}, 'Rename step');
-}
-
-function commitModelCall() {
-  const s = step.value;
-  if (!s || s.config.type !== 'model-call') return;
-  const parts = localModelKey.value.split('::');
-  const modelName = modelNameFromKey(localModelKey.value);
-  const modelRef = modelName
-    ? localUseAnyEndpoint.value
-      ? {kind: 'any-enabled-endpoint' as const, modelName}
-      : {kind: 'fixed' as const, endpointId: parts[0] ?? '', modelName}
-    : s.config.modelRef;
-  const patch: Partial<ModelCallStepConfig> = {modelRef, mode: localMode.value};
-  const temp = parseFloat(localTemperature.value);
-  if (!isNaN(temp)) patch.temperature = temp;
-  const maxTok = parseInt(localMaxTokens.value, 10);
-  if (!isNaN(maxTok) && maxTok > 0) patch.maxTokens = maxTok;
-  editorStore.commitStepConfigEdit(s.id, {config: {...s.config, ...patch}}, 'Update model call');
-}
-
-function autoSelectModel() {
-  const s = step.value;
-  if (!s || s.config.type !== 'model-call') return;
-  const result = tryAutoSelectModelCallStep(s, modelsStore.models);
-  if (result.ok) {
-    autoSelectWarning.value = '';
-    localUseAnyEndpoint.value = false;
-    localModelKey.value = modelKeyFromRef(result.modelRef);
-    commitModelCall();
-  } else {
-    autoSelectWarning.value = result.warning;
-  }
-}
-
-function commitOutputType() {
-  const s = step.value;
-  if (!s || s.config.type !== 'model-call') return;
-  const {outputType: _old, ...rest} = s.config;
-  const newConfig = localOutputType.value === 'auto'
-    ? rest as typeof s.config
-    : {...rest, outputType: localOutputType.value} as typeof s.config;
-  editorStore.commitStepConfigEdit(s.id, {config: newConfig}, 'Update output format');
 }
 
 function commitTemplate() {

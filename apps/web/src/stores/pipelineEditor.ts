@@ -1,136 +1,38 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
-import type {ModelRef, PipelineDefinition, PipelineStep, StepType, StepConfig, PipelineInputConfig} from '@lorca/core';
+import type {PipelineDefinition, PipelineStep, StepType} from '@lorca/core';
 import {
   makeEmptyPipeline,
   extractStepsToCapsule,
   computeCapsuleContentSignature,
   inferLoopExitCondition,
   wireRetryFeedbackOnFirstModelCall,
-  listStepOutputArtifacts,
 } from '@lorca/pipeline';
 import {lockCapsule} from '@lorca/capsules';
 import type {CapsuleExtractionResult} from '@lorca/pipeline';
 import type {CapsuleDefinition} from '@lorca/core';
 import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
+import {
+  buildDefaultStep as buildDefaultStepCore,
+  defaultOutputNamespace,
+  defaultTemplateText,
+} from '../utils/stepBuilders.js';
+import {buildCapsuleInstanceStep as buildCapsuleInstanceStepCore} from '../utils/capsuleInstanceStep.js';
+import {
+  remapDetachedSteps,
+  validateInlineCapsuleLock,
+} from '../utils/inlineCapsulePipelineOps.js';
 import {usePipelinesStore} from './pipelines.js';
 import {useCapsulesStore} from './capsules.js';
 import {reconcileInlineCapsuleSlotRefs} from '../utils/inlineCapsuleRun.js';
-
-// ── Default step builders ────────────────────────────────────────────────────
-
-function defaultStepConfig(type: StepType): StepConfig {
-  switch (type) {
-    case 'model-call':
-      return {
-        type: 'model-call',
-        modelRef: {kind: 'fixed', endpointId: '', modelName: ''},
-        mode: 'generate',
-        outputNames: ['text', 'rawResponse'],
-      };
-    case 'presentation':
-      return {type: 'presentation', text: '', outputNames: ['text']};
-    case 'capsule-instance':
-      return {
-        type: 'capsule-instance',
-        capsuleId: '',
-        capsuleVersion: 'v1',
-        inputBindings: {},
-        outputBindings: {},
-      };
-    case 'loop-group':
-      return {
-        type: 'loop-group',
-        maxIterations: 3,
-        exitCondition: {type: 'json-field-equals', fieldPath: 'passed', value: true},
-        steps: [],
-        outputNames: ['text'],
-      };
-    default: {
-      const _exhaustive: never = type;
-      throw new Error(`Unknown step type: ${_exhaustive}`);
-    }
-  }
-}
-
-function defaultPrimaryOutputName(_type: StepType): string {
-  return 'text';
-}
-
-function defaultLabel(type: StepType): string {
-  const labels: Record<StepType, string> = {
-    'model-call': 'Model Call',
-    'presentation': 'Text',
-    'capsule-instance': 'Capsule',
-    'loop-group': 'Loop',
-  };
-  return labels[type];
-}
-
-function defaultTemplateText(steps: readonly PipelineStep[], input: PipelineInputConfig): string {
-  const lastModelCall = [...steps].reverse().find((s) => s.config.type === 'model-call');
-  const inputRef = `{{artifact.${input.outputNamespace}.raw}}`;
-  if (!lastModelCall) return inputRef;
-  const responseRef = `{{artifact.${lastModelCall.outputNamespace}.text}}`;
-  return `${inputRef}\n\n${responseRef}`;
-}
-
-function defaultNamespace(type: StepType, existingNamespaces: ReadonlySet<string>): string {
-  const base = type.replace(/-/g, '_');
-  return uniqueNamespace(base, existingNamespaces);
-}
-
-function uniqueNamespace(base: string, existingNamespaces: ReadonlySet<string>): string {
-  let ns = base;
-  let i = 2;
-  while (existingNamespaces.has(ns)) {
-    ns = `${base}_${i++}`;
-  }
-  return ns;
-}
-
-function defaultModelSlotBindings(capsule: CapsuleDefinition): Record<string, ModelRef> {
-  const bindings: Record<string, ModelRef> = {};
-  for (const slot of capsule.interface.modelSlots) {
-    if (slot.defaultModelRef) {
-      bindings[slot.name] = {
-        kind: 'fixed',
-        endpointId: slot.defaultModelRef.endpointId,
-        modelName: slot.defaultModelRef.modelName,
-      };
-      continue;
-    }
-    const modelName = slot.preferredModelNames?.[0];
-    if (modelName) bindings[slot.name] = {kind: 'any-enabled-endpoint', modelName};
-  }
-  return bindings;
-}
-
-function unsupportedInlineCapsuleLockStep(steps: readonly PipelineStep[]): PipelineStep | null {
-  for (const step of steps) {
-    if (step.config.type === 'loop-group' || step.config.type === 'capsule-instance') return step;
-  }
-  return null;
-}
 
 export function buildDefaultStep(
   type: StepType,
   existingNamespaces: ReadonlySet<string>,
   overrides?: Partial<PipelineStep>,
 ): PipelineStep {
-  const ns = defaultNamespace(type, existingNamespaces);
-  return {
-    id: newId(type.replace(/-/g, '_')),
-    type,
-    label: defaultLabel(type),
-    enabled: true,
-    outputNamespace: ns,
-    primaryOutputName: defaultPrimaryOutputName(type),
-    lastEditedAt: new Date().toISOString(),
-    config: defaultStepConfig(type),
-    ...overrides,
-  };
+  return buildDefaultStepCore(type, existingNamespaces, overrides, newId);
 }
 
 // ── Undo/redo snapshot ───────────────────────────────────────────────────────
@@ -335,42 +237,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     capsule: CapsuleDefinition,
     overrides?: Partial<PipelineStep>,
   ): PipelineStep {
-    const ns = defaultNamespace('capsule-instance', getExistingNamespaces());
-    const inputBindings: Record<string, string> = {};
-    for (const port of capsule.interface.inputs) {
-      inputBindings[port.name] = port.defaultArtifactKey
-        ?? (port.name === 'user_prompt' ? 'user_prompt.xml' : `${port.name}.text`);
-    }
-    const outputBindings: Record<string, string> = {};
-    for (const port of capsule.interface.outputs) {
-      const suffix = port.sourceArtifactKey?.split('.').pop() ?? port.name;
-      outputBindings[port.name] = `${ns}.${suffix}`;
-    }
-    const lastOut = capsule.interface.outputs.at(-1);
-    const primaryOutputName = lastOut
-      ? (lastOut.sourceArtifactKey?.split('.').pop() ?? 'text')
-      : 'text';
-    const modelSlotBindings = defaultModelSlotBindings(capsule);
-
-    return {
-      id: newId('cap_inst'),
-      type: 'capsule-instance',
-      label: capsule.name,
-      enabled: true,
-      outputNamespace: ns,
-      primaryOutputName,
-      lastEditedAt: new Date().toISOString(),
-      config: {
-        type: 'capsule-instance',
-        capsuleId: capsule.id,
-        capsuleVersion: capsule.version,
-        inputBindings,
-        outputBindings,
-        ...(Object.keys(modelSlotBindings).length > 0 ? {modelSlotBindings} : {}),
-        boundContentSignature: computeCapsuleContentSignature(capsule),
-      },
-      ...overrides,
-    };
+    return buildCapsuleInstanceStepCore(capsule, getExistingNamespaces(), newId, overrides);
   }
 
   function insertCapsuleInstance(capsule: CapsuleDefinition): string | null {
@@ -581,7 +448,7 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const idx = pipeline.value.steps.findIndex((s) => s.id === stepId);
     if (idx < 0) return null;
     const original = pipeline.value.steps[idx]!;
-    const ns = defaultNamespace(original.type, getExistingNamespaces());
+    const ns = defaultOutputNamespace(original.type, getExistingNamespaces());
     const dup: PipelineStep = {
       ...JSON.parse(JSON.stringify(toRaw(original))),
       id: newId(original.type.replace(/-/g, '_')),
@@ -753,21 +620,8 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     const source = useCapsulesStore().getCapsule(step.config.capsuleId, step.config.capsuleVersion);
     if (!source) return {ok: false, message: 'Source capsule not found'};
     const inlineSteps = (step.config.inlineSteps ?? []).map((s) => JSON.parse(JSON.stringify(toRaw(s))) as PipelineStep);
-    if (inlineSteps.length === 0) return {ok: false, message: 'Inline capsule has no steps to lock'};
-    const unsupported = unsupportedInlineCapsuleLockStep(inlineSteps);
-    if (unsupported) {
-      return {
-        ok: false,
-        message: `Cannot lock inline Capsule because "${unsupported.label}" is a ${unsupported.config.type} step`,
-      };
-    }
-
-    const outputRefs = new Set(inlineSteps.flatMap((s) => listStepOutputArtifacts(s).map((a) => a.ref)));
-    for (const port of source.interface.outputs) {
-      if (port.sourceArtifactKey && !outputRefs.has(port.sourceArtifactKey)) {
-        return {ok: false, message: `Output "${port.name}" points to missing artifact ${port.sourceArtifactKey}`};
-      }
-    }
+    const validation = validateInlineCapsuleLock(source, inlineSteps);
+    if (!validation.ok) return validation;
 
     const now = new Date().toISOString();
     const capsuleId = options?.capsuleId ?? newId('cap');
@@ -803,75 +657,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
     selectedInlineCapsuleInnerStepId.value = null;
     recordUndo(`Lock "${capsuleName}"`, before);
     return {ok: true, capsule: locked.value};
-  }
-
-  function remapDetachedSteps(sourceSteps: PipelineStep[], parentNamespaces: ReadonlySet<string>): PipelineStep[] {
-    const namespaceMap = new Map<string, string>();
-    const used = new Set(parentNamespaces);
-    const detached = sourceSteps.map((s) => JSON.parse(JSON.stringify(toRaw(s))) as PipelineStep);
-
-    for (const step of detached) {
-      const original = step.outputNamespace;
-      const next = used.has(original) ? uniqueNamespace(original, used) : original;
-      namespaceMap.set(original, next);
-      used.add(next);
-      step.outputNamespace = next;
-    }
-
-    return detached.map((step) => remapStepArtifactRefs(step, namespaceMap));
-  }
-
-  function remapStepArtifactRefs(step: PipelineStep, namespaceMap: ReadonlyMap<string, string>): PipelineStep {
-    const next: PipelineStep = {...step};
-    if (step.prompt) {
-      next.prompt = {
-        ...step.prompt,
-        historyReads: step.prompt.historyReads.map((read) => ({
-          ...read,
-          sourceArtifactRef: remapArtifactRef(read.sourceArtifactRef, namespaceMap),
-        })),
-      };
-    }
-
-    if (next.config.type === 'presentation') {
-      next.config = {...next.config, text: remapArtifactRefsInText(next.config.text, namespaceMap)};
-    } else if (next.config.type === 'capsule-instance') {
-      const inlineSteps = next.config.inlineSteps?.map((inner) => remapStepArtifactRefs(inner, namespaceMap));
-      next.config = {
-        ...next.config,
-        inputBindings: remapBindingRefs(next.config.inputBindings, namespaceMap),
-        outputBindings: remapBindingRefs(next.config.outputBindings, namespaceMap),
-        ...(inlineSteps ? {inlineSteps} : {}),
-      };
-    } else if (next.config.type === 'loop-group') {
-      next.config = {
-        ...next.config,
-        steps: next.config.steps.map((inner) => remapStepArtifactRefs(inner, namespaceMap)),
-      };
-    }
-
-    return next;
-  }
-
-  function remapBindingRefs(refs: Record<string, string>, namespaceMap: ReadonlyMap<string, string>): Record<string, string> {
-    return Object.fromEntries(Object.entries(refs).map(([key, artifactRef]) => [key, remapArtifactRef(artifactRef, namespaceMap)]));
-  }
-
-  function remapArtifactRef(artifactRef: string, namespaceMap: ReadonlyMap<string, string>): string {
-    for (const [from, to] of namespaceMap) {
-      if (from !== to && artifactRef.startsWith(`${from}.`)) return `${to}.${artifactRef.slice(from.length + 1)}`;
-    }
-    return artifactRef;
-  }
-
-  function remapArtifactRefsInText(text: string, namespaceMap: ReadonlyMap<string, string>): string {
-    let next = text;
-    for (const [from, to] of namespaceMap) {
-      if (from === to) continue;
-      next = next.replaceAll(`artifact.${from}.`, `artifact.${to}.`);
-      next = next.replaceAll(`${from}.`, `${to}.`);
-    }
-    return next;
   }
 
   function getSelectionRange(): {startIndex: number; endIndex: number} | null {

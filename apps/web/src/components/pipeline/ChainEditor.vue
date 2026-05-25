@@ -438,9 +438,9 @@
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, defineComponent, h} from 'vue';
-import {PIPELINE_INPUT_STEP_ID, type PipelineArtifact, type PipelineError, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
-import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary, dataSourceBadgeTitle, findPreviousEnabledStepAt, validateHistoryRead, historyReadIssueLabel} from '@lorca/pipeline';
+import {ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, toRef} from 'vue';
+import {type PipelineArtifact, type PipelineError, type PipelineStep, type PipelineTraceEvent, type StepType} from '@lorca/core';
+import {getStepHistoryReads, stepRunUiStateLabel, formatLoopExitSummary} from '@lorca/pipeline';
 import type {StepStaleState} from '@lorca/pipeline';
 import {
   DND_STEP_ID,
@@ -458,88 +458,15 @@ import {
   type ResolveStepExecutionOptions,
   type StepExecutionChip,
 } from '../../utils/stepExecutionDisplay.js';
+import {dataSourceBadgesByStepId} from '../../utils/chainStepDataSources.js';
+import {stepTypeLabel} from '../../utils/stepTypeLabels.js';
+import {useChainStepContextMenu} from '../../composables/useChainStepContextMenu.js';
 import ContextMenu from '../shared/ContextMenu.vue';
-import type {ContextMenuItem} from '../shared/contextMenu.js';
 import TextEditor from '../shared/TextEditor.vue';
+import DropSlotIndicator from './DropSlotIndicator.vue';
+import StepIcon from './StepIcon.vue';
 
 type DragKind = 'step-reorder' | 'suggestion';
-
-type StepDataSourceKind = 'previous' | 'history' | 'template' | 'binding' | 'direct';
-
-interface StepDataSourceBadge {
-  key: string;
-  label: string;
-  title: string;
-  kind: StepDataSourceKind;
-  invalid?: boolean;
-}
-
-const DropSlotIndicator = defineComponent({
-  name: 'DropSlotIndicator',
-  props: {
-    active: {type: Boolean, required: true},
-    ghost: {type: Boolean, required: true},
-    label: {type: String, required: true},
-  },
-  setup(props) {
-    return () => {
-      if (!props.active && !props.ghost) return null;
-      return h(
-        'div',
-        {
-          class: [
-            'drop-slot-card',
-            props.active ? 'drop-slot-card-active' : 'drop-slot-card-ghost',
-          ],
-          ...(props.active ? {'aria-label': props.label} : {'aria-hidden': 'true'}),
-        },
-        [
-          h('div', {class: 'drop-slot-card-inner'}, [
-            props.active
-              ? h('span', {class: 'drop-slot-label'}, props.label)
-              : null,
-          ]),
-        ],
-      );
-    };
-  },
-});
-
-const ICON_PATHS: Record<string, string[]> = {
-  'arrow-up': ['M12 19V5', 'M5 12l7-7 7 7'],
-  'arrow-down': ['M12 5v14', 'M19 12l-7 7-7-7'],
-  copy: ['M8 8h10v10H8z', 'M6 14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1'],
-  eye: ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
-  'eye-off': ['M3 3l18 18', 'M10.6 10.6a3 3 0 0 0 4.2 4.2', 'M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.2', 'M6.6 6.6C3.6 8.5 2 12 2 12s3.5 8 10 8c1.4 0 2.6-.3 3.8-.8'],
-  trash: ['M3 6h18', 'M8 6V4h8v2', 'M6 6l1 14h10l1-14', 'M10 11v5', 'M14 11v5'],
-  play: ['M4 5l10 7-10 7z', 'M18 5v14'],
-  'play-from': ['M6 5v14', 'M10 5l10 7-10 7z'],
-  refresh: ['M20 12a8 8 0 0 1-13.7 5.6', 'M4 12A8 8 0 0 1 17.7 6.4', 'M17 2v5h-5', 'M7 22v-5h5'],
-  'message-square': ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
-};
-
-const StepIcon = defineComponent({
-  name: 'StepIcon',
-  props: {
-    name: {type: String, required: true},
-  },
-  setup(props) {
-    return () => h(
-      'svg',
-      {
-        class: 'step-action-icon',
-        viewBox: '0 0 24 24',
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-width': 2.2,
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        'aria-hidden': 'true',
-      },
-      (ICON_PATHS[props.name] ?? []).map((d) => h('path', {d})),
-    );
-  },
-});
 
 const props = defineProps<{
   steps: PipelineStep[];
@@ -566,9 +493,7 @@ const props = defineProps<{
   partialRunTargetStepId?: string | null;
 }>();
 
-const sourceBadgesByStepId = computed<Record<string, StepDataSourceBadge[]>>(() =>
-  Object.fromEntries(props.steps.map((step, index) => [step.id, dataSourceBadges(step, index)])),
-);
+const sourceBadgesByStepId = computed(() => dataSourceBadgesByStepId(props.steps));
 
 const executionChipByStepId = computed((): Record<string, StepExecutionChip> => {
   const chips: Record<string, StepExecutionChip> = {};
@@ -730,79 +655,6 @@ function onStepClick(stepId: string, event: MouseEvent) {
   emit('select', stepId, event.shiftKey);
 }
 
-const stepContextMenuItems = computed<ContextMenuItem[]>(() => {
-  const stepId = stepContextMenu.value?.stepId;
-  const step = props.steps.find((s) => s.id === stepId);
-  if (!step) return [];
-  const index = props.steps.findIndex((s) => s.id === step.id);
-  const items: ContextMenuItem[] = [
-    {id: 'run-up-to', label: 'Run up to here', disabled: !step.enabled},
-    {id: 'run-from', label: 'Run from here', disabled: !step.enabled},
-    {id: 'run-only-step', label: 'Re-run only this step', disabled: !step.enabled},
-    {id: 'sep-run-edit', separator: true},
-    {id: 'insert-after', label: 'Insert step after'},
-    {id: 'move-up', label: 'Move up', disabled: index <= 0},
-    {id: 'move-down', label: 'Move down', disabled: index < 0 || index >= props.steps.length - 1},
-    {id: 'duplicate', label: 'Duplicate step'},
-    {id: 'toggle-enabled', label: step.enabled ? 'Disable step' : 'Enable step'},
-    {id: 'comment', label: step.description ? 'Edit comment' : 'Add comment'},
-  ];
-
-  if (step.config.type === 'capsule-instance') {
-    items.push({id: 'sep-capsule', separator: true});
-    if (step.config.displayMode === 'inline') {
-      items.push(
-        {id: 'collapse-inline-capsule', label: 'Collapse inline Capsule'},
-        {id: 'lock-inline-capsule', label: 'Lock as Capsule'},
-        {id: 'detach-capsule', label: 'Detach Capsule'},
-      );
-    } else {
-      items.push({id: 'spread-capsule', label: 'Edit inline'});
-    }
-  }
-
-  items.push(
-    {id: 'sep-danger', separator: true},
-    {id: 'delete', label: 'Delete step', danger: true},
-  );
-  return items;
-});
-
-function openStepContextMenu(step: PipelineStep, event: MouseEvent) {
-  emit('select', step.id);
-  stepContextMenu.value = {stepId: step.id, x: event.clientX, y: event.clientY};
-}
-
-function closeStepContextMenu() {
-  stepContextMenu.value = null;
-}
-
-function selectStepContextMenuAction(action: string) {
-  const stepId = stepContextMenu.value?.stepId;
-  const step = props.steps.find((s) => s.id === stepId);
-  closeStepContextMenu();
-  if (!step) return;
-
-  if ((action === 'run-up-to' || action === 'run-from' || action === 'run-only-step') && !step.enabled) return;
-
-  switch (action) {
-    case 'run-up-to': emit('run-up-to', step.id); break;
-    case 'run-from': emit('run-from', step.id); break;
-    case 'run-only-step': emit('run-only-step', step.id); break;
-    case 'insert-after': emit('insert-after', step.id); break;
-    case 'move-up': emit('move-up', step.id); break;
-    case 'move-down': emit('move-down', step.id); break;
-    case 'duplicate': emit('duplicate', step.id); break;
-    case 'toggle-enabled': emit('toggle-enabled', step.id); break;
-    case 'comment': toggleComment(step); break;
-    case 'spread-capsule': emit('spread-capsule', step.id); break;
-    case 'collapse-inline-capsule': emit('collapse-inline-capsule', step.id); break;
-    case 'lock-inline-capsule': emit('lock-inline-capsule', step.id); break;
-    case 'detach-capsule': emit('detach-capsule', step.id); break;
-    case 'delete': emit('delete', step.id); break;
-  }
-}
-
 const stepRefs = new Map<string, HTMLElement>();
 
 function setStepRef(stepId: string, el: HTMLElement | null) {
@@ -885,17 +737,6 @@ function traceStatusClass(stepId: string): string {
   return t ? `trace-${t.status}` : '';
 }
 
-const TYPE_LABELS: Record<StepType, string> = {
-  'model-call': 'Model call',
-  'presentation': 'Text',
-  'capsule-instance': 'Capsule',
-  'loop-group': 'Loop',
-};
-
-function stepTypeLabel(type: StepType): string {
-  return TYPE_LABELS[type] ?? type;
-}
-
 function loopExitSummary(step: PipelineStep): string {
   if (step.config.type !== 'loop-group') return '';
   return formatLoopExitSummary(step.config.exitCondition);
@@ -903,105 +744,6 @@ function loopExitSummary(step: PipelineStep): string {
 
 function historyReadCount(step: PipelineStep): number {
   return getStepHistoryReads(step).length;
-}
-
-function dataSourceBadges(step: PipelineStep, index: number): StepDataSourceBadge[] {
-  const badges: StepDataSourceBadge[] = [];
-  const seenRefs = new Set<string>();
-
-  function addBadge(badge: StepDataSourceBadge, artifactRef: string) {
-    const cleaned = artifactRef.trim();
-    if (!cleaned || seenRefs.has(cleaned)) return;
-    seenRefs.add(cleaned);
-    badges.push(badge);
-  }
-
-  if (usesPreviousOutputSource(step)) {
-    const prevRef = previousInputArtifactRef(index);
-    addBadge({
-      key: `previous:${prevRef}`,
-      label: sourceLabelForArtifactRef(prevRef),
-      title: dataSourceBadgeTitle('previous', 'Previous input', prevRef),
-      kind: 'previous',
-    }, prevRef);
-  }
-
-  for (const read of getStepHistoryReads(step)) {
-    const validation = validateHistoryRead(read, step.id, props.steps);
-    const validationMessage = validation.ok
-      ? undefined
-      : validation.issues.map(historyReadIssueLabel).join(', ');
-    const titleOptions = validationMessage ? {validationMessage} : undefined;
-    addBadge({
-      key: `history:${read.sourceArtifactRef}`,
-      label: sourceLabelForArtifactRef(read.sourceArtifactRef),
-      title: dataSourceBadgeTitle(
-        'history',
-        read.required ? `Required history read <${read.tagName}>` : `Optional history read <${read.tagName}>`,
-        read.sourceArtifactRef,
-        titleOptions,
-      ),
-      kind: 'history',
-      invalid: !validation.ok,
-    }, read.sourceArtifactRef);
-  }
-
-  if (step.config.type === 'presentation') {
-    for (const templateRef of artifactRefsInTemplate(step.config.text)) {
-      addBadge({
-        key: `template:${templateRef}`,
-        label: sourceLabelForArtifactRef(templateRef),
-        title: dataSourceBadgeTitle('template', 'Template reference', templateRef),
-        kind: 'template',
-      }, templateRef);
-    }
-  }
-
-  if (step.config.type === 'capsule-instance') {
-    for (const [port, bindingRef] of Object.entries(step.config.inputBindings)) {
-      addBadge({
-        key: `binding:${port}:${bindingRef}`,
-        label: sourceLabelForArtifactRef(bindingRef),
-        title: dataSourceBadgeTitle('binding', `Capsule input "${port}"`, bindingRef),
-        kind: 'binding',
-      }, bindingRef);
-    }
-  }
-
-  return badges;
-}
-
-function usesPreviousOutputSource(step: PipelineStep): boolean {
-  if (!['model-call', 'loop-group'].includes(step.config.type)) return false;
-  return step.prompt ? step.prompt.previousOutput.enabled : true;
-}
-
-function previousInputArtifactRef(index: number): string {
-  const previous = findPreviousEnabledStepAt(props.steps, index);
-  return previous ? `${previous.outputNamespace}.${previous.primaryOutputName}` : 'user_prompt.xml';
-}
-
-function artifactRefsInTemplate(text: string): string[] {
-  const refs: string[] = [];
-  const re = /\\?\{\{artifact\.([\w.-]+)\}\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    if (match[0].startsWith('\\')) continue;
-    refs.push(match[1]!);
-  }
-  return refs;
-}
-
-function sourceLabelForArtifactRef(artifactRef: string): string {
-  if (artifactRef.startsWith('user_prompt.')) return 'Pipeline Input';
-  const step = props.steps.find((s) =>
-    artifactRef === `${s.outputNamespace}.${s.primaryOutputName}`
-    || artifactRef.startsWith(`${s.outputNamespace}.`)
-    || (s.config.type === 'capsule-instance' && Object.values(s.config.outputBindings).includes(artifactRef)),
-  );
-  if (step) return step.label;
-  if (artifactRef === PIPELINE_INPUT_STEP_ID) return 'Pipeline Input';
-  return artifactRef;
 }
 
 function stepHasModelError(step: PipelineStep): boolean {
@@ -1085,6 +827,18 @@ function cancelComment(step: PipelineStep) {
   next.delete(step.id);
   expandedCommentStepIds.value = next;
 }
+
+const {
+  stepContextMenuItems,
+  openStepContextMenu,
+  closeStepContextMenu,
+  selectStepContextMenuAction,
+} = useChainStepContextMenu({
+  steps: toRef(props, 'steps'),
+  menu: stepContextMenu,
+  emit: (event, ...args) => { (emit as (e: string, ...a: unknown[]) => void)(event, ...args); },
+  onComment: toggleComment,
+});
 
 function onStepDragStart(stepId: string, event: DragEvent) {
   const target = event.target as HTMLElement;

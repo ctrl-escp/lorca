@@ -213,6 +213,7 @@ import {
   generatorCapsuleCompatible,
   usePipelineGenerator,
 } from '../../composables/usePipelineGenerator.js';
+import {usePipelineCapsuleActions} from '../../composables/usePipelineCapsuleActions.js';
 import ChainEditor from './ChainEditor.vue';
 import PipelineSelector from './PipelineSelector.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
@@ -360,6 +361,18 @@ function resolvePrompt(value: string | null) {
   promptResolve?.(value);
   promptResolve = null;
 }
+
+const {
+  handleWrapInRetryLoop,
+  handleLockSelectionAsCapsule,
+  handleSpreadCapsule,
+  handleLockInlineCapsule,
+  handleDetachCapsule,
+} = usePipelineCapsuleActions({
+  inlineError,
+  closeMoreMenu: () => { moreMenuOpen.value = false; },
+  modals: {showConfirm, showPrompt},
+});
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -534,104 +547,6 @@ function applyGeneratedPipeline(remaps: Record<string, ModelRemap>) {
 function openManualImportFromGenerator() {
   generatorModalOpen.value = false;
   importModalOpen.value = true;
-}
-
-function handleWrapInRetryLoop() {
-  moreMenuOpen.value = false;
-  const range = editorStore.getSelectionRange();
-  if (!range) {
-    inlineError.value = 'Select steps to wrap. Shift+click to select a range ending with a verification step.';
-    return;
-  }
-  const stepCount = range.endIndex - range.startIndex + 1;
-  const result = editorStore.wrapSelectionInRetryLoop(
-    stepCount === 2 ? `Retry: ${editorStore.steps[range.endIndex]?.label ?? 'loop'}` : undefined,
-  );
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  inlineError.value = null;
-  uiStore.setRightPaneTab('inspector');
-}
-
-async function handleLockSelectionAsCapsule() {
-  moreMenuOpen.value = false;
-  if (editorStore.steps.length === 0) {
-    inlineError.value = 'Add steps before locking a Capsule.';
-    return;
-  }
-  const range = editorStore.getSelectionRange();
-  const stepCount = range ? range.endIndex - range.startIndex + 1 : editorStore.steps.length;
-  const confirmed = await showConfirm({
-    title: 'Lock as Capsule',
-    message: range
-      ? `Replace ${stepCount} selected step(s) with a locked Capsule instance?`
-      : `Replace all ${stepCount} pipeline step(s) with a locked Capsule instance?`,
-    confirmLabel: 'Lock',
-    destructive: true,
-  });
-  if (!confirmed) return;
-  const defaultName = range ? editorStore.selectedStep?.label ?? 'Pipeline Capsule' : editorStore.pipeline.name || 'Pipeline Capsule';
-  const name = await showPrompt({title: 'Name this Capsule', label: 'Capsule name', defaultValue: defaultName});
-  if (!name) return;
-  const result = editorStore.lockSelectionAsCapsule(name);
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  capsulesStore.addCapsule(result.capsule);
-  await pipelinesStore.save(editorStore.pipeline);
-  inlineError.value = null;
-  uiStore.setRightPaneTab('inspector');
-}
-
-function handleSpreadCapsule(stepId: string) {
-  const result = editorStore.spreadCapsule(stepId);
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  inlineError.value = null;
-  uiStore.setRightPaneTab('inspector');
-}
-
-async function handleLockInlineCapsule(stepId: string) {
-  const step = editorStore.steps.find((s) => s.id === stepId);
-  const defaultName = step?.label ?? 'Inline Capsule';
-  const name = await showPrompt({title: 'Name this Capsule', label: 'Capsule name', defaultValue: defaultName});
-  if (!name) return;
-  const confirmed = await showConfirm({
-    title: 'Lock inline Capsule',
-    message: 'Save these inline steps as a locked Capsule and point this instance at it?',
-    confirmLabel: 'Lock',
-  });
-  if (!confirmed) return;
-  const result = editorStore.lockInlineCapsuleAsCapsule(stepId, name);
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  capsulesStore.addCapsule(result.capsule);
-  await pipelinesStore.save(editorStore.pipeline);
-  inlineError.value = null;
-}
-
-async function handleDetachCapsule(stepId: string) {
-  const confirmed = await showConfirm({
-    title: 'Detach Capsule',
-    message: 'Replace this Capsule instance with its inline steps and break the link?',
-    confirmLabel: 'Detach',
-    destructive: true,
-  });
-  if (!confirmed) return;
-  const result = editorStore.detachCapsule(stepId);
-  if (!result.ok) {
-    inlineError.value = result.message;
-    return;
-  }
-  await pipelinesStore.save(editorStore.pipeline);
-  inlineError.value = null;
 }
 
 function commitPipelineName() {
