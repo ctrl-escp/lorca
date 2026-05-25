@@ -1,62 +1,26 @@
 <template>
   <div class="center-pane">
-    <div class="center-toolbar">
-      <button class="btn btn-secondary btn-new" type="button" title="Start a new empty pipeline" @click="handleNew">New</button>
-      <!-- Pipeline switcher (shown when multiple pipelines exist) -->
-      <PipelineSelector
-        v-if="pipelinesStore.pipelines.length > 1"
-        :pipelines="pipelinesStore.pipelines"
-        :active-id="pipelinesStore.activePipelineId"
-        @select="handlePipelineSelect"
-        @delete="handlePipelineDelete"
-        @clear-all="handleClearAllPipelines"
-      />
-      <input
-        v-else
-        class="pipeline-name"
-        v-model="localPipelineName"
-        placeholder="Pipeline name"
-        @blur="commitPipelineName"
-        @keydown.enter="commitPipelineName"
-      />
-      <div class="run-controls" :class="{ 'is-running': runStore.isRunning }">
-        <div class="pipeline-action-controls">
-          <!-- Build is always visible -->
-          <button class="btn btn-secondary" type="button" title="Generate a pipeline from a natural-language description" @click="handleBuildFromDescription">✨ Build from description…</button>
-          <!-- Progressive overflow buttons: each revealed at a wider breakpoint -->
-          <button class="btn btn-secondary ovf-inline ovf-1" type="button" title="Wrap selected steps in a retry loop (refine → verify)" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-          <button class="btn btn-secondary ovf-inline ovf-2" type="button" title="Lock selected steps, or the whole pipeline, as a Capsule" @click="handleLockSelectionAsCapsule">Lock as Capsule</button>
-          <button class="btn btn-secondary ovf-inline ovf-3" type="button" @click="handleExport">Export</button>
-          <button class="btn btn-secondary ovf-inline ovf-4" type="button" @click="handleImport">Import</button>
-          <!-- More dropdown: contains only the buttons not yet shown inline -->
-          <div class="more-menu-wrap" ref="moreMenuRef">
-            <button class="btn btn-secondary" type="button" @click="moreMenuOpen = !moreMenuOpen">⋯ More</button>
-            <div v-if="moreMenuOpen" class="more-menu-dropdown">
-              <button class="more-menu-item ovf-drop ovf-drop-1" type="button" @click="handleWrapInRetryLoop">Wrap in retry loop</button>
-              <button class="more-menu-item ovf-drop ovf-drop-2" type="button" @click="handleLockSelectionAsCapsule">Lock as Capsule</button>
-              <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="handleExport">Export</button>
-              <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="handleImport">Import</button>
-              <button class="more-menu-item" type="button" @click="handleClearAllPipelines">Clear all pipelines…</button>
-            </div>
-          </div>
-        </div>
-        <div class="execute-controls">
-          <label v-if="runStore.isRunning" class="follow-run-label" title="Auto-scroll step selection to the running step">
-            <input type="checkbox" v-model="followRunLive" />
-            <span class="follow-run-text">Follow</span>
-          </label>
-          <button
-            class="btn btn-run"
-            :disabled="runStore.isRunning || !canRun"
-            :title="runButtonTitle"
-            @click="handleRun"
-          >
-            {{ runStore.isRunning ? 'Running…' : 'Execute Pipeline' }}
-          </button>
-          <button class="btn btn-cancel" v-if="runStore.isRunning" @click="runStore.cancel">Cancel</button>
-        </div>
-      </div>
-    </div>
+    <PipelineToolbar
+      :pipelines="pipelinesStore.pipelines"
+      :active-pipeline-id="pipelinesStore.activePipelineId"
+      v-model:pipeline-name="localPipelineName"
+      v-model:follow-run-live="followRunLive"
+      :is-running="runStore.isRunning"
+      :can-run="canRun"
+      :run-button-title="runButtonTitle"
+      @new="handleNew"
+      @pipeline-select="handlePipelineSelect"
+      @pipeline-delete="handlePipelineDelete"
+      @clear-all-pipelines="handleClearAllPipelines"
+      @commit-pipeline-name="commitPipelineName"
+      @build-from-description="openGeneratorModal()"
+      @wrap-retry-loop="handleWrapInRetryLoop"
+      @lock-as-capsule="handleLockSelectionAsCapsule"
+      @export="handleExport"
+      @import="handleImport"
+      @run="handleRun"
+      @cancel="runStore.cancel()"
+    />
 
     <!-- Inline error banner for extraction/conversion failures -->
     <div v-if="inlineError" class="inline-error-banner">
@@ -154,10 +118,10 @@
       :preview-labels="generatorPreviewLabels"
       :warnings="generatorWarnings"
       :manual-import-available="generatorManualImportAvailable"
-      @close="closeGeneratorModal"
+      @close="closeGeneratorModal()"
       @generate="handleGeneratePipeline"
-      @apply="openGeneratedModelRemap"
-      @manual-import="openManualImportFromGenerator"
+      @apply="openGeneratedModelRemap()"
+      @manual-import="openManualImportFromGenerator(() => { importModalOpen = true; })"
     />
     <ImportRemapDialog
       v-if="generatedModelRemapOpen"
@@ -193,7 +157,7 @@
 
 <script setup lang="ts">
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
-import type {PipelineDefinition, PipelineStep, StepOutputsExport, StepType} from '@lorca/core';
+import type {PipelineDefinition, StepOutputsExport, StepType} from '@lorca/core';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
@@ -205,24 +169,17 @@ import {useModelsStore} from '../../stores/models.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {pipelineHasConfiguredModel, pipelineStepChainRunReady} from '../../utils/pipelineRunReady.js';
 import {autoAssignModelToStep} from '@lorca/endpoints';
-import {applyModelRemapsToSteps} from '@lorca/storage';
-import {ALL_SUGGESTIONS, LORCA_PIPELINE_GENERATOR_ID, resolveModelCallSuggestedBuckets} from '@lorca/capsules';
 import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
-import {
-  buildStepsFromGeneratorPlan,
-  generatorCapsuleCompatible,
-  usePipelineGenerator,
-} from '../../composables/usePipelineGenerator.js';
+import {usePipelineGeneratorFlow} from '../../composables/usePipelineGeneratorFlow.js';
 import {usePipelineCapsuleActions} from '../../composables/usePipelineCapsuleActions.js';
 import ChainEditor from './ChainEditor.vue';
-import PipelineSelector from './PipelineSelector.vue';
+import PipelineToolbar from './PipelineToolbar.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
 import ImportRemapDialog from '../import/ImportRemapDialog.vue';
 import PipelineGeneratorModal from './PipelineGeneratorModal.vue';
 import TextEditor from '../shared/TextEditor.vue';
-import type {MissingModelReference, ModelRemap} from '../../stores/importExport.js';
 
 const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
@@ -236,7 +193,6 @@ const editorStore = usePipelineEditorStore();
 const modelsStore = useModelsStore();
 const endpointsStore = useEndpointsStore();
 const suggestionInsert = useSuggestionInsert();
-const pipelineGenerator = usePipelineGenerator();
 const followRunLive = ref(true);
 const inlineError = ref<string | null>(null);
 
@@ -247,46 +203,30 @@ const exportModal = ref<{open: boolean; json: string; filename: string; includeS
   includeStepOutputs: false,
 });
 const importModalOpen = ref(false);
-const generatorModalOpen = ref(false);
-const generatorLoading = ref(false);
-const generatorError = ref<string | null>(null);
-const generatorRawResponse = ref<string | null>(null);
-const generatorPreviewSteps = ref<PipelineStep[]>([]);
-const generatorWarnings = ref<string[]>([]);
-const generatedModelRemapOpen = ref(false);
-let generatorAbortController: AbortController | null = null;
+const {
+  generatorModalOpen,
+  generatorLoading,
+  generatorError,
+  generatorRawResponse,
+  generatorWarnings,
+  generatedModelRemapOpen,
+  generatorCapsules,
+  defaultGeneratorCapsuleId,
+  generatorPreviewLabels,
+  generatedModelRefs,
+  generatorManualImportAvailable,
+  openGeneratorModal,
+  closeGeneratorModal,
+  abortGeneratorOnUnmount,
+  handleGeneratePipeline,
+  openGeneratedModelRemap,
+  applyGeneratedPipeline,
+  openManualImportFromGenerator,
+} = usePipelineGeneratorFlow();
 
 const userPrompt = ref(props.def.input.raw);
 const localPipelineName = ref(props.def.name);
 const hasStepOutputs = computed(() => Object.keys(runStore.artifacts).length > 0);
-
-const generatorCapsules = computed(() => {
-  const all = [...capsulesStore.lockedCapsules, ...capsulesStore.draftCapsules];
-  const seen = new Set<string>();
-  return all.filter((capsule) => {
-    if (seen.has(capsule.id)) return false;
-    seen.add(capsule.id);
-    return generatorCapsuleCompatible(capsule);
-  });
-});
-
-const defaultGeneratorCapsuleId = computed(() =>
-  generatorCapsules.value.find((capsule) => capsule.id === LORCA_PIPELINE_GENERATOR_ID)?.id
-  ?? generatorCapsules.value[0]?.id
-  ?? '',
-);
-
-const generatorPreviewLabels = computed(() =>
-  generatorPreviewSteps.value.map((step) => step.label),
-);
-
-const generatedModelRefs = computed<MissingModelReference[]>(() =>
-  collectGeneratedModelRefs(generatorPreviewSteps.value),
-);
-
-const generatorManualImportAvailable = computed(() =>
-  generatorError.value !== null && generatorRawResponse.value !== null,
-);
 
 const stepsWithDisabledModel = computed<Set<string>>(() => {
   const disabledEpIds = new Set(endpointsStore.endpoints.filter((e) => !e.enabled).map((e) => e.id));
@@ -315,17 +255,6 @@ const stepsWithDisabledModel = computed<Set<string>>(() => {
   }
   return result;
 });
-// ── More menu ────────────────────────────────────────────────────────────────
-
-const moreMenuOpen = ref(false);
-const moreMenuRef = ref<HTMLElement | null>(null);
-
-function onDocClick(e: MouseEvent) {
-  if (moreMenuOpen.value && moreMenuRef.value && !moreMenuRef.value.contains(e.target as Node)) {
-    moreMenuOpen.value = false;
-  }
-}
-
 // ── Dialog helpers ───────────────────────────────────────────────────────────
 
 type ConfirmState = {open: boolean; title: string; message: string; confirmLabel: string; destructive: boolean};
@@ -370,7 +299,7 @@ const {
   handleDetachCapsule,
 } = usePipelineCapsuleActions({
   inlineError,
-  closeMoreMenu: () => { moreMenuOpen.value = false; },
+  closeMoreMenu: () => {},
   modals: {showConfirm, showPrompt},
 });
 
@@ -380,13 +309,11 @@ onMounted(() => {
   editorStore.loadPipeline(props.def);
   runStore.restoreForPipeline(props.def.id);
   window.addEventListener('keydown', onKeyDown);
-  document.addEventListener('click', onDocClick, true);
 });
 
 onUnmounted(() => {
-  generatorAbortController?.abort();
+  abortGeneratorOnUnmount();
   window.removeEventListener('keydown', onKeyDown);
-  document.removeEventListener('click', onDocClick, true);
 });
 
 const onKeyDown = (e: KeyboardEvent) => {
@@ -472,81 +399,6 @@ function handleSelectLoopInner(loopStepId: string, innerStepId: string) {
 
 function handleSelectInlineCapsuleInner(capsuleStepId: string, innerStepId: string) {
   editorStore.selectInlineCapsuleInnerStep(capsuleStepId, innerStepId);
-}
-
-function handleBuildFromDescription() {
-  moreMenuOpen.value = false;
-  generatorError.value = null;
-  generatorRawResponse.value = null;
-  generatorPreviewSteps.value = [];
-  generatorWarnings.value = [];
-  generatorModalOpen.value = true;
-}
-
-function closeGeneratorModal() {
-  generatorAbortController?.abort();
-  generatorAbortController = null;
-  generatorLoading.value = false;
-  generatorModalOpen.value = false;
-}
-
-async function handleGeneratePipeline(payload: {description: string; capsuleId: string}) {
-  generatorAbortController?.abort();
-  const controller = new AbortController();
-  generatorAbortController = controller;
-  generatorLoading.value = true;
-  generatorError.value = null;
-  generatorRawResponse.value = null;
-  generatorPreviewSteps.value = [];
-  generatorWarnings.value = [];
-
-  const result = await pipelineGenerator.generatePipelinePlan(
-    payload.capsuleId,
-    payload.description,
-    controller.signal,
-  );
-  if (generatorAbortController === controller) generatorAbortController = null;
-  generatorLoading.value = false;
-
-  if (!result.ok) {
-    generatorError.value = result.message;
-    generatorRawResponse.value = result.rawResponse ?? null;
-    return;
-  }
-
-  const steps = buildStepsFromGeneratorPlan(result.entries);
-  if (steps.length === 0) {
-    generatorError.value = "Couldn't build steps from the generated plan";
-    generatorRawResponse.value = result.rawResponse;
-    return;
-  }
-
-  generatorRawResponse.value = result.rawResponse;
-  generatorWarnings.value = result.unknownSuggestionIds;
-  generatorPreviewSteps.value = steps;
-}
-
-function openGeneratedModelRemap() {
-  if (generatorPreviewSteps.value.length === 0) return;
-  generatedModelRemapOpen.value = true;
-}
-
-function applyGeneratedPipeline(remaps: Record<string, ModelRemap>) {
-  const steps = applyModelRemapsToSteps(generatorPreviewSteps.value, remaps);
-  editorStore.replaceSteps(steps, 'Build pipeline from description');
-  runStore.reset();
-  generatedModelRemapOpen.value = false;
-  generatorModalOpen.value = false;
-  generatorPreviewSteps.value = [];
-  generatorRawResponse.value = null;
-  generatorError.value = null;
-  generatorWarnings.value = [];
-  uiStore.setRightPaneTab('inspector');
-}
-
-function openManualImportFromGenerator() {
-  generatorModalOpen.value = false;
-  importModalOpen.value = true;
 }
 
 function commitPipelineName() {
@@ -677,7 +529,6 @@ async function handleRunOnlyStep(stepId: string) {
 }
 
 function handleExport() {
-  moreMenuOpen.value = false;
   editorStore.updateUserPrompt(userPrompt.value);
   refreshExportModal(false);
 }
@@ -712,7 +563,6 @@ function currentStepOutputs(): StepOutputsExport | null {
 }
 
 function handleImport() {
-  moreMenuOpen.value = false;
   importModalOpen.value = true;
 }
 
@@ -769,7 +619,6 @@ async function handlePipelineDelete(id: string) {
 }
 
 async function handleClearAllPipelines() {
-  moreMenuOpen.value = false;
   const confirmed = await showConfirm({
     title: 'Clear All Pipelines',
     message: 'Delete all saved pipelines? A fresh default pipeline will be created. This cannot be undone.',
@@ -789,140 +638,10 @@ async function handleClearAllPipelines() {
   }
 }
 
-function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference[] {
-  const refs: MissingModelReference[] = [];
-  const visit = (step: PipelineStep) => {
-    if (step.config.type === 'model-call') {
-      refs.push({
-        key: step.id,
-        nodeId: step.id,
-        endpointId: '',
-        modelName: step.config.modelRef.kind === 'slot' ? '' : step.config.modelRef.modelName,
-        label: `Model call ${step.label || step.id}`,
-        suggestedBuckets: resolveModelCallSuggestedBuckets(step),
-      });
-    }
-    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
-      const suggestion = ALL_SUGGESTIONS.find((item) => item.id === step.createdFromSuggestionId);
-      for (const [slotName, modelRef] of Object.entries(step.config.modelSlotBindings)) {
-        refs.push({
-          key: `${step.id}::${slotName}`,
-          nodeId: step.id,
-          endpointId: '',
-          modelName: modelRef.kind === 'slot' ? '' : modelRef.modelName,
-          label: `Capsule slot ${slotName} (${step.label || suggestion?.name || step.id})`,
-          suggestedBuckets: suggestion?.preferredModelBucket ? [suggestion.preferredModelBucket] : ['general'],
-        });
-      }
-    }
-    if (step.config.type === 'loop-group') {
-      for (const inner of step.config.steps) visit(inner);
-    }
-  };
-  for (const step of steps) visit(step);
-  return refs;
-}
 </script>
 
 <style scoped>
 .center-pane { display: flex; flex-direction: column; height: 100%; overflow: hidden; container-type: inline-size; }
-
-.center-toolbar {
-  display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
-  padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-divider); flex-shrink: 0;
-}
-.pipeline-name {
-  flex: 1; background: transparent; border: none; color: #e8e8e8;
-  font-size: 1rem; font-weight: 500; min-width: 0;
-}
-.pipeline-name:focus { outline: none; border-bottom: 1px solid var(--accent-border); }
-
-.run-controls {
-  display: flex; flex: 1 1 auto; gap: 0.4rem; align-items: center;
-  justify-content: flex-end; flex-wrap: wrap; min-width: 0;
-}
-.pipeline-action-controls,
-.execute-controls {
-  display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
-}
-.execute-controls { flex-shrink: 0; }
-.btn { border-radius: 5px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; border: 1px solid #333; }
-.btn-run { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
-.btn-run:hover:not(:disabled) { background: var(--accent-bg-hover); }
-.btn-run:disabled { opacity: 0.4; cursor: default; }
-.btn-secondary { background: #1a1a1a; color: #aaa; }
-.btn-secondary:hover { background: #222; color: #ccc; }
-.btn-cancel { background: #2d1a1a; border-color: #4d2222; color: #e07070; }
-.btn-cancel:hover { background: #3d2222; }
-.follow-run-label {
-  display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem;
-  color: var(--text-label); cursor: pointer; user-select: none; flex-shrink: 0;
-}
-.follow-run-label input { cursor: pointer; }
-
-/* More menu */
-.more-menu-wrap { position: relative; }
-.ovf-inline { display: none; }
-
-@container (min-width: 640px) {
-  .ovf-1 { display: inline-flex; }
-  .ovf-drop-1 { display: none; }
-}
-@container (min-width: 760px) {
-  .ovf-2 { display: inline-flex; }
-  .ovf-drop-2 { display: none; }
-}
-@container (min-width: 875px) {
-  .ovf-3 { display: inline-flex; }
-  .ovf-drop-3 { display: none; }
-}
-@container (min-width: 945px) {
-  .ovf-4 { display: inline-flex; }
-  .ovf-drop-4 { display: none; }
-}
-@container (min-width: 1010px) {
-  .ovf-5 { display: inline-flex; }
-  .ovf-drop-5 { display: none; }
-  .more-menu-wrap { display: none; }
-}
-
-/* Running adds Follow + Cancel — keep inline actions in the More menu longer */
-@container (min-width: 640px) and (max-width: 819px) {
-  .run-controls.is-running .ovf-1 { display: none; }
-  .run-controls.is-running .ovf-drop-1 { display: block; }
-}
-@container (min-width: 760px) and (max-width: 939px) {
-  .run-controls.is-running .ovf-2 { display: none; }
-  .run-controls.is-running .ovf-drop-2 { display: block; }
-}
-@container (min-width: 875px) and (max-width: 1054px) {
-  .run-controls.is-running .ovf-3 { display: none; }
-  .run-controls.is-running .ovf-drop-3 { display: block; }
-}
-@container (min-width: 945px) and (max-width: 1124px) {
-  .run-controls.is-running .ovf-4 { display: none; }
-  .run-controls.is-running .ovf-drop-4 { display: block; }
-}
-@container (min-width: 1010px) and (max-width: 1189px) {
-  .run-controls.is-running .ovf-5 { display: none; }
-  .run-controls.is-running .ovf-drop-5 { display: block; }
-  .run-controls.is-running .more-menu-wrap { display: block; }
-}
-
-@container (max-width: 720px) {
-  .follow-run-text { display: none; }
-}
-.more-menu-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
-  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 5px;
-  display: flex; flex-direction: column; min-width: 190px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-}
-.more-menu-item {
-  background: none; border: none; color: #aaa; text-align: left;
-  padding: 9px 16px; font-size: 0.85rem; cursor: pointer;
-}
-.more-menu-item:hover { background: #242424; color: #ccc; }
 
 /* Inline error */
 .inline-error-banner {
@@ -946,28 +665,7 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 .user-prompt-input :deep(.cm-editor) { font-size: 0.9rem; }
 .user-prompt-input :deep(.cm-content) { font-family: inherit; }
 
-@media (max-width: 767px) {
-  .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
-  .run-controls { flex-wrap: wrap; }
-}
-
 @container (max-width: 620px) {
-  .center-toolbar {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    padding: 0.55rem 0.7rem;
-  }
-
-  .run-controls {
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    padding-inline: 10px;
-  }
-
   .user-prompt-bar {
     padding: 0.55rem 0.7rem;
   }

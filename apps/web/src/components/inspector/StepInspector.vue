@@ -114,104 +114,38 @@
         </template>
 
         <!-- Inputs -->
-        <template v-else-if="activeTab === 'inputs'">
-          <p class="inputs-ref-semantics" :title="REORDER_REF_HINTS.history">
-            Step inputs use two kinds of references:
-            <strong>previous output</strong> follows chain order;
-            <strong>history reads</strong>, template <code v-pre>{{artifact…}}</code> refs, and capsule bindings use artifact namespace strings and stay tied to the named step.
-          </p>
-          <template v-if="effectiveStep?.config.type === 'capsule-instance' && !inlineCapsuleScope">
-            <div class="binding-list">
-              <div v-for="(ref, port) in effectiveStep.config.inputBindings" :key="port" class="binding-row">
-                <span class="binding-port">{{ port }}</span>
-                <span class="binding-arrow">←</span>
-                <code class="binding-ref" :title="REORDER_REF_HINTS.binding">{{ ref }}</code>
-              </div>
-              <p v-if="Object.keys(effectiveStep.config.inputBindings).length === 0" class="empty-hint">No input bindings.</p>
-            </div>
-          </template>
-          <template v-else-if="hasPromptBlocks && effectiveStep?.prompt">
-            <p v-if="effectiveStep.prompt.historyReads.length === 0 && !effectiveStep.prompt.previousOutput?.enabled" class="empty-hint">
-              No history reads. Open the Prompt tab to add prior-step outputs.
-            </p>
-            <ul v-if="effectiveStep.prompt.historyReads.length > 0" class="history-read-list">
-              <li
-                v-for="(hr, i) in effectiveStep.prompt.historyReads"
-                :key="`${hr.sourceStepId}-${i}`"
-                class="history-read-row"
-                :class="{invalid: !historyReadStatus(hr).ok}"
-                :title="historyReadStatusTitle(hr)"
-              >
-                <code class="binding-ref">{{ hr.sourceArtifactRef }}</code>
-                <span class="history-read-tag">&lt;{{ hr.tagName }}&gt;</span>
-                <span v-if="hr.required" class="history-read-required">required</span>
-                <span v-if="!historyReadStatus(hr).ok" class="history-read-issue">
-                  {{ historyReadStatus(hr).issues.map(historyReadIssueLabel).join(' · ') }}
-                </span>
-              </li>
-            </ul>
-            <p v-if="effectiveStep.prompt.previousOutput?.enabled" class="inputs-hint" :title="REORDER_REF_HINTS.previous">
-              Previous output (<code>{{ effectiveStep.prompt.previousOutput.tagName }}</code>, {{ effectiveStep.prompt.previousOutput.placement }}):
-              from <code>{{ previousOutputRef }}</code> — updates when you reorder steps.
-            </p>
-          </template>
-          <p v-else class="empty-hint">No configurable inputs for this step type.</p>
-        </template>
+        <StepInputsPanel
+          v-else-if="activeTab === 'inputs' && effectiveStep"
+          :effective-step="effectiveStep"
+          :inline-capsule-scope="inlineCapsuleScope"
+          :has-prompt-blocks="hasPromptBlocks"
+          :chain-steps="chainSteps"
+          :previous-output-ref="previousOutputRef"
+        />
 
         <!-- Outputs -->
-        <template v-else-if="activeTab === 'outputs'">
-          <div class="inspector-field">
-            <FieldLabel label="Primary output key" />
-            <code class="binding-ref">{{ scopedPrimaryOutputKey }}</code>
-          </div>
-          <div v-if="effectiveStep?.config.type === 'capsule-instance' && !inlineCapsuleScope" class="binding-list">
-            <div v-for="(ref, port) in effectiveStep.config.outputBindings" :key="port" class="binding-row">
-              <span class="binding-port">{{ port }}</span>
-              <span class="binding-arrow">→</span>
-              <code class="binding-ref">{{ ref }}</code>
-            </div>
-          </div>
-          <div v-if="lastSnapshot?.outputArtifactRefs.length" class="inspector-last-outputs">
-            <span class="inspector-last-label">From last run:</span>
-            <code v-for="ref in lastSnapshot.outputArtifactRefs" :key="ref" class="inspector-artifact-ref">{{ ref }}</code>
-          </div>
-          <p v-else class="empty-hint">No output artifacts from a run yet.</p>
-        </template>
+        <StepOutputsPanel
+          v-else-if="activeTab === 'outputs' && effectiveStep"
+          :effective-step="effectiveStep"
+          :inline-capsule-scope="inlineCapsuleScope"
+          :scoped-primary-output-key="scopedPrimaryOutputKey"
+          :last-snapshot="lastSnapshot"
+        />
 
         <!-- Last run (tabs mode only — split modes show this in the bottom section) -->
-        <template v-else-if="activeTab === 'last-run' && splitMode === 'tabs'">
-          <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
-            <div class="inspector-status-header">
-              <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
-              <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">
-                {{ formatTime(lastSnapshot.completedAt) }}
-              </span>
-            </div>
-            <JsonViewer
-              v-if="lastRunOutputValue !== null"
-              class="inspector-output-preview"
-              :value="lastRunOutputValue"
-            />
-            <p v-else-if="stepStatus.state === 'not-run'" class="empty-hint">This step has not been executed yet.</p>
-          </div>
-          <p v-else class="empty-hint">No run data.</p>
-        </template>
+        <StepLastRunPanel
+          v-else-if="activeTab === 'last-run' && splitMode === 'tabs'"
+          :step-status="stepStatus"
+          :last-snapshot="lastSnapshot"
+          :last-run-output-value="lastRunOutputValue"
+          :format-time="formatTime"
+        />
 
         <!-- Validation -->
-        <template v-else-if="activeTab === 'validation'">
-          <div v-if="stepStatus?.blockReasons?.length" class="inspector-status status-blocked">
-            <ul class="inspector-status-issues">
-              <li v-for="(reason, i) in stepStatus.blockReasons" :key="i">{{ reason }}</li>
-            </ul>
-          </div>
-          <p v-else-if="stepStatus?.state === 'stale' || stepStatus?.state === 'failed-stale'" class="inspector-status-hint">
-            Upstream config or inputs changed since the last run. Re-run to refresh outputs.
-          </p>
-          <p v-else-if="stepStatus?.state === 'current' || stepStatus?.state === 'failed-current'" class="inspector-status-hint ok">
-            No blocking issues for this step.
-          </p>
-          <p v-else class="empty-hint">Run the pipeline to evaluate validation state.</p>
-        </template>
+        <StepValidationPanel
+          v-else-if="activeTab === 'validation'"
+          :step-status="stepStatus"
+        />
       </div>
 
       <!-- bottom last-run section (full / collapsed split modes) -->
@@ -236,19 +170,12 @@
             <span class="bottom-chevron">{{ isBottomExpanded ? '▾' : '▴' }}</span>
           </div>
           <div v-show="splitMode === 'full' || isBottomExpanded" class="inspector-bottom-content">
-            <div v-if="stepStatus" class="inspector-status" :class="`status-${stepStatus.state}`">
-              <div v-if="splitMode === 'full'" class="inspector-status-header">
-                <span class="inspector-status-label">{{ stepRunUiStateLabel(stepStatus.state) }}</span>
-                <span v-if="lastSnapshot?.completedAt" class="inspector-status-time">{{ formatTime(lastSnapshot.completedAt) }}</span>
-              </div>
-              <JsonViewer
-                v-if="lastRunOutputValue !== null"
-                class="inspector-output-preview"
-                :value="lastRunOutputValue"
-              />
-              <p v-else-if="stepStatus.state === 'not-run'" class="empty-hint">This step has not been executed yet.</p>
-            </div>
-            <p v-else class="empty-hint">No run data.</p>
+            <StepLastRunPanel
+              :step-status="stepStatus"
+              :last-snapshot="lastSnapshot"
+              :last-run-output-value="lastRunOutputValue"
+              :format-time="formatTime"
+            />
           </div>
         </div>
       </template>
@@ -258,15 +185,14 @@
 
 <script setup lang="ts">
 import {ref, watch, computed, onMounted, onUnmounted} from 'vue';
-import type {PipelineStep, CapsuleInstanceStepConfig, LoopExitCondition, StepHistoryReadConfig} from '@lorca/core';
-import {stepRunUiStateLabel, resolvePreviousOutputArtifactRef, validateHistoryRead, historyReadIssueLabel, REORDER_REF_HINTS} from '@lorca/pipeline';
-import type {HistoryReadIssue} from '@lorca/pipeline';
+import type {PipelineStep, CapsuleInstanceStepConfig, LoopExitCondition} from '@lorca/core';
+import {stepRunUiStateLabel, resolvePreviousOutputArtifactRef} from '@lorca/pipeline';
 import {useStepStaleStateMap} from '../../composables/useStepStaleStateMap.js';
 import {useActiveStepEditor} from '../../composables/useActiveStepEditor.js';
 import {useActiveRunStore} from '../../stores/activeRun.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
-import {FieldLabel, JsonViewer} from '@lorca/ui-kit';
+import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
 import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
@@ -274,6 +200,10 @@ import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
 import ModelCallConfigPanel from './ModelCallConfigPanel.vue';
+import StepInputsPanel from './StepInputsPanel.vue';
+import StepOutputsPanel from './StepOutputsPanel.vue';
+import StepValidationPanel from './StepValidationPanel.vue';
+import StepLastRunPanel from './StepLastRunPanel.vue';
 import TextEditor from '../shared/TextEditor.vue';
 import {stepTypeInspectorLabel} from '../../utils/stepTypeLabels.js';
 import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
@@ -421,19 +351,6 @@ const previousOutputRef = computed(() => {
   if (!s) return '';
   return resolvePreviousOutputArtifactRef(chainSteps.value, s.id);
 });
-
-function historyReadStatus(read: StepHistoryReadConfig) {
-  const s = effectiveStep.value;
-  if (!s) return {ok: true, issues: [] as HistoryReadIssue[]};
-  return validateHistoryRead(read, s.id, chainSteps.value);
-}
-
-function historyReadStatusTitle(read: StepHistoryReadConfig): string {
-  const status = historyReadStatus(read);
-  const base = `${read.sourceArtifactRef} → <${read.tagName}>. ${REORDER_REF_HINTS.history}`;
-  if (status.ok) return base;
-  return `${base} Issue: ${status.issues.map(historyReadIssueLabel).join(', ')}`;
-}
 
 const visibleTabs = computed(() => {
   const tabs: {id: InspectorTab; label: string; title: string}[] = [
