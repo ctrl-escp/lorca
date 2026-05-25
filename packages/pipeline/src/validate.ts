@@ -1,27 +1,16 @@
 import type {LegacyPipelineDefinition, PipelineDefinition, PipelineError, Result} from '@lorca/core';
 import {ok, err} from '@lorca/core';
 import {outputKey} from './artifacts.js';
+import {validateStepChainPipeline, type ValidateStepChainOptions} from './stepChainValidation.js';
 
 export function validatePipeline(
   def: PipelineDefinition,
+  options?: ValidateStepChainOptions,
 ): Result<void, PipelineError> {
-  const stepIds = new Set(def.steps.map((s) => s.id));
-  if (stepIds.size !== def.steps.length) {
-    return err({code: 'invalid_pipeline_graph', message: 'Duplicate step IDs detected'});
-  }
-  for (const step of def.steps) {
-    const names = step.config.type === 'capsule-instance'
-      ? null
-      : (step.config as {outputNames: readonly string[]}).outputNames as readonly string[];
-    if (names && !names.includes(step.primaryOutputName)) {
-      return err({
-        code: 'invalid_pipeline_graph',
-        message: `Step "${step.id}" primaryOutputName "${step.primaryOutputName}" is not in outputNames`,
-      });
-    }
-  }
-  return ok(undefined);
+  return validateStepChainPipeline(def, options);
 }
+
+export type {ValidateStepChainOptions} from './stepChainValidation.js';
 
 export function validateLegacyPipeline(
   def: LegacyPipelineDefinition,

@@ -1,4 +1,6 @@
 export {validatePipeline, validateLegacyPipeline} from './validate.js';
+export type {ValidateStepChainOptions} from './validate.js';
+export {validateStepChainBody, validateStepChainPipeline} from './stepChainValidation.js';
 export {topologicalOrder} from './order.js';
 export {outputKey, nodePrefix, resolveOutputRef, stepArtifactKey} from './artifacts.js';
 export {executePipeline} from './executor.js';

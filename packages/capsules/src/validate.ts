@@ -1,6 +1,6 @@
 import type {CapsuleDefinition, PipelineEdge, PipelineError, PipelineNode, PipelineStep, Result} from '@lorca/core';
 import {ok, err} from '@lorca/core';
-import {outputKey, validatePipeline} from '@lorca/pipeline';
+import {outputKey, validateStepChainPipeline} from '@lorca/pipeline';
 
 export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineError> {
   if (def.steps !== undefined) {
@@ -79,8 +79,21 @@ export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineEr
   return ok(undefined);
 }
 
+function capsuleInputArtifactRefs(def: CapsuleDefinition): string[] {
+  const refs: string[] = [];
+  for (const port of def.interface.inputs) {
+    const ref = port.defaultArtifactKey
+      ?? (port.name === 'user_prompt' ? 'user_prompt.xml' : `${port.name}.text`);
+    refs.push(ref);
+    if (port.name === 'user_prompt') {
+      refs.push('user_prompt.raw', 'user_prompt.xml');
+    }
+  }
+  return refs;
+}
+
 function validateStepChainCapsule(def: CapsuleDefinition): Result<void, PipelineError> {
-  const pipelineResult = validatePipeline({
+  const pipelineResult = validateStepChainPipeline({
     schemaVersion: 2,
     id: def.id,
     name: def.name,
@@ -88,7 +101,7 @@ function validateStepChainCapsule(def: CapsuleDefinition): Result<void, Pipeline
     steps: def.steps ?? [],
     createdAt: def.createdAt,
     updatedAt: def.updatedAt,
-  });
+  }, {extraArtifactRefs: capsuleInputArtifactRefs(def)});
   if (!pipelineResult.ok) return pipelineResult;
 
   const slotErr = validateStepModelSlots(def.steps ?? [], new Set(def.interface.modelSlots.map((s) => s.name)));
