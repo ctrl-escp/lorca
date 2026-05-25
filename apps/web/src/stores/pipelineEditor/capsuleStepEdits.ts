@@ -131,7 +131,7 @@ export function createCapsuleStepEditors(ctx: CapsuleStepEditContext) {
     const now = new Date().toISOString();
     const capsuleId = options?.capsuleId ?? newId('cap');
     const draft: CapsuleDefinition = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: capsuleId,
       name: capsuleName,
       version: 'v1',

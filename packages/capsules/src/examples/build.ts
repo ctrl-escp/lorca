@@ -69,7 +69,7 @@ export function modelCallStep(spec: ModelCallStepSpec): PipelineStep {
 
 export function buildExampleCapsule(spec: ExampleCapsuleSpec): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: spec.id,
     name: spec.name,
     description: spec.description,

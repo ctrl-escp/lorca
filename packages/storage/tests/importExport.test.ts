@@ -556,6 +556,7 @@ describe('importExport', () => {
 
   it('prepareImportedCapsule migrates graph-only capsules and stores step-chain fields only', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
+    expect(next.schemaVersion).toBe(2);
     expect(next.steps).toBeDefined();
     expect(next.nodes).toBeUndefined();
     expect(next.edges).toBeUndefined();
@@ -573,6 +574,7 @@ describe('importExport', () => {
 
   it('exports graph-only capsules as migrated step-chain bodies', () => {
     const file = exportCapsule(makeCapsule());
+    expect(file.capsule.schemaVersion).toBe(2);
     expect(file.capsule.steps).toBeDefined();
     expect(file.capsule.nodes).toBeUndefined();
     expect(file.capsule.edges).toBeUndefined();

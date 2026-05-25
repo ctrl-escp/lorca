@@ -11,20 +11,24 @@ const tables = {
   pipelines: new Map<string, PipelineDefinition>(),
 };
 
-vi.mock('@lorca/storage', () => ({
-  getDb: () => ({
-    capsules: {
-      put: async (cap: CapsuleDefinition) => { tables.capsules.set(cap.id, cap); },
-      delete: async (id: string) => { tables.capsules.delete(id); },
-      toArray: async () => [...tables.capsules.values()],
-    },
-    pipelines: {
-      put: async (pipe: PipelineDefinition) => { tables.pipelines.set(pipe.id, pipe); },
-      delete: async (id: string) => { tables.pipelines.delete(id); },
-      toArray: async () => [...tables.pipelines.values()],
-    },
-  }),
-}));
+vi.mock('@lorca/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@lorca/storage')>();
+  return {
+    ...actual,
+    getDb: () => ({
+      capsules: {
+        put: async (cap: CapsuleDefinition) => { tables.capsules.set(cap.id, cap); },
+        delete: async (id: string) => { tables.capsules.delete(id); },
+        toArray: async () => [...tables.capsules.values()],
+      },
+      pipelines: {
+        put: async (pipe: PipelineDefinition) => { tables.pipelines.set(pipe.id, pipe); },
+        delete: async (id: string) => { tables.pipelines.delete(id); },
+        toArray: async () => [...tables.pipelines.values()],
+      },
+    }),
+  };
+});
 
 function textStep(id: string, text: string, outputNamespace = id): PipelineStep {
   return {

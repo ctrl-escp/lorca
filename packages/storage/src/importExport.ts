@@ -9,11 +9,14 @@ import type {
   StepOutputsExport,
 } from '@lorca/core';
 import {resolveModelCallSuggestedBuckets} from '@lorca/capsules';
-import {validatePipeline, ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
+import {validatePipeline} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
+import {
+  isCapsuleImportSchemaVersion,
+  normalizePersistedCapsule,
+} from './persistence.js';
 
 const PIPELINE_SCHEMA_VERSION = 2;
-const CAPSULE_SCHEMA_VERSION = 1;
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -21,7 +24,7 @@ function deepClone<T>(value: T): T {
 
 /** Migrate graph-only capsules and drop legacy graph fields for persistence/export/import. */
 function normalizeCapsuleBody(capsule: CapsuleDefinition): CapsuleDefinition {
-  return stripCapsuleLegacyGraphFields(ensureCapsuleStepChain(capsule));
+  return normalizePersistedCapsule(capsule);
 }
 
 function cloneCapsuleForExport(capsule: CapsuleDefinition): CapsuleDefinition {
@@ -121,7 +124,7 @@ export function parsePipelineExport(data: unknown): PipelineExportFile | ImportP
 
   if (file.includedCapsules) {
     for (const cap of file.includedCapsules) {
-      const capErr = schemaVersionError(cap.schemaVersion, 'capsule', CAPSULE_SCHEMA_VERSION);
+      const capErr = capsuleImportSchemaVersionError(cap.schemaVersion);
       if (capErr) return {ok: false, errors: [capErr]};
     }
   }
@@ -142,7 +145,7 @@ export function parseCapsuleExport(data: unknown): CapsuleExportFile | ImportPar
   if (errors.length > 0) return {ok: false, errors};
 
   const file = data as CapsuleExportFile;
-  const schemaErr = schemaVersionError(file.capsule.schemaVersion, 'capsule', CAPSULE_SCHEMA_VERSION);
+  const schemaErr = capsuleImportSchemaVersionError(file.capsule.schemaVersion);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
 
   const capsule = normalizeCapsuleBody(file.capsule);
@@ -388,6 +391,13 @@ function envelopeErrors(data: unknown, expectedKind: 'pipeline' | 'capsule'): st
     errors.push(`Import file is missing a valid "${payloadKey}" object`);
   }
   return errors;
+}
+
+function capsuleImportSchemaVersionError(version: unknown): string | null {
+  if (!isCapsuleImportSchemaVersion(version)) {
+    return `Unsupported capsule schemaVersion: ${String(version)} (expected 1 or 2)`;
+  }
+  return null;
 }
 
 function schemaVersionError(version: unknown, label: string, expected: number): string | null {

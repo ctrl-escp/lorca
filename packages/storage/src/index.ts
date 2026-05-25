@@ -1,6 +1,17 @@
 export type {PipelineExportFile, CapsuleExportFile} from '@lorca/core';
 export {getDb, LorcaDb} from './db.js';
 export {
+  CAPSULE_SCHEMA_VERSION,
+  CAPSULE_IMPORT_SCHEMA_VERSIONS,
+  DB_SCHEMA_VERSION,
+  isCapsuleImportSchemaVersion,
+  isLegacyPipelineRecord,
+  normalizePersistedCapsule,
+  normalizePersistedPipeline,
+  capsuleNeedsPersistenceRewrite,
+  pipelineNeedsPersistenceRewrite,
+} from './persistence.js';
+export {
   exportPipeline,
   exportCapsule,
   parsePipelineExport,
@@ -23,5 +34,3 @@ export type {
   PipelineImportPreview,
   CapsuleImportPreview,
 } from './importExport.js';
-
-export const CURRENT_SCHEMA_VERSION = 1 as const;

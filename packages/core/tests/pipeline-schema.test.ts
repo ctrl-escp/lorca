@@ -187,6 +187,16 @@ describe('CapsuleDefinition schema', () => {
     expect(cap.status).toBe('draft');
   });
 
+  it('accepts canonical schemaVersion 2 capsules', () => {
+    const {nodes: _n, edges: _e, outputRef: _o, ...base} = makeMinimalCapsule();
+    const cap: CapsuleDefinition = {
+      ...base,
+      schemaVersion: 2,
+      steps: [],
+    };
+    expect(cap.schemaVersion).toBe(2);
+  });
+
   it('validates a preprocess-model-postprocess shape', () => {
     const cap: CapsuleDefinition = {
       ...makeMinimalCapsule(),

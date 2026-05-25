@@ -323,7 +323,8 @@ export interface CapsuleTestCase {
 }
 
 export interface CapsuleDefinition {
-  schemaVersion: 1;
+  /** 1 = legacy graph import only; 2 = canonical step-chain body persisted in IndexedDB/export. */
+  schemaVersion: 1 | 2;
   id: string;
   name: string;
   description?: string;

@@ -1,8 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
-import type {PipelineDefinition, LegacyPipelineDefinition} from '@lorca/core';
-import {getDb} from '@lorca/storage';
-import {migrateLegacyPipeline, migrateManualTextSteps} from '@lorca/pipeline';
+import type {PipelineDefinition} from '@lorca/core';
+import {getDb, normalizePersistedPipeline, pipelineNeedsPersistenceRewrite} from '@lorca/storage';
 import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
 
@@ -37,15 +36,6 @@ export function createDefaultPipeline(preserveId?: string): PipelineDefinition {
   };
 }
 
-function isLegacyPipeline(def: unknown): def is LegacyPipelineDefinition {
-  return (
-    typeof def === 'object' &&
-    def !== null &&
-    (def as {schemaVersion?: unknown}).schemaVersion === 1 &&
-    'nodes' in def
-  );
-}
-
 const ACTIVE_PIPELINE_KEY = 'lorca:activePipelineId';
 
 export const usePipelinesStore = defineStore('pipelines', () => {
@@ -63,11 +53,12 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     if (loaded.value) return;
     const stored = await getDb().pipelines.toArray();
     if (stored.length > 0) {
-      // Migrate any V1 pipelines on load
-      const migrated = stored.map((p) => {
-        const v2 = isLegacyPipeline(p) ? migrateLegacyPipeline(p) : p as PipelineDefinition;
-        return migrateManualTextSteps(v2);
-      });
+      const migrated = stored.map((p) => normalizePersistedPipeline(p));
+      for (let i = 0; i < stored.length; i++) {
+        if (pipelineNeedsPersistenceRewrite(stored[i])) {
+          await getDb().pipelines.put(cloneForStorage(migrated[i]!));
+        }
+      }
       pipelines.value = migrated;
       const savedId = localStorage.getItem(ACTIVE_PIPELINE_KEY);
       const match = savedId ? migrated.find((p) => p.id === savedId) : undefined;

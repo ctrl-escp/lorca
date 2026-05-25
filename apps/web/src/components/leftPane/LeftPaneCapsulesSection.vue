@@ -156,7 +156,7 @@ function onNewCapsule() {
   const id = newId('cap');
   const now = new Date().toISOString();
   capsulesStore.addCapsule({
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     name: 'New Capsule',
     version: 'v1',

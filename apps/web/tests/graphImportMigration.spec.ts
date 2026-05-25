@@ -178,7 +178,7 @@ test('e2e: import graph-only capsule export migrates to step-chain body', async 
   });
 
   const stored = await readStoredCapsule(page, 'Graph Legacy Capsule');
-  expect(stored.schemaVersion).toBe(1);
+  expect(stored.schemaVersion).toBe(2);
   expect(stored.stepCount).toBeGreaterThan(0);
   expect(stored.stepTypes).toContain('presentation');
   expect(stored.hasNodes).toBe(false);

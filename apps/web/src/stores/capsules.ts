@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
-import {getDb} from '@lorca/storage';
+import {getDb, normalizePersistedCapsule, capsuleNeedsPersistenceRewrite} from '@lorca/storage';
 import {
   lockCapsule,
   createDraftFromLocked,
@@ -9,7 +9,7 @@ import {
   getBuiltinExample,
   duplicateExampleCapsule,
 } from '@lorca/capsules';
-import {ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
+import {ensureCapsuleStepChain} from '@lorca/pipeline';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -35,15 +35,23 @@ export const useCapsulesStore = defineStore('capsules', () => {
 
   async function load() {
     if (loaded.value) return;
-    const fromDb = (await getDb().capsules.toArray()).map((c) => ensureCapsuleStepChain(c));
-    const dbIds = new Set(fromDb.map((c) => c.id));
+    const fromDb = await getDb().capsules.toArray();
+    const normalized = fromDb.map((c) => normalizePersistedCapsule(c));
+    for (let i = 0; i < fromDb.length; i++) {
+      const before = fromDb[i]!;
+      const after = normalized[i]!;
+      if (capsuleNeedsPersistenceRewrite(before, after)) {
+        await getDb().capsules.put(cloneForStorage(after));
+      }
+    }
+    const dbIds = new Set(normalized.map((c) => c.id));
     const inMemoryOnly = capsules.value.filter((c) => !dbIds.has(c.id));
-    capsules.value = [...fromDb, ...inMemoryOnly];
+    capsules.value = [...normalized, ...inMemoryOnly];
     loaded.value = true;
   }
 
   function addCapsule(capsule: CapsuleDefinition) {
-    const plain = cloneForStorage(stripCapsuleLegacyGraphFields(capsule));
+    const plain = cloneForStorage(normalizePersistedCapsule(capsule));
     capsules.value.push(plain);
     void getDb().capsules.put(plain);
   }
@@ -59,7 +67,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
       createdAt: _createdAt,
       ...mutablePatch
     } = patch as CapsuleDefinition;
-    const updated = cloneForStorage(stripCapsuleLegacyGraphFields({
+    const updated = cloneForStorage(normalizePersistedCapsule({
       ...capsules.value[idx]!,
       ...mutablePatch,
       updatedAt: new Date().toISOString(),
@@ -120,7 +128,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
     if (idx === -1) return {ok: false, message: 'Draft capsule not found'};
     const result = lockCapsule(capsules.value[idx]!);
     if (!result.ok) return {ok: false, message: result.error.message};
-    const plain = cloneForStorage(stripCapsuleLegacyGraphFields(result.value));
+    const plain = cloneForStorage(normalizePersistedCapsule(result.value));
     capsules.value[idx] = plain;
     void getDb().capsules.put(plain);
     return {ok: true};
@@ -130,7 +138,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
     const locked = getCapsule(id);
     if (locked?.status !== 'locked') return null;
     const newCapsuleId = newId('cap');
-    const draft = stripCapsuleLegacyGraphFields(ensureCapsuleStepChain(createDraftFromLocked(locked, newCapsuleId)));
+    const draft = normalizePersistedCapsule(ensureCapsuleStepChain(createDraftFromLocked(locked, newCapsuleId)));
     capsules.value.push(draft);
     void getDb().capsules.put(cloneForStorage(draft));
     return newCapsuleId;

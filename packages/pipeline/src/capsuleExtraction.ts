@@ -334,7 +334,7 @@ export function extractStepsToCapsule(
   }
 
   const capsule: CapsuleDefinition = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: capsuleId,
     name: capsuleName,
     version: 'v1',
