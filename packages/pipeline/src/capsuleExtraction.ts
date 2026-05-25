@@ -7,15 +7,13 @@ import type {
   CapsuleValueKind,
   LegacyPipelineDefinition,
   PipelineDefinition,
-  PipelineEdge,
   PipelineInputConfig,
   PipelineNode,
-  PipelineOutputRef,
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
-import {compilePipelineToLegacyGraph, migrateLegacyPipeline} from './chainCompiler.js';
+import {migrateLegacyPipeline} from './chainCompiler.js';
 import {buildActiveStepChain, compileActiveStepsToExecutionPlan} from './chainCompiler.js';
 import {getStepHistoryReads} from './historyReads.js';
 import {stepArtifactKey} from './artifacts.js';
@@ -277,33 +275,6 @@ const DEFAULT_CAPSULE_INPUT: PipelineInputConfig = {
   tagName: 'user',
   outputNamespace: 'user_prompt',
 };
-
-/** Build legacy graph fields for graph-only compatibility tests/import migrations. */
-export function syncCapsuleLegacyGraphFromSteps(
-  capsuleId: string,
-  capsuleName: string,
-  steps: PipelineStep[],
-  input: PipelineInputConfig,
-): {nodes: PipelineNode[]; edges: PipelineEdge[]; outputRef: PipelineOutputRef} {
-  const miniPipeline: PipelineDefinition = {
-    schemaVersion: 2,
-    id: capsuleId,
-    name: capsuleName,
-    input,
-    steps,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  const legacy = compilePipelineToLegacyGraph(miniPipeline);
-  const nonInputNodes = legacy.nodes.filter((n) => n.type !== 'input');
-  return {
-    nodes: legacy.nodes,
-    edges: legacy.edges,
-    outputRef: legacy.outputRef.nodeId === 'pipeline-input-node' && nonInputNodes.length > 0
-      ? {nodeId: nonInputNodes.at(-1)!.id, outputName: legacy.outputRef.outputName}
-      : legacy.outputRef,
-  };
-}
 
 export function stripCapsuleLegacyGraphFields(capsule: CapsuleDefinition): CapsuleDefinition {
   if (capsule.steps === undefined) return capsule;

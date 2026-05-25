@@ -107,4 +107,28 @@ describe('resolveOutputRef', () => {
   it('returns null for unknown nodeId', () => {
     expect(resolveOutputRef({nodeId: 'ghost', outputName: 'text'}, base().nodes)).toBeNull();
   });
+
+  it('returns .final. key for looped legacy capsule instance nodes', () => {
+    const node = {
+      id: 'refiner',
+      type: 'capsule-instance' as const,
+      artifactPrefix: 'refiner',
+      config: {
+        capsuleDefinitionId: 'cap1',
+        capsuleVersion: 'v1',
+        inputBindings: {},
+        outputBindings: {},
+        parameterValues: {},
+        modelSlotAssignments: {},
+        loop: {
+          enabled: true,
+          count: 3,
+          inputCarryMode: 'first-input-then-previous-output' as const,
+          carriedInputName: 'carried_text',
+          carriedOutputName: 'output_text',
+        },
+      },
+    };
+    expect(resolveOutputRef({nodeId: 'refiner', outputName: 'output_text'}, [node])).toBe('refiner.final.output_text');
+  });
 });

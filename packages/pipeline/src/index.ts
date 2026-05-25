@@ -3,21 +3,23 @@ export type {ValidateStepChainOptions} from './validate.js';
 export {validateStepChainBody, validateStepChainPipeline} from './stepChainValidation.js';
 export {topologicalOrder} from './order.js';
 export {outputKey, nodePrefix, resolveOutputRef, stepArtifactKey} from './artifacts.js';
-export {executePipeline} from './executor.js';
-export type {ExecutorCallbacks, EndpointResolver, CapsuleResolver} from './executor.js';
 export {
   buildActiveStepChain,
   compileStepChainToExecutionPlan,
   compileActiveStepsToExecutionPlan,
-  compilePipelineToLegacyGraph,
-  expandLoopGroupsForLegacyCompile,
   migrateLegacyPipeline,
   migrateManualTextSteps,
   makeEmptyPipeline,
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
 export {executeStepChain} from './stepExecutor.js';
-export type {ModelEndpointResolver, StepChainRunResult} from './stepExecutor.js';
+export type {
+  ExecutorCallbacks,
+  EndpointResolver,
+  CapsuleResolver,
+  ModelEndpointResolver,
+  StepChainRunResult,
+} from './stepExecutor.js';
 export {
   computeUserPromptSignature,
   computeStepConfigSignature,
@@ -33,7 +35,6 @@ export {
   extractFullPipelineToCapsule,
   computeCapsuleContentSignature,
   ensureCapsuleStepChain,
-  syncCapsuleLegacyGraphFromSteps,
   stripCapsuleLegacyGraphFields,
 } from './capsuleExtraction.js';
 export type {
