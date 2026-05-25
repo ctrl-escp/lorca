@@ -62,7 +62,6 @@ describe('executeCapsuleTestRun', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(artifacts).toContain('user_prompt.xml');
     expect(artifacts).toContain('answer.text');
     if (result.ok) expect(result.value.finalOutputKey).toBe('answer.text');
   });
@@ -165,7 +164,7 @@ describe('executeCapsuleTestRun', () => {
       {onArtifact(a) { artifactNames.push(a.name); }, onTraceEvent() {}},
     );
 
-    expect(artifactNames).toContain('source_text');
+    expect(artifactNames).toContain('source_text.text');
   });
 
   it('substitutes params in template nodes', async () => {

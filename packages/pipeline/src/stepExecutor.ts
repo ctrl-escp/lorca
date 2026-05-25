@@ -9,7 +9,6 @@ import type {
   LoopGroupStepConfig,
   LoopExitCondition,
   Result,
-  CapsuleInstanceNode,
   TraceHistoryReadInput,
   StepRunSnapshot,
 } from '@lorca/core';
@@ -24,7 +23,6 @@ import {
   compileStepChainToExecutionPlan,
 } from './chainCompiler.js';
 import type {ExecutePipelineOptions, CompiledExecutionStep} from './chainCompiler.js';
-import {executePipeline} from './executor.js';
 import {
   buildStepRunSnapshot,
   computeUserPromptSignature,
@@ -35,6 +33,7 @@ import {
   rawResponsePreview,
 } from './stepTrace.js';
 import {tryParseJson} from './jsonParser.js';
+import {ensureCapsuleStepChain} from './capsuleExtraction.js';
 
 interface StepExecutionResult {
   artifacts: PipelineArtifact[];
@@ -648,7 +647,7 @@ async function executeCapsuleStep(
     return {ok: false, error: {code: 'missing_capsule', message: 'No capsule resolver provided', nodeId: step.id}};
   }
 
-  const {capsuleId, capsuleVersion, inputBindings, outputBindings, parameterValues, modelSlotBindings} = step.config;
+  const {capsuleId, capsuleVersion} = step.config;
 
   const capsule = resolveCapsule(capsuleId, capsuleVersion);
   if (!capsule) {
@@ -659,77 +658,8 @@ async function executeCapsuleStep(
     ? {...capsule, steps: step.config.inlineSteps}
     : capsule;
 
-  if (executionCapsule.steps && executionCapsule.steps.length > 0) {
-    return executeCapsuleStepChain(step, executionCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel, runOptions);
-  }
-
-  const modelSlotAssignments: Record<string, {endpointId: string; modelName: string}> = {};
-  for (const [slotName, ref] of Object.entries(modelSlotBindings ?? {})) {
-    if (ref.kind === 'fixed') {
-      modelSlotAssignments[slotName] = {endpointId: ref.endpointId, modelName: ref.modelName};
-    } else if (ref.kind === 'any-enabled-endpoint') {
-      const endpoint = resolveEndpointForModel?.(ref.modelName);
-      if (!endpoint) {
-        return {ok: false, error: {code: 'missing_endpoint', message: `No enabled endpoint has model: ${ref.modelName}`, nodeId: step.id}};
-      }
-      modelSlotAssignments[slotName] = {endpointId: endpoint.id, modelName: ref.modelName};
-    }
-  }
-
-  const capsuleNode: CapsuleInstanceNode = {
-    id: step.id,
-    type: 'capsule-instance',
-    config: {
-      capsuleDefinitionId: capsuleId,
-      capsuleVersion,
-      inputBindings,
-      outputBindings,
-      parameterValues: parameterValues ?? {},
-      modelSlotAssignments,
-    },
-  };
-
-  const runId = `run-${step.id}`;
-  const ctx = {
-    runId,
-    pipelineId: pipeline.id,
-    startedAt: new Date().toISOString(),
-    input: {
-      userPromptRaw: typeof artifacts['user_prompt.raw']?.value === 'string' ? artifacts['user_prompt.raw'].value : '',
-      userPromptXml: typeof artifacts['user_prompt.xml']?.value === 'string' ? artifacts['user_prompt.xml'].value : '',
-    },
-    artifacts: {...artifacts},
-    trace: [] as import('@lorca/core').PipelineTraceEvent[],
-  };
-
-  const produced: PipelineArtifact[] = [];
-  const collectedCallbacks = {
-    onTraceEvent() { /* trace events handled by outer executor */ },
-    onArtifact(a: PipelineArtifact) { produced.push(a); },
-  };
-
-  const legacyDef = {
-    schemaVersion: 1 as const,
-    id: capsule.id,
-    name: capsule.name,
-    inputArtifactName: 'user_prompt',
-    nodes: [{id: 'pipeline-input', type: 'input' as const}, capsuleNode],
-    edges: [{
-      id: `e-input-${step.id}`,
-      fromNodeId: 'pipeline-input',
-      fromOutput: 'xml',
-      toNodeId: step.id,
-      toInput: 'input',
-    }],
-    outputRef: {nodeId: step.id, outputName: step.primaryOutputName},
-    createdAt: capsule.createdAt,
-    updatedAt: capsule.updatedAt,
-  };
-
-  const result = await executePipeline(legacyDef, ctx, resolveEndpoint, collectedCallbacks, resolveCapsule, resolveEndpointForModel);
-  if (!result.ok) return {ok: false, error: {...result.error, nodeId: step.id}};
-
-  return {ok: true, value: {artifacts: produced}};
+  const stepChainCapsule = ensureCapsuleStepChain(executionCapsule);
+  return executeCapsuleStepChain(step, stepChainCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel, runOptions);
 }
 
 const USER_PROMPT_ARTIFACT_PREFIXES = ['user_prompt.raw', 'user_prompt.xml'] as const;

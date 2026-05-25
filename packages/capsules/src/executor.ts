@@ -1,15 +1,11 @@
 import type {
   CapsuleDefinition,
-  LegacyPipelineDefinition,
-  PipelineNode,
-  PipelineArtifact,
-  PipelineRunContext,
   PipelineError,
   PipelineStep,
   Result,
 } from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
-import {executePipeline, executeStepChain} from '@lorca/pipeline';
+import {ensureCapsuleStepChain, executeStepChain} from '@lorca/pipeline';
 import type {ExecutorCallbacks, EndpointResolver, ModelEndpointResolver, StepChainRunResult} from '@lorca/pipeline';
 import type {PipelineDefinition} from '@lorca/core';
 import {validateCapsule} from './validate.js';
@@ -34,68 +30,11 @@ export async function executeCapsuleTestRun(
   callbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<CapsuleTestRunResult, PipelineError>> {
-  const validation = validateCapsule(def);
+  const executionDef = ensureCapsuleStepChain(def);
+  const validation = validateCapsule(executionDef);
   if (!validation.ok) return validation;
 
-  if (def.steps && def.steps.length > 0) {
-    return executeCapsuleStepChainTestRun(def, testInput, resolveEndpoint, callbacks, resolveEndpointForModel);
-  }
-
-  // Resolve slot model refs → fixed refs using provided slot assignments
-  const resolvedNodes = resolveSlots(def.nodes ?? [], testInput.slotAssignments);
-
-  const syntheticDef: LegacyPipelineDefinition = {
-    schemaVersion: 1,
-    id: def.id,
-    name: def.name,
-    inputArtifactName: 'user_prompt',
-    nodes: resolvedNodes,
-    edges: def.edges ?? [],
-    outputRef: def.outputRef ?? {nodeId: '', outputName: 'text'},
-    createdAt: def.createdAt,
-    updatedAt: def.updatedAt,
-  };
-
-  const {raw, xml} = buildUserPromptArtifacts(testInput.userPromptRaw);
-  const ctx: PipelineRunContext = {
-    runId: `capsule-test-${crypto.randomUUID().slice(0, 8)}`,
-    pipelineId: def.id,
-    startedAt: new Date().toISOString(),
-    ...(testInput.abortSignal !== undefined && {abortSignal: testInput.abortSignal}),
-    input: {userPromptRaw: raw, userPromptXml: xml},
-    artifacts: {},
-    trace: [],
-    ...(Object.keys(testInput.paramValues).length > 0 && {params: testInput.paramValues}),
-  };
-
-  // Pre-seed input port artifacts from declared interface inputs
-  for (const port of def.interface.inputs) {
-    const value = testInput.inputValues[port.name];
-    if (value !== undefined) {
-      const artifact: PipelineArtifact = {
-        name: port.name,
-        nodeId: 'capsule-input',
-        kind: port.kind === 'json' ? 'json' : 'text',
-        value,
-        createdAt: new Date().toISOString(),
-      };
-      ctx.artifacts[port.name] = artifact;
-      callbacks.onArtifact(artifact);
-    }
-  }
-
-  const graphResult = await executePipeline(syntheticDef, ctx, resolveEndpoint, callbacks, undefined, resolveEndpointForModel);
-  if (!graphResult.ok) return graphResult;
-  return {
-    ok: true,
-    value: {
-      finalOutputKey: graphResult.value,
-      snapshots: {},
-      userPromptSignature: '',
-      partial: false,
-      executedStepIds: [],
-    },
-  };
+  return executeCapsuleStepChainTestRun(executionDef, testInput, resolveEndpoint, callbacks, resolveEndpointForModel);
 }
 
 async function executeCapsuleStepChainTestRun(
@@ -118,6 +57,9 @@ async function executeCapsuleStepChainTestRun(
       seedArtifacts['user_prompt.raw'] = {name: 'user_prompt.raw', nodeId: 'capsule-input', kind: 'text', value: raw, createdAt: now};
       seedArtifacts['user_prompt.xml'] = {name: 'user_prompt.xml', nodeId: 'capsule-input', kind: 'text', value: xml, createdAt: now};
     }
+  }
+  for (const artifact of Object.values(seedArtifacts)) {
+    callbacks.onArtifact(artifact);
   }
 
   const innerPipeline: PipelineDefinition = {
@@ -145,26 +87,6 @@ async function executeCapsuleStepChainTestRun(
     undefined,
     resolveEndpointForModel,
   );
-}
-
-function resolveSlots(
-  nodes: PipelineNode[],
-  slotAssignments: Record<string, {endpointId: string; modelName: string}>,
-): PipelineNode[] {
-  return nodes.map((node) => {
-    if (node.type !== 'model-call') return node;
-    const {modelRef} = node.config;
-    if (modelRef.kind !== 'slot') return node;
-    const assignment = slotAssignments[modelRef.slotName];
-    if (!assignment) return node;
-    return {
-      ...node,
-      config: {
-        ...node.config,
-        modelRef: {kind: 'fixed', endpointId: assignment.endpointId, modelName: assignment.modelName},
-      },
-    };
-  });
 }
 
 function resolveStepSlots(
