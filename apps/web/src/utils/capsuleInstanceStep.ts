@@ -1,4 +1,4 @@
-import type {CapsuleDefinition, ModelRef, PipelineStep} from '@lorca/core';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {computeCapsuleContentSignature} from '@lorca/pipeline';
 import {defaultModelSlotBindings, uniqueNamespace} from './stepBuilders.js';
 

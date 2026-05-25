@@ -7,7 +7,7 @@ export function useLeftPaneContextMenu() {
     y: number;
     items: ContextMenuItem[];
     actions: Record<string, () => void>;
-  } | null>(null);
+      } | null>(null);
 
   function open(
     event: MouseEvent,

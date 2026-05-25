@@ -24,35 +24,35 @@ export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
   version: 'v1',
   status: 'locked',
   interface: {
-  inputs: [
-    {
-      name: "description",
-      kind: "text",
-      required: true,
-      description: "Natural language description of the pipeline to build."
-    }
-  ],
-  outputs: [
-    {
-      name: "pipeline_steps_json",
-      kind: "json",
-      description: "JSON plan describing suggestion steps to instantiate.",
-      sourceArtifactKey: "generate.text"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "generator",
-      suggestedBuckets: [
-        "general",
-        "thinking"
-      ],
-      required: true,
-      description: "Model used to plan a pipeline from the description."
-    }
-  ]
-},
+    inputs: [
+      {
+        name: 'description',
+        kind: 'text',
+        required: true,
+        description: 'Natural language description of the pipeline to build.',
+      },
+    ],
+    outputs: [
+      {
+        name: 'pipeline_steps_json',
+        kind: 'json',
+        description: 'JSON plan describing suggestion steps to instantiate.',
+        sourceArtifactKey: 'generate.text',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'generator',
+        suggestedBuckets: [
+          'general',
+          'thinking',
+        ],
+        required: true,
+        description: 'Model used to plan a pipeline from the description.',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'generate',
@@ -93,30 +93,30 @@ export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
 
 export const EXAMPLE_INTENT_EXTRACTION = buildExampleCapsule({
   id: 'example-intent-extraction',
-  name: "Intent Extraction",
-  description: "Extract structured intent and topics from the user prompt.",
+  name: 'Intent Extraction',
+  description: 'Extract structured intent and topics from the user prompt.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "intent_json",
-      kind: "json",
-      description: "Parsed intent object",
-      sourceArtifactKey: "extract.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "extractor",
-      suggestedBuckets: [
-        "tiny"
-      ],
-      required: true,
-      description: "Small model for fast intent extraction"
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'intent_json',
+        kind: 'json',
+        description: 'Parsed intent object',
+        sourceArtifactKey: 'extract.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'extractor',
+        suggestedBuckets: [
+          'tiny',
+        ],
+        required: true,
+        description: 'Small model for fast intent extraction',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'extract',
@@ -138,31 +138,31 @@ export const EXAMPLE_INTENT_EXTRACTION = buildExampleCapsule({
 
 export const EXAMPLE_ACCEPTANCE_CRITERIA = buildExampleCapsule({
   id: 'example-acceptance-criteria',
-  name: "Acceptance Criteria Generation",
-  description: "Generate testable acceptance criteria from a user prompt.",
+  name: 'Acceptance Criteria Generation',
+  description: 'Generate testable acceptance criteria from a user prompt.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "acceptance_criteria_json",
-      kind: "json",
-      description: "Structured acceptance criteria",
-      sourceArtifactKey: "generate.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "generator",
-      suggestedBuckets: [
-        "thinking",
-        "general"
-      ],
-      required: true,
-      description: "Model for criteria generation"
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'acceptance_criteria_json',
+        kind: 'json',
+        description: 'Structured acceptance criteria',
+        sourceArtifactKey: 'generate.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'generator',
+        suggestedBuckets: [
+          'thinking',
+          'general',
+        ],
+        required: true,
+        description: 'Model for criteria generation',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'generate',
@@ -186,39 +186,39 @@ export const EXAMPLE_ACCEPTANCE_CRITERIA = buildExampleCapsule({
 
 export const EXAMPLE_CANDIDATE_ANSWER = buildExampleCapsule({
   id: 'example-candidate-answer',
-  name: "Candidate Answer Generation",
-  description: "Produce a candidate answer using the user prompt and acceptance criteria.",
+  name: 'Candidate Answer Generation',
+  description: 'Produce a candidate answer using the user prompt and acceptance criteria.',
   interface: {
-  inputs: [
-    {
-      name: "acceptance_criteria",
-      kind: "json",
-      required: true,
-      description: "Acceptance criteria JSON from a prior step",
-      defaultArtifactKey: "acceptance_criteria"
-    }
-  ],
-  outputs: [
-    {
-      name: "candidate_answer",
-      kind: "text",
-      description: "Generated answer text",
-      sourceArtifactKey: "answer.text"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "answer_model",
-      suggestedBuckets: [
-        "thinking",
-        "general"
-      ],
-      required: true,
-      description: "Primary answer model"
-    }
-  ]
-},
+    inputs: [
+      {
+        name: 'acceptance_criteria',
+        kind: 'json',
+        required: true,
+        description: 'Acceptance criteria JSON from a prior step',
+        defaultArtifactKey: 'acceptance_criteria',
+      },
+    ],
+    outputs: [
+      {
+        name: 'candidate_answer',
+        kind: 'text',
+        description: 'Generated answer text',
+        sourceArtifactKey: 'answer.text',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'answer_model',
+        suggestedBuckets: [
+          'thinking',
+          'general',
+        ],
+        required: true,
+        description: 'Primary answer model',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'answer',
@@ -240,46 +240,46 @@ export const EXAMPLE_CANDIDATE_ANSWER = buildExampleCapsule({
 
 export const EXAMPLE_ANSWER_VERIFICATION = buildExampleCapsule({
   id: 'example-answer-verification',
-  name: "Candidate Answer Verification",
-  description: "Verify a candidate answer against acceptance criteria.",
+  name: 'Candidate Answer Verification',
+  description: 'Verify a candidate answer against acceptance criteria.',
   interface: {
-  inputs: [
-    {
-      name: "acceptance_criteria",
-      kind: "json",
-      required: true,
-      description: "Criteria to verify against",
-      defaultArtifactKey: "acceptance_criteria"
-    },
-    {
-      name: "candidate_answer",
-      kind: "text",
-      required: true,
-      description: "Answer to verify",
-      defaultArtifactKey: "candidate_answer"
-    }
-  ],
-  outputs: [
-    {
-      name: "verification_result_json",
-      kind: "json",
-      description: "Pass/fail verification result",
-      sourceArtifactKey: "verify.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "verifier",
-      suggestedBuckets: [
-        "tiny",
-        "general"
-      ],
-      required: true,
-      description: "Model for verification"
-    }
-  ]
-},
+    inputs: [
+      {
+        name: 'acceptance_criteria',
+        kind: 'json',
+        required: true,
+        description: 'Criteria to verify against',
+        defaultArtifactKey: 'acceptance_criteria',
+      },
+      {
+        name: 'candidate_answer',
+        kind: 'text',
+        required: true,
+        description: 'Answer to verify',
+        defaultArtifactKey: 'candidate_answer',
+      },
+    ],
+    outputs: [
+      {
+        name: 'verification_result_json',
+        kind: 'json',
+        description: 'Pass/fail verification result',
+        sourceArtifactKey: 'verify.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'verifier',
+        suggestedBuckets: [
+          'tiny',
+          'general',
+        ],
+        required: true,
+        description: 'Model for verification',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'verify',
@@ -304,39 +304,39 @@ export const EXAMPLE_ANSWER_VERIFICATION = buildExampleCapsule({
 
 export const EXAMPLE_SUMMARY = buildExampleCapsule({
   id: 'example-summary',
-  name: "Summary Generation",
-  description: "Summarize source text while preserving key facts.",
+  name: 'Summary Generation',
+  description: 'Summarize source text while preserving key facts.',
   interface: {
-  inputs: [
-    {
-      name: "source_text",
-      kind: "text",
-      required: true,
-      description: "Text to summarize",
-      defaultArtifactKey: "source_text"
-    }
-  ],
-  outputs: [
-    {
-      name: "summary",
-      kind: "text",
-      description: "Compressed summary",
-      sourceArtifactKey: "summarize.text"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "summarizer",
-      suggestedBuckets: [
-        "summarize",
-        "tiny"
-      ],
-      required: true,
-      description: "Summarization model"
-    }
-  ]
-},
+    inputs: [
+      {
+        name: 'source_text',
+        kind: 'text',
+        required: true,
+        description: 'Text to summarize',
+        defaultArtifactKey: 'source_text',
+      },
+    ],
+    outputs: [
+      {
+        name: 'summary',
+        kind: 'text',
+        description: 'Compressed summary',
+        sourceArtifactKey: 'summarize.text',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'summarizer',
+        suggestedBuckets: [
+          'summarize',
+          'tiny',
+        ],
+        required: true,
+        description: 'Summarization model',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'summarize',
@@ -355,38 +355,38 @@ export const EXAMPLE_SUMMARY = buildExampleCapsule({
 
 export const EXAMPLE_PROMPT_REWRITE = buildExampleCapsule({
   id: 'example-prompt-rewrite',
-  name: "Prompt Rewrite",
-  description: "Rewrite the user prompt in a requested style.",
+  name: 'Prompt Rewrite',
+  description: 'Rewrite the user prompt in a requested style.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "rewritten_prompt",
-      kind: "text",
-      description: "Rewritten user prompt",
-      sourceArtifactKey: "rewrite.text"
-    }
-  ],
-  parameters: [
-    {
-      name: "style",
-      kind: "text",
-      required: true,
-      description: "Rewrite style (e.g. concise, formal, step-by-step)",
-      default: "concise"
-    }
-  ],
-  modelSlots: [
-    {
-      name: "rewriter",
-      suggestedBuckets: [
-        "general"
-      ],
-      required: true,
-      description: "Rewrite model"
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'rewritten_prompt',
+        kind: 'text',
+        description: 'Rewritten user prompt',
+        sourceArtifactKey: 'rewrite.text',
+      },
+    ],
+    parameters: [
+      {
+        name: 'style',
+        kind: 'text',
+        required: true,
+        description: 'Rewrite style (e.g. concise, formal, step-by-step)',
+        default: 'concise',
+      },
+    ],
+    modelSlots: [
+      {
+        name: 'rewriter',
+        suggestedBuckets: [
+          'general',
+        ],
+        required: true,
+        description: 'Rewrite model',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'rewrite',
@@ -406,31 +406,31 @@ export const EXAMPLE_PROMPT_REWRITE = buildExampleCapsule({
 
 export const EXAMPLE_CONSTRAINT_EXTRACTION = buildExampleCapsule({
   id: 'example-constraint-extraction',
-  name: "Constraint Extraction",
-  description: "Extract explicit constraints and requirements from a user prompt.",
+  name: 'Constraint Extraction',
+  description: 'Extract explicit constraints and requirements from a user prompt.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "constraints_json",
-      kind: "json",
-      description: "Extracted constraints",
-      sourceArtifactKey: "extract.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "extractor",
-      suggestedBuckets: [
-        "tiny",
-        "general"
-      ],
-      required: true,
-      description: "Constraint extraction model"
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'constraints_json',
+        kind: 'json',
+        description: 'Extracted constraints',
+        sourceArtifactKey: 'extract.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'extractor',
+        suggestedBuckets: [
+          'tiny',
+          'general',
+        ],
+        required: true,
+        description: 'Constraint extraction model',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'extract',
@@ -452,46 +452,46 @@ export const EXAMPLE_CONSTRAINT_EXTRACTION = buildExampleCapsule({
 
 export const EXAMPLE_DRIFT_CHECK = buildExampleCapsule({
   id: 'example-drift-check',
-  name: "Drift Check",
-  description: "Detect semantic drift between a baseline and current text.",
+  name: 'Drift Check',
+  description: 'Detect semantic drift between a baseline and current text.',
   interface: {
-  inputs: [
-    {
-      name: "baseline_text",
-      kind: "text",
-      required: true,
-      description: "Original reference text",
-      defaultArtifactKey: "baseline_text"
-    },
-    {
-      name: "current_text",
-      kind: "text",
-      required: true,
-      description: "Revised text to compare",
-      defaultArtifactKey: "current_text"
-    }
-  ],
-  outputs: [
-    {
-      name: "drift_result_json",
-      kind: "json",
-      description: "Drift analysis result",
-      sourceArtifactKey: "check.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "checker",
-      suggestedBuckets: [
-        "tiny",
-        "general"
-      ],
-      required: true,
-      description: "Drift detection model"
-    }
-  ]
-},
+    inputs: [
+      {
+        name: 'baseline_text',
+        kind: 'text',
+        required: true,
+        description: 'Original reference text',
+        defaultArtifactKey: 'baseline_text',
+      },
+      {
+        name: 'current_text',
+        kind: 'text',
+        required: true,
+        description: 'Revised text to compare',
+        defaultArtifactKey: 'current_text',
+      },
+    ],
+    outputs: [
+      {
+        name: 'drift_result_json',
+        kind: 'json',
+        description: 'Drift analysis result',
+        sourceArtifactKey: 'check.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'checker',
+        suggestedBuckets: [
+          'tiny',
+          'general',
+        ],
+        required: true,
+        description: 'Drift detection model',
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'check',
@@ -516,115 +516,115 @@ export const EXAMPLE_DRIFT_CHECK = buildExampleCapsule({
 
 export const EXAMPLE_BEST_OF_TWO = buildExampleCapsule({
   id: 'example-best-of-two',
-  name: "Best of Two",
-  description: "Extract intent, run two independent answer models, and select the strongest result.",
+  name: 'Best of Two',
+  description: 'Extract intent, run two independent answer models, and select the strongest result.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "best_answer_json",
-      kind: "json",
-      description: "Winner, answer, rationale, and improvement notes",
-      sourceArtifactKey: "choose.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "extractor",
-      suggestedBuckets: [
-        "extract-json",
-        "general"
-      ],
-      required: true,
-      description: "Model that extracts intent, acceptance criteria, and constraints",
-      preferredModelNames: [
-        "mistral:7b",
-        "hermes3:8b",
-        "qwen2.5-coder:7b"
-      ],
-      preferredFamilies: [
-        "mistral",
-        "qwen"
-      ],
-      preferredParameterSizes: [
-        "7B",
-        "8B"
-      ]
-    },
-    {
-      name: "candidate_a",
-      suggestedBuckets: [
-        "thinking",
-        "general"
-      ],
-      required: true,
-      description: "First answer model",
-      preferredModelNames: [
-        "qwen3:8b",
-        "llama3.1:8b",
-        "llama3.2:3b"
-      ],
-      preferredFamilies: [
-        "qwen",
-        "llama"
-      ],
-      preferredParameterSizes: [
-        "8B",
-        "7B",
-        "3B"
-      ]
-    },
-    {
-      name: "candidate_b",
-      suggestedBuckets: [
-        "general",
-        "thinking"
-      ],
-      required: true,
-      description: "Second answer model with a different model family when available",
-      preferredModelNames: [
-        "gemma3:12b",
-        "mistral:7b",
-        "llama3.1:8b"
-      ],
-      preferredFamilies: [
-        "gemma",
-        "mistral",
-        "llama"
-      ],
-      preferredParameterSizes: [
-        "12B",
-        "8B",
-        "7B"
-      ]
-    },
-    {
-      name: "judge",
-      suggestedBuckets: [
-        "verify",
-        "thinking",
-        "general"
-      ],
-      required: true,
-      description: "Model that compares candidate answers against the extracted criteria",
-      preferredModelNames: [
-        "qwen3:8b",
-        "llama3-judgelm:8b",
-        "mistral:7b"
-      ],
-      preferredFamilies: [
-        "qwen",
-        "llama",
-        "mistral"
-      ],
-      preferredParameterSizes: [
-        "8B",
-        "7B"
-      ]
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'best_answer_json',
+        kind: 'json',
+        description: 'Winner, answer, rationale, and improvement notes',
+        sourceArtifactKey: 'choose.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'extractor',
+        suggestedBuckets: [
+          'extract-json',
+          'general',
+        ],
+        required: true,
+        description: 'Model that extracts intent, acceptance criteria, and constraints',
+        preferredModelNames: [
+          'mistral:7b',
+          'hermes3:8b',
+          'qwen2.5-coder:7b',
+        ],
+        preferredFamilies: [
+          'mistral',
+          'qwen',
+        ],
+        preferredParameterSizes: [
+          '7B',
+          '8B',
+        ],
+      },
+      {
+        name: 'candidate_a',
+        suggestedBuckets: [
+          'thinking',
+          'general',
+        ],
+        required: true,
+        description: 'First answer model',
+        preferredModelNames: [
+          'qwen3:8b',
+          'llama3.1:8b',
+          'llama3.2:3b',
+        ],
+        preferredFamilies: [
+          'qwen',
+          'llama',
+        ],
+        preferredParameterSizes: [
+          '8B',
+          '7B',
+          '3B',
+        ],
+      },
+      {
+        name: 'candidate_b',
+        suggestedBuckets: [
+          'general',
+          'thinking',
+        ],
+        required: true,
+        description: 'Second answer model with a different model family when available',
+        preferredModelNames: [
+          'gemma3:12b',
+          'mistral:7b',
+          'llama3.1:8b',
+        ],
+        preferredFamilies: [
+          'gemma',
+          'mistral',
+          'llama',
+        ],
+        preferredParameterSizes: [
+          '12B',
+          '8B',
+          '7B',
+        ],
+      },
+      {
+        name: 'judge',
+        suggestedBuckets: [
+          'verify',
+          'thinking',
+          'general',
+        ],
+        required: true,
+        description: 'Model that compares candidate answers against the extracted criteria',
+        preferredModelNames: [
+          'qwen3:8b',
+          'llama3-judgelm:8b',
+          'mistral:7b',
+        ],
+        preferredFamilies: [
+          'qwen',
+          'llama',
+          'mistral',
+        ],
+        preferredParameterSizes: [
+          '8B',
+          '7B',
+        ],
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'intent',
@@ -747,123 +747,123 @@ export const EXAMPLE_BEST_OF_TWO = buildExampleCapsule({
 
 export const EXAMPLE_EXPERT = withAnswerVerifyRetryLoop(buildExampleCapsule({
   id: 'example-expert',
-  name: "The Expert",
-  description: "Route the prompt to a domain expert, answer it, and verify the answer against criteria. Retries up to 3 times until verification passes.",
+  name: 'The Expert',
+  description: 'Route the prompt to a domain expert, answer it, and verify the answer against criteria. Retries up to 3 times until verification passes.',
   interface: {
-  inputs: [],
-  outputs: [
-    {
-      name: "expert_answer",
-      kind: "text",
-      description: "Domain-grounded answer",
-      sourceArtifactKey: "answer.text"
-    },
-    {
-      name: "verification_json",
-      kind: "json",
-      description: "Verification result for the expert answer",
-      sourceArtifactKey: "verify.json"
-    }
-  ],
-  parameters: [],
-  modelSlots: [
-    {
-      name: "domain_router",
-      suggestedBuckets: [
-        "extract-json",
-        "tiny",
-        "general"
-      ],
-      required: true,
-      description: "Model that identifies the domain and required expertise",
-      preferredModelNames: [
-        "mistral:7b",
-        "llama3.2:3b",
-        "hermes3:8b"
-      ],
-      preferredFamilies: [
-        "mistral",
-        "llama"
-      ],
-      preferredParameterSizes: [
-        "7B",
-        "3B",
-        "8B"
-      ]
-    },
-    {
-      name: "expert_planner",
-      suggestedBuckets: [
-        "thinking",
-        "extract-json",
-        "general"
-      ],
-      required: true,
-      description: "Model that turns the domain into intent and acceptance criteria",
-      preferredModelNames: [
-        "qwen3:8b",
-        "mistral:7b",
-        "qwen2.5:7b"
-      ],
-      preferredFamilies: [
-        "qwen",
-        "mistral"
-      ],
-      preferredParameterSizes: [
-        "8B",
-        "7B"
-      ]
-    },
-    {
-      name: "expert_answerer",
-      suggestedBuckets: [
-        "thinking",
-        "general"
-      ],
-      required: true,
-      description: "Model that answers as the selected expert",
-      preferredModelNames: [
-        "qwen3:8b",
-        "gemma3:12b",
-        "llama3.1:8b"
-      ],
-      preferredFamilies: [
-        "qwen",
-        "gemma",
-        "llama"
-      ],
-      preferredParameterSizes: [
-        "8B",
-        "12B",
-        "7B"
-      ]
-    },
-    {
-      name: "verifier",
-      suggestedBuckets: [
-        "verify",
-        "extract-json",
-        "general"
-      ],
-      required: true,
-      description: "Model that verifies the answer against acceptance criteria",
-      preferredModelNames: [
-        "qwen3:8b",
-        "llama3-judgelm:8b",
-        "mistral:7b"
-      ],
-      preferredFamilies: [
-        "qwen",
-        "llama",
-        "mistral"
-      ],
-      preferredParameterSizes: [
-        "8B",
-        "7B"
-      ]
-    }
-  ]
-},
+    inputs: [],
+    outputs: [
+      {
+        name: 'expert_answer',
+        kind: 'text',
+        description: 'Domain-grounded answer',
+        sourceArtifactKey: 'answer.text',
+      },
+      {
+        name: 'verification_json',
+        kind: 'json',
+        description: 'Verification result for the expert answer',
+        sourceArtifactKey: 'verify.json',
+      },
+    ],
+    parameters: [],
+    modelSlots: [
+      {
+        name: 'domain_router',
+        suggestedBuckets: [
+          'extract-json',
+          'tiny',
+          'general',
+        ],
+        required: true,
+        description: 'Model that identifies the domain and required expertise',
+        preferredModelNames: [
+          'mistral:7b',
+          'llama3.2:3b',
+          'hermes3:8b',
+        ],
+        preferredFamilies: [
+          'mistral',
+          'llama',
+        ],
+        preferredParameterSizes: [
+          '7B',
+          '3B',
+          '8B',
+        ],
+      },
+      {
+        name: 'expert_planner',
+        suggestedBuckets: [
+          'thinking',
+          'extract-json',
+          'general',
+        ],
+        required: true,
+        description: 'Model that turns the domain into intent and acceptance criteria',
+        preferredModelNames: [
+          'qwen3:8b',
+          'mistral:7b',
+          'qwen2.5:7b',
+        ],
+        preferredFamilies: [
+          'qwen',
+          'mistral',
+        ],
+        preferredParameterSizes: [
+          '8B',
+          '7B',
+        ],
+      },
+      {
+        name: 'expert_answerer',
+        suggestedBuckets: [
+          'thinking',
+          'general',
+        ],
+        required: true,
+        description: 'Model that answers as the selected expert',
+        preferredModelNames: [
+          'qwen3:8b',
+          'gemma3:12b',
+          'llama3.1:8b',
+        ],
+        preferredFamilies: [
+          'qwen',
+          'gemma',
+          'llama',
+        ],
+        preferredParameterSizes: [
+          '8B',
+          '12B',
+          '7B',
+        ],
+      },
+      {
+        name: 'verifier',
+        suggestedBuckets: [
+          'verify',
+          'extract-json',
+          'general',
+        ],
+        required: true,
+        description: 'Model that verifies the answer against acceptance criteria',
+        preferredModelNames: [
+          'qwen3:8b',
+          'llama3-judgelm:8b',
+          'mistral:7b',
+        ],
+        preferredFamilies: [
+          'qwen',
+          'llama',
+          'mistral',
+        ],
+        preferredParameterSizes: [
+          '8B',
+          '7B',
+        ],
+      },
+    ],
+  },
   steps: [
     modelCallStep({
       id: 'domain',
@@ -967,7 +967,6 @@ export const EXAMPLE_EXPERT = withAnswerVerifyRetryLoop(buildExampleCapsule({
     }),
   ],
 }));
-
 
 export const BUILTIN_EXAMPLES: CapsuleDefinition[] = [
   LORCA_PIPELINE_GENERATOR,

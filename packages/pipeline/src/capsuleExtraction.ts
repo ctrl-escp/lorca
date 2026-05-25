@@ -8,7 +8,6 @@ import type {
   LegacyPipelineDefinition,
   PipelineDefinition,
   PipelineInputConfig,
-  PipelineNode,
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';

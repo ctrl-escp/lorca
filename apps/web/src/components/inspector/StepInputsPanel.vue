@@ -45,7 +45,6 @@
 <script setup lang="ts">
 import type {PipelineStep, StepHistoryReadConfig} from '@lorca/core';
 import {validateHistoryRead, historyReadIssueLabel, REORDER_REF_HINTS} from '@lorca/pipeline';
-import type {HistoryReadIssue} from '@lorca/pipeline';
 
 const props = defineProps<{
   effectiveStep: PipelineStep;
