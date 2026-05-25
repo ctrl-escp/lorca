@@ -67,13 +67,13 @@
     <!-- User prompt input -->
     <div class="user-prompt-bar">
       <label class="prompt-label hdr-prompt">Prompt</label>
-      <textarea
+      <TextEditor
         class="user-prompt-input"
-        v-model="userPrompt"
+        :model-value="userPrompt"
         placeholder="Enter your prompt…"
-        rows="2"
+        :rows="2"
         @focus="editorStore.beginInputEdit()"
-        @input="onUserPromptInput(($event.target as HTMLTextAreaElement).value)"
+        @update:model-value="onUserPromptInput"
         @blur="editorStore.commitUserPrompt(userPrompt)"
       />
     </div>
@@ -220,6 +220,7 @@ import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
 import ImportRemapDialog from '../import/ImportRemapDialog.vue';
 import PipelineGeneratorModal from './PipelineGeneratorModal.vue';
+import TextEditor from '../shared/TextEditor.vue';
 import type {MissingModelReference, ModelRemap} from '../../stores/importExport.js';
 
 const props = defineProps<{def: PipelineDefinition}>();
@@ -1025,11 +1026,10 @@ function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference
 }
 .prompt-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0.35rem; flex-shrink: 0; font-weight: 600; }
 .user-prompt-input {
-  flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 5px;
-  color: #ccc; font-size: 0.9rem; padding: 0.5rem 0.65rem; resize: vertical;
-  font-family: inherit; line-height: 1.4;
+  flex: 1;
 }
-.user-prompt-input:focus { outline: none; border-color: var(--accent-border); }
+.user-prompt-input :deep(.cm-editor) { font-size: 0.9rem; }
+.user-prompt-input :deep(.cm-content) { font-family: inherit; }
 
 @media (max-width: 767px) {
   .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }

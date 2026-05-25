@@ -41,7 +41,12 @@
         <template v-if="selectedInnerStep.config.type === 'presentation'">
           <div class="inspector-field">
             <FieldLabel label="Text" />
-            <textarea v-model="localTemplate" rows="4" @blur="commitTemplate" />
+            <TextEditor
+              v-model="localTemplate"
+              :rows="4"
+              :artifact-refs="templateArtifactRefs"
+              @blur="commitTemplate"
+            />
           </div>
         </template>
 
@@ -89,7 +94,9 @@ import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
 import {FieldLabel} from '@lorca/ui-kit';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
+import TextEditor from '../shared/TextEditor.vue';
 import {modelKeyFromRef, tryAutoSelectModelCallStep} from '../../utils/modelAutoSelect.js';
+import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 
 const props = defineProps<{
   loopStepId: string;
@@ -116,6 +123,10 @@ const contextSteps = computed(() => {
   if (!id) return editorStore.contextStepsForLoopInner(props.loopStepId, props.innerSteps[0]?.id ?? '');
   return editorStore.contextStepsForLoopInner(props.loopStepId, id);
 });
+
+const templateArtifactRefs = computed(() =>
+  selectedInnerStep.value ? artifactRefsBeforeStep(contextSteps.value, selectedInnerStep.value.id) : [],
+);
 
 const hasPromptBlocks = computed(() => {
   const s = selectedInnerStep.value;
@@ -276,8 +287,7 @@ function autoSelectModel() {
 .checkbox-row { display: flex; align-items: center; gap: 0.4rem; color: #aaa; font-size: 0.72rem; }
 .checkbox-row input { width: auto; margin: 0; }
 .inspector-field input,
-.inspector-field select,
-.inspector-field textarea {
+.inspector-field select {
   background: #0d0d0d;
   border: 1px solid #2a2a2a;
   color: #e8e8e8;

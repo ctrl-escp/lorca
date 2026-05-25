@@ -9,9 +9,9 @@
       <div class="dialog-body">
         <label class="field">
           <span class="hdr-prompt">Description</span>
-          <textarea
+          <TextEditor
             v-model="description"
-            rows="5"
+            :rows="5"
             placeholder="Describe the pipeline you want…"
             :disabled="loading"
           />
@@ -76,6 +76,7 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue';
 import type {CapsuleDefinition} from '@lorca/core';
+import TextEditor from '../shared/TextEditor.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -177,7 +178,7 @@ function submit() {
   letter-spacing: 0.06em;
   font-weight: 600;
 }
-textarea, select {
+select {
   background: #111;
   border: 1px solid #2a2a2a;
   color: #e8e8e8;
@@ -185,8 +186,7 @@ textarea, select {
   padding: 0.5rem 0.6rem;
   font: inherit;
 }
-textarea { resize: vertical; line-height: 1.4; }
-textarea:focus, select:focus { outline: none; border-color: var(--accent-border); }
+select:focus { outline: none; border-color: var(--accent-border); }
 .error-box, .warning-box {
   border-radius: 4px;
   padding: 0.5rem 0.6rem;

@@ -45,7 +45,7 @@ describe('getStepRolePromptCatalog', () => {
 describe('truncatePromptPreview', () => {
   it('collapses whitespace and truncates long text', () => {
     const long = 'a'.repeat(150);
-    expect(truncatePromptPreview(`  hello\n\nworld  `)).toBe('hello world');
+    expect(truncatePromptPreview('  hello\n\nworld  ')).toBe('hello world');
     expect(truncatePromptPreview(long)).toHaveLength(120);
     expect(truncatePromptPreview(long).endsWith('…')).toBe(true);
   });

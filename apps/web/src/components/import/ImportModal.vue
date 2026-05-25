@@ -8,11 +8,12 @@
         </header>
 
         <div class="dialog-body">
-          <textarea
+          <TextEditor
             class="json-input"
             v-model="jsonText"
             placeholder="Paste JSON here…"
-            spellcheck="false"
+            language="json"
+            :rows="14"
           />
           <label class="option-row">
             <input type="checkbox" v-model="includeStepOutputs" />
@@ -36,6 +37,7 @@
 
 <script setup lang="ts">
 import {ref, watch, computed} from 'vue';
+import TextEditor from '../shared/TextEditor.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -105,12 +107,7 @@ function handleImport() {
 .dialog-body {
   padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-height: 0;
 }
-.json-input {
-  flex: 1; min-height: 260px; background: #0d0d0d; border: 1px solid #2a2a2a;
-  border-radius: 4px; color: #a8d8a8; font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-  font-size: 0.75rem; padding: 0.6rem; resize: vertical; line-height: 1.5;
-}
-.json-input:focus { outline: none; border-color: var(--accent-border); }
+.json-input { flex: 1; min-height: 260px; }
 .option-row {
   display: flex; align-items: center; gap: 0.45rem;
   font-size: 0.78rem; color: #bbb; user-select: none;

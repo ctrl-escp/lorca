@@ -32,13 +32,12 @@
 
           <label class="pim-field">
             <span class="hdr-prompt">Improvement prompt</span>
-            <textarea
-              v-model="instructionText"
+            <TextEditor
+              :model-value="instructionText"
               class="pim-textarea"
-              rows="10"
-              spellcheck="true"
+              :rows="10"
               :disabled="isRunning"
-              @input="persistInstructionText"
+              @update:model-value="updateInstructionText"
             />
           </label>
 
@@ -60,11 +59,11 @@
 
           <label v-if="resultText !== null" class="pim-field">
             <span class="hdr-preview">Preview</span>
-            <textarea
-              v-model="resultText"
+            <TextEditor
+              :model-value="resultText ?? ''"
               class="pim-textarea pim-result"
-              rows="14"
-              spellcheck="true"
+              :rows="14"
+              @update:model-value="resultText = $event"
             />
           </label>
 
@@ -105,6 +104,7 @@ import {
   savePromptImproverPrompt,
   selectPromptImproverModel,
 } from '../../utils/promptImprover.js';
+import TextEditor from '../shared/TextEditor.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -200,6 +200,11 @@ function persistModelSelection() {
 
 function persistInstructionText() {
   savePromptImproverPrompt(props.stepId, instructionText.value);
+}
+
+function updateInstructionText(value: string) {
+  instructionText.value = value;
+  persistInstructionText();
 }
 
 async function runImprover() {
@@ -398,8 +403,7 @@ function applyResult() {
   font-weight: 600;
 }
 
-.pim-select,
-.pim-textarea {
+.pim-select {
   width: 100%;
   background: #0d0d0d;
   border: 1px solid #2a2a2a;
@@ -409,17 +413,12 @@ function applyResult() {
   font-size: 0.78rem;
 }
 
-.pim-select:focus,
-.pim-textarea:focus {
+.pim-select:focus {
   outline: none;
   border-color: var(--accent-border);
 }
 
-.pim-textarea {
-  resize: vertical;
-  line-height: 1.45;
-  font-family: monospace;
-}
+.pim-textarea { width: 100%; }
 
 .pim-result {
   color: #d8ead8;

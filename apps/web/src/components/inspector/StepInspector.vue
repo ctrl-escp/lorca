@@ -112,9 +112,10 @@
           <template v-else-if="effectiveStep.config.type === 'presentation'">
             <div class="inspector-field">
               <FieldLabel label="Text" title="Free-form text with optional {{artifact.key}} interpolation" />
-              <textarea
+              <TextEditor
                 v-model="localTemplate"
-                rows="6"
+                :rows="6"
+                :artifact-refs="templateArtifactRefs"
                 placeholder="{{artifact.user_prompt.raw}}"
                 title="Text with optional artifact placeholders"
                 @focus="onTextFieldFocus"
@@ -155,6 +156,7 @@
             v-if="hasPromptBlocks && effectiveStep?.prompt && inlineCapsuleScope"
             :step-id="effectiveStep.id"
             :config="effectiveStep.prompt"
+            :context-steps="inlineCapsulePromptContextSteps"
             :nested-edit-target="{kind: 'inline-capsule', parentStepId: inlineCapsuleScope.capsuleStepId}"
           />
           <PromptCompositionEditor
@@ -327,7 +329,9 @@ import LoopInnerChainEditor from './LoopInnerChainEditor.vue';
 import LoopExitConditionEditor from './LoopExitConditionEditor.vue';
 import PipelineCapsuleInstanceEditor from './PipelineCapsuleInstanceEditor.vue';
 import CapsuleInlineStepEditor from './CapsuleInlineStepEditor.vue';
+import TextEditor from '../shared/TextEditor.vue';
 import {usePipelineEditorStore} from '../../stores/pipelineEditor.js';
+import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 import {
   inlineCapsuleArtifactKey,
   inlineCapsuleSnapshotKey,
@@ -357,6 +361,17 @@ const inlineCapsuleScope = computed(() =>
 );
 
 const effectiveStep = computed(() => inlineCapsuleScope.value?.innerStep ?? step.value);
+const templateArtifactRefs = computed(() => {
+  const selected = effectiveStep.value;
+  return selected ? artifactRefsBeforeStep(editorStore.steps, selected.id) : [];
+});
+const inlineCapsulePromptContextSteps = computed(() => {
+  if (!inlineCapsuleScope.value) return [];
+  return pipelineEditorStore.contextStepsForInlineCapsuleInner(
+    inlineCapsuleScope.value.capsuleStepId,
+    inlineCapsuleScope.value.innerStep.id,
+  );
+});
 const activeTab = ref<InspectorTab>('config');
 
 const inspectorRef = ref<HTMLElement | null>(null);
@@ -792,12 +807,11 @@ function onLoopExitUpdate(exit: LoopExitCondition) {
 .checkbox-row { display: flex; align-items: center; gap: 0.45rem; color: #aaa; font-size: 0.78rem; }
 .checkbox-row input { width: auto; margin: 0; }
 
-input, select, textarea {
+input, select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 5px; padding: 6px 10px; font-size: 0.88rem; width: 100%;
 }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-border); }
-textarea { resize: vertical; font-family: monospace; line-height: 1.4; }
+input:focus, select:focus { outline: none; border-color: var(--accent-border); }
 
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; }
 .model-select-row select { flex: 1; min-width: 0; }

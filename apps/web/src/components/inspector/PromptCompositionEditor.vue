@@ -234,14 +234,15 @@
             @click="deleteBlock(idx)"
           >×</button>
         </div>
-        <textarea
+        <TextEditor
           class="pce-body"
-          v-model="block.body"
-          rows="4"
+          :model-value="block.body"
+          :rows="4"
+          :artifact-refs="promptArtifactRefs"
           :placeholder="block.source === 'system-default' ? 'System instructions…' : 'Block content…'"
           title="Block body text"
           @focus="beginPromptEdit"
-          @input="liveUpdate"
+          @update:model-value="(value) => updateBlockBody(idx, value)"
           @blur="commitBlocks('Edit block body')"
         />
       </div>
@@ -264,12 +265,10 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
 import type {PromptCompositionConfig, PromptBlock, StepHistoryReadConfig, PipelineStep} from '@lorca/core';
-import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import {buildUserPromptArtifacts, isValidTag, renderPromptComposition} from '@lorca/prompt';
 import type {ResolvedHistoryRead} from '@lorca/prompt';
 import {
   getPriorSourceSteps,
-  listStepOutputArtifacts,
   artifactsForSourceStep,
   defaultArtifactRefForSource,
   suggestHistoryReadTagName,
@@ -285,7 +284,9 @@ import XmlPreview from '../shared/XmlPreview.vue';
 import FullPromptModal from './FullPromptModal.vue';
 import PromptImproverModal from './PromptImproverModal.vue';
 import PromptLibraryButton from '../shared/PromptLibraryButton.vue';
+import TextEditor from '../shared/TextEditor.vue';
 import {resolveArtifactValue, resolvePreviousOutput, PREVIEW_TRUNCATE_CHARS} from '../../utils/promptPreview.js';
+import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 
 export type NestedEditTarget =
   | {kind: 'loop'; parentStepId: string}
@@ -323,18 +324,7 @@ const chainSteps = computed(() => props.contextSteps ?? editorStore.steps);
 
 const priorSources = computed(() => getPriorSourceSteps(chainSteps.value, props.stepId));
 
-const promptArtifactRefs = computed(() => {
-  const refs = ['user_prompt.raw', 'user_prompt.xml'];
-  for (const opt of priorSources.value) {
-    if (opt.stepId === props.stepId || opt.stepId === PIPELINE_INPUT_STEP_ID) continue;
-    const step = chainSteps.value.find((s) => s.id === opt.stepId);
-    if (!step) continue;
-    for (const art of listStepOutputArtifacts(step)) {
-      refs.push(art.ref);
-    }
-  }
-  return [...new Set(refs)];
-});
+const promptArtifactRefs = computed(() => artifactRefsBeforeStep(chainSteps.value, props.stepId));
 
 const currentUserPromptArtifacts = computed(() =>
   buildUserPromptArtifacts(editorStore.pipeline.input.raw),
@@ -436,6 +426,11 @@ function applyBlockStartingPoint(idx: number, text: string) {
   beginPromptEdit();
   localBlocks.value[idx]!.body = text;
   commitBlocks('Apply starting prompt');
+}
+
+function updateBlockBody(idx: number, body: string) {
+  localBlocks.value[idx]!.body = body;
+  liveUpdate();
 }
 
 function addBlock() {
@@ -727,12 +722,7 @@ const previewXml = computed(() =>
 }
 .pce-improve-btn:hover { background: var(--accent-bg-hover); color: #a8d8f0; }
 
-.pce-body {
-  width: 100%; background: #0d0d0d; border: 1px solid #222; color: #e8e8e8;
-  border-radius: 3px; padding: 4px 6px; font-size: 0.78rem; font-family: monospace;
-  resize: vertical; line-height: 1.4; box-sizing: border-box;
-}
-.pce-body:focus { outline: none; border-color: var(--accent-border); }
+.pce-body { font-size: 0.78rem; }
 
 .pce-toggle-preview-btn {
   font-size: 0.65rem; padding: 1px 6px;

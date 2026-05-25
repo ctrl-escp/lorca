@@ -19,11 +19,11 @@
 
     <div class="user-prompt-bar" v-if="!editor.isReadOnly">
       <label class="prompt-label hdr-prompt">Test prompt</label>
-      <textarea
+      <TextEditor
         class="user-prompt-input"
         v-model="testPrompt"
         placeholder="Enter your prompt…"
-        rows="2"
+        :rows="2"
         @focus="editor.beginInputEdit()"
         @blur="editor.commitUserPrompt(testPrompt)"
       />
@@ -98,11 +98,12 @@
           <div v-for="port in def.interface.inputs" :key="port.name" class="test-field">
             <FieldLabel :label="port.name" :required="port.required" :title="`Test value for input port '${port.name}' (${port.kind})`" />
             <span class="kind-badge">{{ port.kind }}</span>
-            <textarea
-              v-model="testInputValues[port.name]"
-              rows="2"
+            <TextEditor
+              :model-value="testInputValues[port.name] ?? ''"
+              :rows="2"
               :placeholder="port.kind === 'json' ? '{}' : ''"
               :title="`Test value for input port '${port.name}' (${port.kind})`"
+              @update:model-value="testInputValues[port.name] = $event"
             />
           </div>
         </template>
@@ -145,6 +146,7 @@ import {FieldLabel} from '@lorca/ui-kit';
 import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
 import CapsuleModelSlotFields from '../shared/CapsuleModelSlotFields.vue';
+import TextEditor from '../shared/TextEditor.vue';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -452,10 +454,10 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 }
 .prompt-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; flex-shrink: 0; font-weight: 600; }
 .user-prompt-input {
-  flex: 1; background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
-  border-radius: 3px; padding: 4px 6px; font-size: 0.82rem; resize: vertical; font-family: inherit;
+  flex: 1;
 }
-.user-prompt-input:focus { outline: none; border-color: var(--accent-border); }
+.user-prompt-input :deep(.cm-editor) { font-size: 0.82rem; }
+.user-prompt-input :deep(.cm-content) { font-family: inherit; }
 
 .capsule-chain { flex: 1; min-height: 0; }
 
@@ -472,12 +474,11 @@ function handleImportSubmit(text: string, includeStepOutputs: boolean) {
 .test-run-controls { display: flex; gap: 0.4rem; }
 .test-fields { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .test-field { display: flex; flex-direction: column; gap: 0.15rem; }
-.test-field input, .test-field textarea, .test-field select {
+.test-field input, .test-field select {
   background: #111; border: 1px solid #2a2a2a; color: #e8e8e8;
   border-radius: 3px; padding: 4px 6px; font-size: 0.82rem;
 }
-.test-field input:focus, .test-field textarea:focus, .test-field select:focus { outline: none; border-color: var(--accent-border); }
-.test-field textarea { resize: vertical; font-family: inherit; }
+.test-field input:focus, .test-field select:focus { outline: none; border-color: var(--accent-border); }
 .kind-badge { font-size: 0.65rem; color: var(--text-secondary); background: #1a1a1a; padding: 0 4px; border-radius: 2px; }
 
 .model-select-row { display: flex; gap: 0.4rem; align-items: center; }

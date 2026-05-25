@@ -13,7 +13,12 @@
     <template v-if="innerStep.config.type === 'presentation'">
       <div class="inspector-field">
         <FieldLabel label="Text" />
-        <textarea v-model="localTemplate" rows="5" @blur="commitTemplate" />
+        <TextEditor
+          v-model="localTemplate"
+          :rows="5"
+          :artifact-refs="templateArtifactRefs"
+          @blur="commitTemplate"
+        />
       </div>
     </template>
 
@@ -122,11 +127,13 @@ import {useCapsulesStore} from '../../stores/capsules.js';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
 import PromptCompositionEditor from './PromptCompositionEditor.vue';
+import TextEditor from '../shared/TextEditor.vue';
 import {
   autoSelectCapsuleSlot,
   modelKeyFromRef,
   tryAutoSelectModelCallStep,
 } from '../../utils/modelAutoSelect.js';
+import {artifactRefsBeforeStep} from '../../utils/artifactRefs.js';
 
 const props = defineProps<{
   capsuleStepId: string;
@@ -189,6 +196,8 @@ const canRestoreSlotBinding = computed(() => {
 const contextSteps = computed(() =>
   editorStore.contextStepsForInlineCapsuleInner(props.capsuleStepId, props.innerStep.id),
 );
+
+const templateArtifactRefs = computed(() => artifactRefsBeforeStep(contextSteps.value, props.innerStep.id));
 
 const hasPromptBlocks = computed(() =>
   props.innerStep.type === 'model-call' || Boolean(props.innerStep.prompt?.blocks?.length),
@@ -419,8 +428,7 @@ function autoSelectModel() {
   line-height: 1.4;
 }
 select,
-input,
-textarea {
+input {
   width: 100%;
   background: #111;
   border: 1px solid #2a2a2a;
@@ -466,9 +474,4 @@ textarea {
   cursor: pointer;
 }
 .btn-restore-slot:hover { background: #21182a; }
-textarea {
-  resize: vertical;
-  font-family: inherit;
-  line-height: 1.45;
-}
 </style>

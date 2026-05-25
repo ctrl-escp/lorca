@@ -303,13 +303,13 @@
                   <span v-if="!isCommentExpanded(step.id) && step.description" class="step-comment-preview">{{ step.description }}</span>
                   <span v-else class="step-comment-label">Comment</span>
                 </button>
-                <textarea
+                <TextEditor
                   v-if="isCommentExpanded(step.id)"
                   class="step-comment-textarea"
-                  :value="commentDrafts[step.id] ?? ''"
+                  :model-value="commentDrafts[step.id] ?? ''"
                   placeholder="Add a comment…"
-                  rows="3"
-                  @input="commentDrafts[step.id] = ($event.target as HTMLTextAreaElement).value"
+                  :rows="3"
+                  @update:model-value="commentDrafts[step.id] = $event"
                   @click.stop
                   @keydown.stop
                 />
@@ -449,6 +449,7 @@ import {
   type ResolveStepExecutionOptions,
   type StepExecutionChip,
 } from '../../utils/stepExecutionDisplay.js';
+import TextEditor from '../shared/TextEditor.vue';
 
 type DragKind = 'step-reorder' | 'suggestion';
 
@@ -1001,7 +1002,7 @@ function cancelComment(step: PipelineStep) {
 
 function onStepDragStart(stepId: string, event: DragEvent) {
   const target = event.target as HTMLElement;
-  if (target.closest('button, input, textarea, select, a, [contenteditable="true"]')) {
+  if (target.closest('button, input, select, a, .cm-editor, [contenteditable="true"]')) {
     event.preventDefault();
     return;
   }
@@ -1316,7 +1317,7 @@ function runStateTitle(stepId: string): string {
   color: #6a9fc8;
 }
 .chain-step.selected:hover .step-drag-handle { background: #152535; color: #8ec8e8; }
-.step-card-content :is(button, input, textarea, select) { cursor: pointer; }
+.step-card-content :is(button, input, select, .text-editor) { cursor: pointer; }
 .chain-step.dragging .step-card { opacity: 0.45; }
 /* Full step-card outline when reordering onto an existing step */
 .chain-step.drop-target-step .step-card {
@@ -1800,6 +1801,9 @@ function runStateTitle(stepId: string): string {
   display: block;
   width: 100%;
   box-sizing: border-box;
+  cursor: text;
+}
+.step-comment-textarea :deep(.cm-editor) {
   background: #0a0900;
   border: none;
   border-top: 1px solid #2a2510;
@@ -1807,14 +1811,14 @@ function runStateTitle(stepId: string): string {
   font-size: clamp(0.9rem, 1.8cqh, 1.15rem);
   font-family: inherit;
   line-height: 1.5;
-  padding: 0.55rem 0.65rem;
-  resize: vertical;
-  outline: none;
-  cursor: text;
 }
 .step-card-content .step-comment-textarea { cursor: text; }
-.step-comment-textarea:focus { background: #0c0a00; border-top-color: #4a3d18; }
-.step-comment-textarea::placeholder { color: #4a4010; }
+.step-comment-textarea :deep(.cm-content) {
+  padding: 0.55rem 0.65rem;
+  font-family: inherit;
+}
+.step-comment-textarea :deep(.cm-focused) { background: #0c0a00; border-top-color: #4a3d18; }
+.step-comment-textarea :deep(.cm-placeholder) { color: #4a4010; }
 .step-comment-actions {
   display: flex;
   justify-content: flex-end;
