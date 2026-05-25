@@ -61,6 +61,7 @@
             <div
               class="step-card"
               @dragend="onStepDragEnd"
+              @contextmenu.prevent.stop="openStepContextMenu(step, $event)"
             >
               <div
                 class="step-drag-handle"
@@ -425,6 +426,14 @@
       </div>
     </div>
 
+    <ContextMenu
+      :open="stepContextMenu !== null"
+      :x="stepContextMenu?.x ?? 0"
+      :y="stepContextMenu?.y ?? 0"
+      :items="stepContextMenuItems"
+      @select="selectStepContextMenuAction"
+      @close="closeStepContextMenu"
+    />
   </div>
 </template>
 
@@ -449,6 +458,8 @@ import {
   type ResolveStepExecutionOptions,
   type StepExecutionChip,
 } from '../../utils/stepExecutionDisplay.js';
+import ContextMenu from '../shared/ContextMenu.vue';
+import type {ContextMenuItem} from '../shared/contextMenu.js';
 import TextEditor from '../shared/TextEditor.vue';
 
 type DragKind = 'step-reorder' | 'suggestion';
@@ -641,6 +652,7 @@ const chainDndHover = ref(false);
 const expandedOutputStepIds = ref<Set<string>>(new Set());
 const expandedCommentStepIds = ref<Set<string>>(new Set());
 const commentDrafts = reactive<Record<string, string>>({});
+const stepContextMenu = ref<{stepId: string; x: number; y: number} | null>(null);
 
 const isDndActive = computed(() =>
   chainDndHover.value
@@ -717,6 +729,80 @@ function isInSelectionRange(stepId: string): boolean {
 function onStepClick(stepId: string, event: MouseEvent) {
   emit('select', stepId, event.shiftKey);
 }
+
+const stepContextMenuItems = computed<ContextMenuItem[]>(() => {
+  const stepId = stepContextMenu.value?.stepId;
+  const step = props.steps.find((s) => s.id === stepId);
+  if (!step) return [];
+  const index = props.steps.findIndex((s) => s.id === step.id);
+  const items: ContextMenuItem[] = [
+    {id: 'run-up-to', label: 'Run up to here', disabled: !step.enabled},
+    {id: 'run-from', label: 'Run from here', disabled: !step.enabled},
+    {id: 'run-only-step', label: 'Re-run only this step', disabled: !step.enabled},
+    {id: 'sep-run-edit', separator: true},
+    {id: 'insert-after', label: 'Insert step after'},
+    {id: 'move-up', label: 'Move up', disabled: index <= 0},
+    {id: 'move-down', label: 'Move down', disabled: index < 0 || index >= props.steps.length - 1},
+    {id: 'duplicate', label: 'Duplicate step'},
+    {id: 'toggle-enabled', label: step.enabled ? 'Disable step' : 'Enable step'},
+    {id: 'comment', label: step.description ? 'Edit comment' : 'Add comment'},
+  ];
+
+  if (step.config.type === 'capsule-instance') {
+    items.push({id: 'sep-capsule', separator: true});
+    if (step.config.displayMode === 'inline') {
+      items.push(
+        {id: 'collapse-inline-capsule', label: 'Collapse inline Capsule'},
+        {id: 'lock-inline-capsule', label: 'Lock as Capsule'},
+        {id: 'detach-capsule', label: 'Detach Capsule'},
+      );
+    } else {
+      items.push({id: 'spread-capsule', label: 'Edit inline'});
+    }
+  }
+
+  items.push(
+    {id: 'sep-danger', separator: true},
+    {id: 'delete', label: 'Delete step', danger: true},
+  );
+  return items;
+});
+
+function openStepContextMenu(step: PipelineStep, event: MouseEvent) {
+  emit('select', step.id);
+  stepContextMenu.value = {stepId: step.id, x: event.clientX, y: event.clientY};
+}
+
+function closeStepContextMenu() {
+  stepContextMenu.value = null;
+}
+
+function selectStepContextMenuAction(action: string) {
+  const stepId = stepContextMenu.value?.stepId;
+  const step = props.steps.find((s) => s.id === stepId);
+  closeStepContextMenu();
+  if (!step) return;
+
+  if ((action === 'run-up-to' || action === 'run-from' || action === 'run-only-step') && !step.enabled) return;
+
+  switch (action) {
+    case 'run-up-to': emit('run-up-to', step.id); break;
+    case 'run-from': emit('run-from', step.id); break;
+    case 'run-only-step': emit('run-only-step', step.id); break;
+    case 'insert-after': emit('insert-after', step.id); break;
+    case 'move-up': emit('move-up', step.id); break;
+    case 'move-down': emit('move-down', step.id); break;
+    case 'duplicate': emit('duplicate', step.id); break;
+    case 'toggle-enabled': emit('toggle-enabled', step.id); break;
+    case 'comment': toggleComment(step); break;
+    case 'spread-capsule': emit('spread-capsule', step.id); break;
+    case 'collapse-inline-capsule': emit('collapse-inline-capsule', step.id); break;
+    case 'lock-inline-capsule': emit('lock-inline-capsule', step.id); break;
+    case 'detach-capsule': emit('detach-capsule', step.id); break;
+    case 'delete': emit('delete', step.id); break;
+  }
+}
+
 const stepRefs = new Map<string, HTMLElement>();
 
 function setStepRef(stepId: string, el: HTMLElement | null) {

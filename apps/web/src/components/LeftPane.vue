@@ -57,6 +57,7 @@
                 :key="suggestion.id"
                 class="suggestion-row"
                 :title="isPipelineContext ? `${suggestion.description} — drag into the pipeline` : suggestion.description"
+                @contextmenu.prevent.stop="openSuggestionContextMenu(suggestion, $event)"
               >
                 <button
                   v-if="isPipelineContext"
@@ -165,6 +166,7 @@
             :key="`${cap.id}::${cap.version}`"
             class="capsule-row"
             :class="{active: uiStore.activeCapsuleEditId === cap.id}"
+            @contextmenu.prevent.stop="openCapsuleContextMenu(cap, $event)"
           >
             <div
               class="capsule-row-main"
@@ -298,6 +300,16 @@
     @cancel="resolveReplaceConfirm(false)"
   />
 
+  <!-- Context menu -->
+  <ContextMenu
+    :open="leftContextMenu !== null"
+    :x="leftContextMenu?.x ?? 0"
+    :y="leftContextMenu?.y ?? 0"
+    :items="leftContextMenu?.items ?? []"
+    @select="selectLeftContextMenuAction"
+    @close="closeLeftContextMenu"
+  />
+
   <!-- Disable warning dialog -->
   <ConfirmDialog
     :open="disableWarnOpen"
@@ -342,6 +354,8 @@ import {DND_BODY_SUGGESTION, DND_SUGGESTION_ID} from '../utils/dragDrop.js';
 import {pickJsonFile} from '../utils/importFile.js';
 import {newId} from '../utils/id.js';
 import {autoAssignModelToStep, modelMatchesBucket, pickModelRefForSlot} from '@lorca/endpoints';
+import ContextMenu from './shared/ContextMenu.vue';
+import type {ContextMenuItem} from './shared/contextMenu.js';
 import EndpointCard from './endpoints/EndpointCard.vue';
 import AddEndpointForm from './endpoints/AddEndpointForm.vue';
 import AddModelForm from './models/AddModelForm.vue';
@@ -378,6 +392,12 @@ const advisorLoading = ref(false);
 const advisorSuggestions = ref<{suggestionId: string; reason: string}[]>([]);
 const advisorError = ref<{message: string; raw?: string} | null>(null);
 let advisorAbort: AbortController | null = null;
+const leftContextMenu = ref<{
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  actions: Record<string, () => void>;
+} | null>(null);
 
 const FEATURED_CAPSULE_IDS = ['example-best-of-two', 'example-expert'];
 
@@ -690,6 +710,62 @@ function onSuggestionDragStart(suggestionId: string, event: DragEvent) {
 
 function onSuggestionDragEnd() {
   document.body.classList.remove('lorca-dnd-active', DND_BODY_SUGGESTION);
+}
+
+function openLeftContextMenu(
+  event: MouseEvent,
+  items: ContextMenuItem[],
+  actions: Record<string, () => void>,
+) {
+  leftContextMenu.value = {x: event.clientX, y: event.clientY, items, actions};
+}
+
+function closeLeftContextMenu() {
+  leftContextMenu.value = null;
+}
+
+function selectLeftContextMenuAction(action: string) {
+  const handler = leftContextMenu.value?.actions[action];
+  closeLeftContextMenu();
+  handler?.();
+}
+
+function openSuggestionContextMenu(suggestion: PipelineSuggestion, event: MouseEvent) {
+  openLeftContextMenu(
+    event,
+    [
+      {id: 'insert-before', label: 'Insert before selected step', disabled: !isPipelineContext.value || !editorStore.selectedStepId},
+      {id: 'insert-after', label: 'Insert after selected step', disabled: !isPipelineContext.value},
+      {id: 'append', label: 'Append to pipeline', disabled: !isPipelineContext.value},
+      {id: 'sep-new', separator: true},
+      {id: 'new', label: 'Replace pipeline with this', disabled: !isPipelineContext.value, danger: true},
+    ],
+    {
+      'insert-before': () => { void onInsertSuggestion(suggestion, 'before'); },
+      'insert-after': () => { void onInsertSuggestion(suggestion, 'after'); },
+      append: () => { void onInsertSuggestion(suggestion, 'append'); },
+      new: () => { void onInsertSuggestion(suggestion, 'new'); },
+    },
+  );
+}
+
+function openCapsuleContextMenu(cap: CapsuleDefinition, event: MouseEvent) {
+  openLeftContextMenu(
+    event,
+    [
+      {id: 'open', label: 'Open Capsule editor'},
+      {id: 'insert', label: 'Insert into pipeline', disabled: !isPipelineContext.value},
+      {id: 'duplicate', label: 'Duplicate as draft'},
+      {id: 'sep-delete', separator: true},
+      {id: 'delete', label: 'Delete Capsule', disabled: !canDeleteCapsule(cap.id), danger: true},
+    ],
+    {
+      open: () => uiStore.openCapsuleEditor(cap.id),
+      insert: () => onInsertCapsule(cap.id),
+      duplicate: () => onDuplicateCapsule(cap.id),
+      delete: () => requestDeleteCapsule(cap.id, cap.name),
+    },
+  );
 }
 
 function onInsertStepType(type: StepType) {
