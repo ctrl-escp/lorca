@@ -40,10 +40,12 @@ describe('ensureCapsuleStepChain', () => {
     expect(migrated.steps).toHaveLength(1);
     expect(migrated.steps![0]!.type).toBe('model-call');
     expect(migrated.input?.outputNamespace).toBe('user_prompt');
-    expect((migrated.nodes ?? []).length).toBeGreaterThan(0);
+    expect(migrated.nodes).toBeUndefined();
+    expect(migrated.edges).toBeUndefined();
+    expect(migrated.outputRef).toBeUndefined();
   });
 
-  it('keeps existing steps and refreshes legacy graph', () => {
+  it('keeps existing steps and strips stale legacy graph', () => {
     const inputNode = {id: 'in', type: 'input' as const};
     const manualNode = {id: 'mt', type: 'manual-text' as const, artifactPrefix: 'note', text: 'hi'};
     const capsule: CapsuleDefinition = {
@@ -63,12 +65,17 @@ describe('ensureCapsuleStepChain', () => {
     const result = ensureCapsuleStepChain(capsule);
     expect(result.steps).toHaveLength(1);
     expect(result.steps![0]!.label).toBe('Note');
+    expect(result.nodes).toBeUndefined();
+    expect(result.edges).toBeUndefined();
+    expect(result.outputRef).toBeUndefined();
   });
 
-  it('syncs legacy graph for capsules with loop-group steps', () => {
+  it('does not synthesize legacy graph fields for capsules with loop-group steps', () => {
     const expert = getBuiltinExample('example-expert')!;
     const loaded = ensureCapsuleStepChain(expert);
     expect(loaded.steps?.some((s) => s.config.type === 'loop-group')).toBe(true);
-    expect((loaded.nodes ?? []).filter((n) => n.type === 'model-call').length).toBeGreaterThanOrEqual(4);
+    expect(loaded.nodes).toBeUndefined();
+    expect(loaded.edges).toBeUndefined();
+    expect(loaded.outputRef).toBeUndefined();
   });
 });

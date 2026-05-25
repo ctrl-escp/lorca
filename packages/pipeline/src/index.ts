@@ -32,6 +32,7 @@ export {
   computeCapsuleContentSignature,
   ensureCapsuleStepChain,
   syncCapsuleLegacyGraphFromSteps,
+  stripCapsuleLegacyGraphFields,
 } from './capsuleExtraction.js';
 export type {
   CapsuleExtractionRequest,

@@ -3,7 +3,7 @@ import {ok, err} from '@lorca/core';
 import {outputKey, validatePipeline} from '@lorca/pipeline';
 
 export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineError> {
-  if (def.steps && def.steps.length > 0) {
+  if (def.steps !== undefined) {
     return validateStepChainCapsule(def);
   }
 

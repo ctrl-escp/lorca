@@ -7,7 +7,6 @@ import {
   computeCapsuleContentSignature,
   inferLoopExitCondition,
   wireRetryFeedbackOnFirstModelCall,
-  syncCapsuleLegacyGraphFromSteps,
   listStepOutputArtifacts,
 } from '@lorca/pipeline';
 import {lockCapsule} from '@lorca/capsules';
@@ -772,7 +771,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
 
     const now = new Date().toISOString();
     const capsuleId = options?.capsuleId ?? newId('cap');
-    const graph = syncCapsuleLegacyGraphFromSteps(capsuleId, capsuleName, inlineSteps, source.input ?? pipeline.value.input);
     const draft: CapsuleDefinition = {
       schemaVersion: 1,
       id: capsuleId,
@@ -780,9 +778,6 @@ export const usePipelineEditorStore = defineStore('pipelineEditor', () => {
       version: 'v1',
       status: 'draft',
       interface: JSON.parse(JSON.stringify(toRaw(source.interface))),
-      nodes: graph.nodes,
-      edges: graph.edges,
-      outputRef: graph.outputRef,
       steps: inlineSteps,
       input: source.input ?? pipeline.value.input,
       tests: [],

@@ -9,7 +9,7 @@ import {
   getBuiltinExample,
   duplicateExampleCapsule,
 } from '@lorca/capsules';
-import {ensureCapsuleStepChain} from '@lorca/pipeline';
+import {ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -43,7 +43,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
   }
 
   function addCapsule(capsule: CapsuleDefinition) {
-    const plain = cloneForStorage(capsule);
+    const plain = cloneForStorage(stripCapsuleLegacyGraphFields(capsule));
     capsules.value.push(plain);
     void getDb().capsules.put(plain);
   }
@@ -59,11 +59,11 @@ export const useCapsulesStore = defineStore('capsules', () => {
       createdAt: _createdAt,
       ...mutablePatch
     } = patch as CapsuleDefinition;
-    const updated = cloneForStorage({
+    const updated = cloneForStorage(stripCapsuleLegacyGraphFields({
       ...capsules.value[idx]!,
       ...mutablePatch,
       updatedAt: new Date().toISOString(),
-    });
+    }));
     capsules.value[idx] = updated;
     void getDb().capsules.put(updated);
   }
@@ -120,8 +120,9 @@ export const useCapsulesStore = defineStore('capsules', () => {
     if (idx === -1) return {ok: false, message: 'Draft capsule not found'};
     const result = lockCapsule(capsules.value[idx]!);
     if (!result.ok) return {ok: false, message: result.error.message};
-    capsules.value[idx] = result.value;
-    void getDb().capsules.put(cloneForStorage(result.value));
+    const plain = cloneForStorage(stripCapsuleLegacyGraphFields(result.value));
+    capsules.value[idx] = plain;
+    void getDb().capsules.put(plain);
     return {ok: true};
   }
 

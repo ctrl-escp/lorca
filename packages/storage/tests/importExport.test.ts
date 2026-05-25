@@ -265,6 +265,39 @@ function makeCapsule(): CapsuleDefinition {
   };
 }
 
+function makeStepChainCapsule(): CapsuleDefinition {
+  return {
+    schemaVersion: 1,
+    id: 'cap-chain',
+    name: 'Step Capsule',
+    version: 'v1',
+    status: 'locked',
+    interface: {
+      inputs: [],
+      outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+      parameters: [],
+      modelSlots: [],
+    },
+    nodes: [{id: 'stale', type: 'manual-text', text: 'stale graph'}],
+    edges: [],
+    outputRef: {nodeId: 'stale', outputName: 'text'},
+    steps: [{
+      id: 'body',
+      type: 'presentation',
+      label: 'Body',
+      enabled: true,
+      outputNamespace: 'body',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00Z',
+      config: {type: 'presentation', text: 'canonical step', outputNames: ['text']},
+    }],
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+    tests: [],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
+
 const localCtx = {
   knownEndpointIds: new Set(['ep-local']),
   knownModelKeys: new Set(['ep-local::llama3:latest']),
@@ -479,6 +512,43 @@ describe('importExport', () => {
     expect(parsed.stepOutputs?.artifacts['answer.text']?.stepId).toBe('step-1');
   });
 
+  it('strips legacy graph fields from step-chain capsule exports', () => {
+    const file = exportCapsule(makeStepChainCapsule());
+    expect(file.capsule.steps).toHaveLength(1);
+    expect(file.capsule.nodes).toBeUndefined();
+    expect(file.capsule.edges).toBeUndefined();
+    expect(file.capsule.outputRef).toBeUndefined();
+  });
+
+  it('strips legacy graph fields from included step-chain capsules in pipeline exports', () => {
+    const pipeline: PipelineDefinition = {
+      ...makePipeline(),
+      steps: [{
+        id: 'cap-step',
+        type: 'capsule-instance',
+        label: 'Capsule',
+        enabled: true,
+        outputNamespace: 'cap',
+        primaryOutputName: 'text',
+        lastEditedAt: '2026-01-01T00:00:00Z',
+        config: {
+          type: 'capsule-instance',
+          capsuleId: 'cap-chain',
+          capsuleVersion: 'v1',
+          inputBindings: {},
+          outputBindings: {result: 'cap.text'},
+        },
+      }],
+    };
+
+    const file = exportPipeline(pipeline, [makeStepChainCapsule()]);
+    const cap = file.includedCapsules?.[0];
+    expect(cap?.steps).toHaveLength(1);
+    expect(cap?.nodes).toBeUndefined();
+    expect(cap?.edges).toBeUndefined();
+    expect(cap?.outputRef).toBeUndefined();
+  });
+
   it('applyModelRemapsToNodes updates capsule instance slot assignments', () => {
     const nodes = applyModelRemapsToNodes(
       [{
@@ -512,6 +582,14 @@ describe('importExport', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
     expect(next.id).toBe('cap-imported');
     expect(next.id).not.toBe('cap-1');
+  });
+
+  it('prepareImportedCapsule migrates graph-only capsules and stores step-chain fields only', () => {
+    const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
+    expect(next.steps).toBeDefined();
+    expect(next.nodes).toBeUndefined();
+    expect(next.edges).toBeUndefined();
+    expect(next.outputRef).toBeUndefined();
   });
 
   it('round-trips prompt blocks, history reads, enabled flags, and primaryOutputName', () => {

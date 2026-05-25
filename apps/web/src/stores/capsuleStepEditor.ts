@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
 import type {CapsuleDefinition, PipelineDefinition, PipelineStep, StepType} from '@lorca/core';
-import {ensureCapsuleStepChain, syncCapsuleLegacyGraphFromSteps} from '@lorca/pipeline';
+import {ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
 import {buildDefaultStep, newStepId} from '../utils/stepBuilders.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -19,11 +19,10 @@ interface UndoEntry {
 
 const MAX_UNDO = 30;
 
-function applyGraphSync(capsule: CapsuleDefinition): CapsuleDefinition {
+function applyStepChainUpdate(capsule: CapsuleDefinition): CapsuleDefinition {
   const input = capsule.input ?? {raw: '', tagName: 'user', outputNamespace: 'user_prompt'};
   const steps = capsule.steps ?? [];
-  const graph = syncCapsuleLegacyGraphFromSteps(capsule.id, capsule.name, steps, input);
-  return {...capsule, input, steps, ...graph, updatedAt: new Date().toISOString()};
+  return stripCapsuleLegacyGraphFields({...capsule, input, steps, updatedAt: new Date().toISOString()});
 }
 
 export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => {
@@ -81,7 +80,7 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
 
   function applySnapshot(snap: CapsuleEditorSnapshot) {
     if (!capsule.value) return;
-    capsule.value = applyGraphSync({
+    capsule.value = applyStepChainUpdate({
       ...capsule.value,
       name: snap.capsuleName,
       steps: snap.steps,
@@ -160,7 +159,7 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     if (!capsule.value || isReadOnly.value) return;
     const before = snapshot();
     const next = mutator(JSON.parse(JSON.stringify(toRaw(capsule.value.steps ?? []))));
-    capsule.value = applyGraphSync({...capsule.value, steps: next});
+    capsule.value = applyStepChainUpdate({...capsule.value, steps: next});
     recordUndo(label, before);
   }
 
@@ -251,7 +250,7 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
     const next = (capsule.value.steps ?? []).map((s) =>
       s.id === stepId ? {...s, ...patch, lastEditedAt: new Date().toISOString()} : s,
     );
-    capsule.value = applyGraphSync({...capsule.value, steps: next});
+    capsule.value = applyStepChainUpdate({...capsule.value, steps: next});
   }
 
   function commitStepConfigEdit(stepId: string, patch: Partial<PipelineStep>, label = 'Edit step') {
@@ -276,7 +275,7 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
   function updateCapsuleName(name: string) {
     if (!capsule.value || isReadOnly.value) return;
     const before = snapshot();
-    capsule.value = applyGraphSync({...capsule.value, name});
+    capsule.value = applyStepChainUpdate({...capsule.value, name});
     recordUndo('Rename capsule', before);
   }
 

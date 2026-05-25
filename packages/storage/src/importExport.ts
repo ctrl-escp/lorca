@@ -10,7 +10,7 @@ import type {
   StepOutputsExport,
 } from '@lorca/core';
 import {resolveModelCallSuggestedBuckets} from '@lorca/capsules';
-import {validatePipeline, ensureCapsuleStepChain} from '@lorca/pipeline';
+import {validatePipeline, ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
 import {validateCapsule} from '@lorca/capsules';
 
 const PIPELINE_SCHEMA_VERSION = 2;
@@ -18,6 +18,10 @@ const CAPSULE_SCHEMA_VERSION = 1;
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function cloneCapsuleForExport(capsule: CapsuleDefinition): CapsuleDefinition {
+  return stripCapsuleLegacyGraphFields(deepClone(capsule));
 }
 
 export interface ImportContext {
@@ -85,7 +89,7 @@ export function exportPipeline(
     app: 'lorca',
     kind: 'pipeline',
     pipeline: deepClone(pipeline),
-    ...(capsules.length > 0 ? {includedCapsules: capsules.map((c) => deepClone(c))} : {}),
+    ...(capsules.length > 0 ? {includedCapsules: capsules.map((c) => cloneCapsuleForExport(c))} : {}),
     ...(stepOutputs ? {stepOutputs: deepClone(stepOutputs)} : {}),
   };
 }
@@ -98,7 +102,7 @@ export function exportCapsule(
     exportedAt: new Date().toISOString(),
     app: 'lorca',
     kind: 'capsule',
-    capsule: deepClone(capsule),
+    capsule: cloneCapsuleForExport(capsule),
     ...(stepOutputs ? {stepOutputs: deepClone(stepOutputs)} : {}),
   };
 }
@@ -294,9 +298,8 @@ export function prepareImportedCapsule(
   const withRemaps: CapsuleDefinition = {
     ...migrated,
     ...(migrated.steps ? {steps: applyModelRemapsToSteps(migrated.steps, remaps)} : {}),
-    ...(migrated.nodes ? {nodes: applyModelRemapsToNodes(migrated.nodes, remaps)} : {}),
   };
-  return {...withRemaps, id: newId, updatedAt: now, createdAt: now};
+  return stripCapsuleLegacyGraphFields({...withRemaps, id: newId, updatedAt: now, createdAt: now});
 }
 
 export function collectPipelineCapsuleRefs(

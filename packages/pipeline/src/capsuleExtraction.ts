@@ -278,7 +278,7 @@ const DEFAULT_CAPSULE_INPUT: PipelineInputConfig = {
   outputNamespace: 'user_prompt',
 };
 
-/** Keep legacy nodes/edges in sync when the canonical body is steps[]. */
+/** Build legacy graph fields for graph-only compatibility tests/import migrations. */
 export function syncCapsuleLegacyGraphFromSteps(
   capsuleId: string,
   capsuleName: string,
@@ -303,6 +303,12 @@ export function syncCapsuleLegacyGraphFromSteps(
       ? {nodeId: nonInputNodes.at(-1)!.id, outputName: legacy.outputRef.outputName}
       : legacy.outputRef,
   };
+}
+
+export function stripCapsuleLegacyGraphFields(capsule: CapsuleDefinition): CapsuleDefinition {
+  if (capsule.steps === undefined) return capsule;
+  const {nodes: _nodes, edges: _edges, outputRef: _outputRef, ...rest} = capsule;
+  return rest;
 }
 
 export function extractStepsToCapsule(
@@ -345,8 +351,6 @@ export function extractStepsToCapsule(
 
   const innerSteps = selectedSteps.map((s) => remapStepForCapsule(s, inputPortByParentRef));
   const now = new Date().toISOString();
-  const graph = syncCapsuleLegacyGraphFromSteps(capsuleId, capsuleName, innerSteps, pipeline.input);
-
   const capsuleInterface = buildCapsuleInterface(externalInputs, externalOutputs, innerSteps);
 
   const lastInner = innerSteps.at(-1)!;
@@ -366,9 +370,6 @@ export function extractStepsToCapsule(
     version: 'v1',
     status: 'draft',
     interface: capsuleInterface,
-    nodes: graph.nodes,
-    edges: graph.edges,
-    outputRef: graph.outputRef,
     steps: innerSteps,
     input: {...pipeline.input},
     tests: [],
@@ -454,9 +455,8 @@ export function extractFullPipelineToCapsule(
 export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefinition {
   const input = capsule.input ?? DEFAULT_CAPSULE_INPUT;
 
-  if (capsule.steps && capsule.steps.length > 0) {
-    const graph = syncCapsuleLegacyGraphFromSteps(capsule.id, capsule.name, capsule.steps, input);
-    return {...capsule, input, ...graph};
+  if (capsule.steps !== undefined) {
+    return stripCapsuleLegacyGraphFields({...capsule, input});
   }
 
   if (!(capsule.nodes?.length ?? 0)) {
@@ -477,24 +477,27 @@ export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefin
   if (capsule.description !== undefined) legacy.description = capsule.description;
 
   const migrated = migrateLegacyPipeline(legacy);
-  const graph = syncCapsuleLegacyGraphFromSteps(capsule.id, capsule.name, migrated.steps, migrated.input);
-  return {
+  return stripCapsuleLegacyGraphFields({
     ...capsule,
     input: migrated.input,
     steps: migrated.steps,
-    ...graph,
-  };
+  });
 }
 
 /** Stable hash of capsule body for instance staleness when definition changes. */
 export function computeCapsuleContentSignature(capsule: CapsuleDefinition): string {
-  const body = capsule.steps ?? capsule.nodes;
-  const json = JSON.stringify({
-    interface: capsule.interface,
-    body,
-    input: capsule.input,
-    outputRef: capsule.outputRef,
-  });
+  const json = capsule.steps
+    ? JSON.stringify({
+      interface: capsule.interface,
+      steps: capsule.steps,
+      input: capsule.input,
+    })
+    : JSON.stringify({
+      interface: capsule.interface,
+      nodes: capsule.nodes,
+      edges: capsule.edges,
+      outputRef: capsule.outputRef,
+    });
   let h = 5381;
   for (let i = 0; i < json.length; i++) h = ((h << 5) + h) ^ json.charCodeAt(i);
   return (h >>> 0).toString(36);
