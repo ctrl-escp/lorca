@@ -85,6 +85,15 @@ describe('builtin examples', () => {
     }
   });
 
+  it('exports built-in examples as step-chain capsules only', () => {
+    for (const def of BUILTIN_EXAMPLES) {
+      expect(def.steps?.length, `${def.id} should define steps`).toBeGreaterThan(0);
+      expect(def.nodes, `${def.id} should not export legacy nodes`).toBeUndefined();
+      expect(def.edges, `${def.id} should not export legacy edges`).toBeUndefined();
+      expect(def.outputRef, `${def.id} should not export legacy outputRef`).toBeUndefined();
+    }
+  });
+
   it('wraps The Expert answer and verify steps in a retry loop', () => {
     const expert = getBuiltinExample('example-expert')!;
     const retryLoop = expert.steps?.find((s) => s.id === 'answer_verify_retry');

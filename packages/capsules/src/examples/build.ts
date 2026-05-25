@@ -108,15 +108,15 @@ export function modelStepsFromGraph(nodes: PipelineNode[], edges: PipelineEdge[]
 }
 
 export function withGeneratedSteps(capsule: CapsuleDefinition): CapsuleDefinition {
+  const {nodes: _nodes, edges: _edges, outputRef: _outputRef, ...rest} = capsule;
   return {
-    ...capsule,
+    ...rest,
     steps: modelStepsFromGraph(capsule.nodes ?? [], capsule.edges ?? []),
     input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
   };
 }
 
 export function buildExampleCapsule(spec: ExampleCapsuleSpec): CapsuleDefinition {
-  const last = spec.nodes[spec.nodes.length - 1]!;
   const edges = linearEdges(spec.nodes);
   return {
     schemaVersion: 1,
@@ -126,9 +126,6 @@ export function buildExampleCapsule(spec: ExampleCapsuleSpec): CapsuleDefinition
     version: 'v1',
     status: 'locked',
     interface: spec.interface,
-    nodes: spec.nodes,
-    edges,
-    outputRef: {nodeId: last.id, outputName: primaryOutput(last)},
     steps: modelStepsFromGraph(spec.nodes, edges),
     input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
     tests: [],

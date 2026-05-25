@@ -52,47 +52,6 @@ export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
       },
     ],
   },
-  nodes: [
-    INPUT_NODE,
-    {
-      id: 'generate',
-      type: 'model-call',
-      artifactPrefix: 'generate',
-      config: {
-        modelRef: {kind: 'slot', slotName: 'generator'},
-        mode: 'chat',
-        systemPrompt: [
-          'You are a pipeline architect for Lorca, a local AI orchestration tool.',
-          'Given a user description, produce a JSON step sequence using only these built-in suggestions.',
-          'Return a concise ordered array. Prefer 2-5 steps unless the request clearly needs more.',
-          'Use only suggestion IDs from the catalog. Do not invent IDs.',
-          'Output format:',
-          '[',
-          '  { "suggestionId": "suggestion-intent-extraction" },',
-          '  { "suggestionId": "suggestion-acceptance-criteria" }',
-          ']',
-          'Respond with JSON only. No prose, no markdown fences.',
-          '',
-          'Available suggestions:',
-          GENERATOR_SUGGESTION_CATALOG,
-        ].join('\n'),
-        inputArtifactRef: 'description',
-        temperature: 0.2,
-        maxTokens: 1200,
-        expectedOutput: 'json',
-      },
-    },
-  ],
-  edges: [
-    {
-      id: 'e-input-generate',
-      fromNodeId: 'input',
-      fromOutput: 'xml',
-      toNodeId: 'generate',
-      toInput: 'input',
-    },
-  ],
-  outputRef: {nodeId: 'generate', outputName: 'text'},
   steps: [
     {
       id: 'generate',

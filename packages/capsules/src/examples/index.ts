@@ -1,4 +1,4 @@
-import type {CapsuleDefinition} from '@lorca/core';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {BUILTIN_EXAMPLES, BUILTIN_EXAMPLE_IDS} from './definitions.js';
 
 export {
@@ -47,9 +47,14 @@ export function duplicateExampleCapsule(example: CapsuleDefinition, newId: strin
   };
 }
 
-/** Collect template strings from example Capsule nodes (for snapshot tests). */
+/** Collect prompt template strings from example Capsule steps (for snapshot tests). */
 export function collectExampleTemplateStrings(def: CapsuleDefinition): string[] {
-  return (def.nodes ?? [])
-    .filter((n): n is Extract<typeof n, {type: 'template'}> => n.type === 'template')
-    .map((n) => n.template);
+  if (def.id === 'lorca-pipeline-generator') return [];
+  const collect = (steps: PipelineStep[]): string[] => steps.flatMap((step) => {
+    if (step.config.type === 'loop-group') return collect(step.config.steps);
+    return step.prompt?.blocks
+      .filter((block) => block.label !== 'Retry feedback')
+      .map((block) => block.body) ?? [];
+  });
+  return [...new Set(collect(def.steps ?? []))];
 }
