@@ -17,8 +17,13 @@ export {
   EXAMPLE_BEST_OF_TWO,
   EXAMPLE_EXPERT,
 } from './definitions.js';
-export {buildExampleCapsule, withAnswerVerifyRetryLoop, linearEdges, EXAMPLE_TIMESTAMP} from './build.js';
-export type {ExampleCapsuleSpec} from './build.js';
+export {
+  buildExampleCapsule,
+  modelCallStep,
+  withAnswerVerifyRetryLoop,
+  EXAMPLE_TIMESTAMP,
+} from './build.js';
+export type {ExampleCapsuleSpec, ModelCallStepSpec} from './build.js';
 
 export function isBuiltinExampleId(id: string): boolean {
   return (BUILTIN_EXAMPLE_IDS as readonly string[]).includes(id);
