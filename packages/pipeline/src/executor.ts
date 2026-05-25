@@ -18,6 +18,7 @@ import {executeModelCall} from '@lorca/endpoints';
 import {validateLegacyPipeline} from './validate.js';
 import {topologicalOrder} from './order.js';
 import {outputKey, resolveOutputRef} from './artifacts.js';
+import {tryParseJson} from './jsonParser.js';
 
 export type EndpointResolver = (id: string) => AiEndpointConfig | undefined;
 export type ModelEndpointResolver = (modelName: string) => AiEndpointConfig | undefined;
@@ -596,25 +597,4 @@ function resolveCapsuleSlots(
       },
     };
   });
-}
-
-type ParseResult = {ok: true; value: unknown} | {ok: false};
-
-function tryParseJson(text: string): ParseResult {
-  // Strategy 1: strict JSON parse
-  try { return {ok: true, value: JSON.parse(text)}; } catch { /* fall through */ }
-
-  // Strategy 2: fenced code block extraction
-  const fenced = text.match(/```(?:json)?\s*\n?([\s\S]+?)\n?```/);
-  if (fenced?.[1]) {
-    try { return {ok: true, value: JSON.parse(fenced[1])}; } catch { /* fall through */ }
-  }
-
-  // Strategy 3: first complete object or array
-  const objMatch = text.match(/\{[\s\S]*\}/);
-  if (objMatch) { try { return {ok: true, value: JSON.parse(objMatch[0])}; } catch { /* fall through */ } }
-  const arrMatch = text.match(/\[[\s\S]*\]/);
-  if (arrMatch) { try { return {ok: true, value: JSON.parse(arrMatch[0])}; } catch { /* fall through */ } }
-
-  return {ok: false};
 }

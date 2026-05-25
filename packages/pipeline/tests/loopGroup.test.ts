@@ -130,6 +130,54 @@ describe('loop-group execution', () => {
     expect(callCount).toBe(1); // must exit after 1st iteration, not run all 3
   });
 
+  it('exits when the condition JSON is wrapped in prose', async () => {
+    let callCount = 0;
+    server.use(
+      http.post(`${BASE}/api/generate`, async () => {
+        callCount++;
+        return HttpResponse.json({
+          response: 'Verification says:\n```json\n{"passed":true}\n```',
+          done: true,
+          model: 'test',
+        });
+      }),
+    );
+
+    const checkerStep: PipelineStep = {
+      id: 'checker',
+      type: 'model-call',
+      label: 'Checker',
+      enabled: true,
+      outputNamespace: 'checker',
+      primaryOutputName: 'text',
+      lastEditedAt: new Date().toISOString(),
+      config: {
+        type: 'model-call',
+        modelRef: {kind: 'fixed', endpointId: 'loop-ep', modelName: 'test'},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
+      },
+      prompt: {
+        previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'prev'},
+        historyReads: [],
+        blocks: [{id: 'b1', label: 'body', tagName: 'body', body: 'check', enabled: true, source: 'custom'}],
+      },
+    };
+
+    const pipeline = makeLoopPipeline([checkerStep], {
+      maxIterations: 3,
+      exitCondition: {type: 'json-field-equals', fieldPath: 'passed', value: true},
+    });
+
+    const result = await executeStepChain(pipeline, 'hello', {}, (id) => id === 'loop-ep' ? mockEndpoint : undefined, {
+      onTraceEvent() {},
+      onArtifact() {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(callCount).toBe(1);
+  });
+
   it('runs until maxIterations when exit condition is never met', async () => {
     const pipeline = makeLoopPipeline([
       makeManualStep('verify', JSON.stringify({passed: false})),

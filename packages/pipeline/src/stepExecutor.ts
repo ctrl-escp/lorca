@@ -34,6 +34,7 @@ import {
   primaryOutputPreview,
   rawResponsePreview,
 } from './stepTrace.js';
+import {tryParseJson} from './jsonParser.js';
 
 interface StepExecutionResult {
   artifacts: PipelineArtifact[];
@@ -79,14 +80,6 @@ function traceEvent(
   extra?: Partial<PipelineTraceEvent>,
 ): PipelineTraceEvent {
   return {runId, stepId, nodeId: stepId, status, timestamp: new Date().toISOString(), ...extra};
-}
-
-type ParseResult = {ok: true; value: unknown} | {ok: false};
-
-function tryParseJson(text: string): ParseResult {
-  const stripped = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  try { return {ok: true, value: JSON.parse(stripped)}; } catch { /* ignore */ }
-  try { return {ok: true, value: JSON.parse(text)}; } catch { return {ok: false}; }
 }
 
 function getJsonField(obj: unknown, fieldPath: string): unknown {
@@ -369,7 +362,7 @@ export async function executeStepInternal(
     }
 
     case 'loop-group': {
-      const loopResult = await executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal, resolveEndpointForModel);
+      const loopResult = await executeLoopGroupStep(step, compiledStep, artifacts, resolveEndpoint, resolveCapsule, pipeline, abortSignal, resolveEndpointForModel, params, runOptions);
       if (!loopResult.ok) return loopResult;
       return stepOk(loopResult.value, {inputArtifactNames});
     }
@@ -390,6 +383,8 @@ async function executeLoopGroupStep(
   pipeline: PipelineDefinition,
   abortSignal?: AbortSignal,
   resolveEndpointForModel?: ModelEndpointResolver,
+  params?: Record<string, unknown>,
+  runOptions?: ExecutePipelineOptions,
 ): Promise<Result<PipelineArtifact[], PipelineError>> {
   if (step.config.type !== 'loop-group') {
     return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'executeLoopGroupStep called on non-loop step', nodeId: step.id}};
@@ -402,7 +397,7 @@ async function executeLoopGroupStep(
   }
 
   if (innerActive.some((s) => s.config.type === 'loop-group')) {
-    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Nested loop groups are not supported in V1', nodeId: step.id}};
+    return {ok: false, error: {code: 'invalid_pipeline_graph', message: 'Nested loop groups are not supported', nodeId: step.id}};
   }
 
   const loopIdx = pipeline.steps.findIndex((s) => s.id === step.id);
@@ -454,6 +449,8 @@ async function executeLoopGroupStep(
         {onTraceEvent() {}, onArtifact() {}},
         abortSignal,
         resolveEndpointForModel,
+        params,
+        runOptions,
       );
 
       if (!result.ok) {
@@ -883,6 +880,7 @@ async function executeCapsuleStepChain(
     userPromptRaw,
     {
       seedArtifacts: innerArtifacts,
+      ...(runOptions?.abortSignal ? {abortSignal: runOptions.abortSignal} : {}),
       ...(parameterValues && Object.keys(parameterValues).length > 0 ? {params: parameterValues} : {}),
       ...(innerStartAtStepId ? {startAtStepId: innerStartAtStepId} : {}),
     },

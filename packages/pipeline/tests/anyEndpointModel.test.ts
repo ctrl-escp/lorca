@@ -29,7 +29,7 @@ beforeAll(() => server.listen({onUnhandledRequest: 'error'}));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-function makePipeline(): PipelineDefinition {
+function makePipeline(outputType?: 'auto' | 'json'): PipelineDefinition {
   return {
     schemaVersion: 2,
     id: 'p-any',
@@ -48,6 +48,7 @@ function makePipeline(): PipelineDefinition {
         modelRef: {kind: 'any-enabled-endpoint', modelName: 'llama3'},
         mode: 'generate',
         outputNames: ['text', 'rawResponse'],
+        ...(outputType ? {outputType} : {}),
       },
     }],
     createdAt: '2026-01-01T00:00:00Z',
@@ -89,5 +90,33 @@ describe('any-enabled-endpoint model refs', () => {
       expect(result.error.code).toBe('missing_endpoint');
       expect(result.error.message).toContain('No enabled endpoint has model: llama3');
     }
+  });
+
+  it('parses prose-wrapped JSON from native model-call output', async () => {
+    server.use(http.post(`${BASE}/api/generate`, () =>
+      HttpResponse.json({
+        response: 'Here is the result:\n{"passed":true,"items":[1,2]}\nDone.',
+        done: true,
+        model: 'llama3',
+      }),
+    ));
+
+    const artifacts: Record<string, unknown> = {};
+    const result = await executeStepChain(
+      makePipeline('json'),
+      'hello',
+      {},
+      () => undefined,
+      {
+        onTraceEvent: () => {},
+        onArtifact: (artifact) => { artifacts[artifact.name] = artifact.value; },
+      },
+      undefined,
+      (modelName) => modelName === 'llama3' ? endpoint : undefined,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(artifacts['answer.json']).toEqual({passed: true, items: [1, 2]});
+    expect(artifacts['answer.jsonValid']).toBe(true);
   });
 });

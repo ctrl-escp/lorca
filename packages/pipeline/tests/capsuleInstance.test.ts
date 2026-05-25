@@ -536,4 +536,105 @@ describe('capsule-instance step-chain execution', () => {
       outputArtifactRefs: ['cap.internal.body.text'],
     });
   });
+
+  it('forwards abort signals into nested step-chain capsules', async () => {
+    const capsule = makeStepChainCapsule('saved body');
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        displayMode: 'inline',
+        inlineSteps: [makeTextStep('body', 'inline body', 'body')],
+      },
+    };
+    const controller = new AbortController();
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {abortSignal: controller.signal},
+      () => ENDPOINT,
+      {
+        onArtifact() {},
+        onTraceEvent(e) {
+          if (e.stepId === 'inst-inline' && e.status === 'started') controller.abort();
+        },
+      },
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('run_cancelled');
+  });
+
+  it('renders capsule params inside native loop groups', async () => {
+    const loopStep: PipelineStep = {
+      id: 'loop',
+      type: 'loop-group',
+      label: 'Loop',
+      enabled: true,
+      outputNamespace: 'loop',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'loop-group',
+        maxIterations: 1,
+        exitCondition: {type: 'iterations'},
+        steps: [makeTextStep('inner', 'Goal: {{param.goal}}', 'inner')],
+        outputNames: ['text'],
+      },
+    };
+    const capsule: CapsuleDefinition = {
+      ...makeStepChainCapsule('unused'),
+      interface: {
+        inputs: [],
+        outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'loop.text'}],
+        parameters: [{name: 'goal', kind: 'text', required: true}],
+        modelSlots: [],
+      },
+      steps: [loopStep],
+      outputRef: {nodeId: 'loop', outputName: 'text'},
+    };
+    const instance: PipelineStep = {
+      id: 'inst-inline',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: capsule.id,
+        capsuleVersion: capsule.version,
+        inputBindings: {},
+        outputBindings: {result: 'cap.text'},
+        parameterValues: {goal: 'extract JSON'},
+        displayMode: 'opaque',
+      },
+    };
+    const artifacts: Record<string, import('@lorca/core').PipelineArtifact> = {};
+
+    const result = await executeStepChain(
+      makeStepChainPipeline(instance),
+      'hello',
+      {},
+      () => ENDPOINT,
+      {onArtifact(a) { artifacts[a.name] = a; }, onTraceEvent() {}},
+      () => capsule,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(artifacts['cap.text']?.value).toBe('Goal: extract JSON');
+  });
 });
