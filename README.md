@@ -168,7 +168,7 @@ flowchart TB
 **Design principles:**
 
 - **Browser-first:** validation, prompt rendering, `fetch` to endpoints, artifacts, and traces run client-side.
-- **One graph model:** pipelines and Capsules are the same node/edge/artifact abstraction; Capsules add a boundary and public interface.
+- **Step-chain first:** pipelines and Capsules use ordered `steps[]` as the canonical body; legacy V1 graph fields are accepted only at import/load and migrated immediately.
 - **Optional backend later:** CORS bypass, secrets, MCP, and LAN serving are explicitly out of scope for the MVP.
 
 ---
@@ -189,7 +189,7 @@ lorca/
 │   ├── core/                # Pipeline & Capsule TypeScript types, errors
 │   ├── prompt/              # User prompt envelope, templates, tag rules
 │   ├── endpoints/           # Endpoint adapters (Ollama implemented)
-│   ├── pipeline/            # validatePipeline, executePipeline, artifacts
+│   ├── pipeline/            # validatePipeline, executeStepChain, step-chain compiler
 │   ├── capsules/            # Capsule validate/execute/lock, built-in examples
 │   ├── storage/             # Dexie DB, JSON import/export
 │   └── ui-kit/              # Shared Vue UI primitives (FieldLabel, dialogs)
@@ -206,7 +206,7 @@ lorca/
 | `@lorca/core` | Domain types: `PipelineDefinition`, `CapsuleDefinition`, nodes, edges, artifacts, traces, export file shapes | ✅ Implemented |
 | `@lorca/prompt` | `buildUserPromptArtifacts`, `renderPromptWrapper`, `renderTemplate`, XML/tag helpers | ✅ Implemented |
 | `@lorca/endpoints` | `testBrowserAccess`, `listModels`, `executeModelCall`; `ollamaAdapter` + bucket heuristics | ✅ Implemented |
-| `@lorca/pipeline` | `validatePipeline`, `topologicalOrder`, `executePipeline`, artifact key helpers | ✅ Implemented |
+| `@lorca/pipeline` | `validatePipeline`, `executeStepChain`, `migrateLegacyPipeline` (import-only), artifact key helpers | ✅ Implemented |
 | `@lorca/capsules` | `validateCapsule`, `executeCapsuleTestRun`, locking/versioning, built-in examples | ✅ Implemented |
 | `@lorca/storage` | IndexedDB via Dexie; pipeline/Capsule export, parse, import preview/remap | ✅ Implemented |
 | `@lorca/ui-kit` | Shared Vue UI primitives (`FieldLabel`, `ConfirmDialog`, `PromptDialog`) | ✅ Implemented |
@@ -218,15 +218,11 @@ lorca/
 
 ### Pipeline
 
-A **pipeline** is the top-level runnable flow: nodes, edges, an `inputArtifactName`, and an `outputRef` pointing at the final artifact to display. The MVP UI presents a mostly linear chain; internally the representation is graph-shaped.
+A **pipeline** is the top-level runnable flow: an ordered **step chain** (`steps[]`), pipeline input config, and optional `outputStepId`. The UI presents a linear chain editor; loop groups and inline capsules nest additional step chains.
 
 ### Capsule
 
-A **Capsule** is a reusable subgraph—typically preprocess → model call → postprocess, but flexible. It defines:
-
-- **Public interface:** input ports, output ports, parameters, model slots
-- **Internal nodes/edges** (hidden behind the instance boundary at run time)
-- **Status:** `draft` or `locked` (locked Capsules are read-only; duplicate to edit)
+A **Capsule** is a reusable step-chain subgraph with a public interface (input ports, output ports, parameters, model slots). Capsules persist as `steps[]` at schema version 2. Legacy graph-only exports (schema version 1 with `nodes`/`edges`) are validated and migrated on import.
 
 A **Capsule instance** node in a pipeline references a Capsule definition by id/version, binds inputs to parent artifacts, maps outputs to prefixed keys, and optional **loop** config.
 

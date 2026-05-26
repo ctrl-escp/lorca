@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import type {LegacyPipelineDefinition} from '@lorca/core';
-import {validateLegacyPipeline, topologicalOrder, resolveOutputRef} from '../src/index.js';
+import {validateLegacyPipeline, topologicalOrder, resolveOutputRef} from '../src/legacyGraph.js';
 
 function base(): LegacyPipelineDefinition {
   return {
@@ -19,7 +19,7 @@ function base(): LegacyPipelineDefinition {
   };
 }
 
-describe('validatePipeline', () => {
+describe('validateLegacyPipeline', () => {
   it('accepts a valid minimal pipeline', () => {
     expect(validateLegacyPipeline(base()).ok).toBe(true);
   });
@@ -41,7 +41,6 @@ describe('validatePipeline', () => {
 
   it('detects a cycle', () => {
     const def = base();
-    // Add a back-edge mc → in
     def.edges.push({id: 'e2', fromNodeId: 'mc', fromOutput: 'text', toNodeId: 'in', toInput: 'x'});
     const result = validateLegacyPipeline(def);
     expect(result.ok).toBe(false);

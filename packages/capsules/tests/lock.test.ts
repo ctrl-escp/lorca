@@ -1,19 +1,35 @@
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition} from '@lorca/core';
+import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
 import {nextVersion, lockCapsule, createDraftFromLocked} from '../src/lock.js';
 
-function makeDraft(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
-  const id = 'cap-test';
+function textStep(id: string, text = 'ok', outputNamespace = id): PipelineStep {
   return {
-    schemaVersion: 1,
     id,
+    type: 'presentation',
+    label: id,
+    enabled: true,
+    outputNamespace,
+    primaryOutputName: 'text',
+    lastEditedAt: '2026-01-01T00:00:00Z',
+    config: {type: 'presentation', text, outputNames: ['text']},
+  };
+}
+
+function makeDraft(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
+  return {
+    schemaVersion: 2,
+    id: 'cap-test',
     name: 'Test Capsule',
     version: 'v1',
     status: 'draft',
-    interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    nodes: [{id: `${id}-input`, type: 'input'}],
-    edges: [],
-    outputRef: {nodeId: `${id}-input`, outputName: 'xml'},
+    interface: {
+      inputs: [],
+      outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+      parameters: [],
+      modelSlots: [],
+    },
+    steps: [textStep('body')],
+    input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
     tests: [],
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',
@@ -53,21 +69,20 @@ describe('lockCapsule', () => {
     expect(result.error.code).toBe('invalid_capsule_interface');
   });
 
-  it('rejects an invalid capsule (duplicate node ids)', () => {
-    const id = 'cap-test';
+  it('rejects an invalid capsule (duplicate step ids)', () => {
     const invalid = makeDraft({
-      nodes: [{id: `${id}-input`, type: 'input'}, {id: `${id}-input`, type: 'manual-text', text: 'x'}],
+      steps: [textStep('dup'), textStep('dup')],
     });
     const result = lockCapsule(invalid);
     expect(result.ok).toBe(false);
   });
 
-  it('preserves nodes and interface', () => {
+  it('preserves steps and interface', () => {
     const def = makeDraft();
     const result = lockCapsule(def);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.nodes).toEqual(def.nodes);
+    expect(result.value.steps).toEqual(def.steps);
     expect(result.value.interface).toEqual(def.interface);
   });
 });
@@ -87,10 +102,10 @@ describe('createDraftFromLocked', () => {
     expect('lockedAt' in draft).toBe(false);
   });
 
-  it('copies nodes and interface from locked capsule', () => {
+  it('copies steps and interface from locked capsule', () => {
     const locked = makeDraft({status: 'locked', lockedAt: '2025-01-01T00:00:00.000Z'});
     const draft = createDraftFromLocked(locked, 'cap-new');
-    expect(draft.nodes).toEqual(locked.nodes);
+    expect(draft.steps).toEqual(locked.steps);
     expect(draft.interface).toEqual(locked.interface);
   });
 });

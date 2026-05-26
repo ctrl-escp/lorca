@@ -10,6 +10,7 @@ import type {
 } from '@lorca/core';
 import {resolveModelCallSuggestedBuckets} from '@lorca/capsules';
 import {validatePipeline} from '@lorca/pipeline';
+import {validateGraphCapsuleForImport} from '@lorca/pipeline/legacyGraph';
 import {validateCapsule} from '@lorca/capsules';
 import {
   isCapsuleImportSchemaVersion,
@@ -17,6 +18,21 @@ import {
 } from './persistence.js';
 
 const PIPELINE_SCHEMA_VERSION = 2;
+
+function isGraphOnlyCapsule(capsule: CapsuleDefinition): boolean {
+  return (capsule.steps?.length ?? 0) === 0 && (capsule.nodes?.length ?? 0) > 0;
+}
+
+function validateCapsuleImportBody(capsule: CapsuleDefinition): ImportParseError | null {
+  if (isGraphOnlyCapsule(capsule)) {
+    const graphVal = validateGraphCapsuleForImport(capsule);
+    if (!graphVal.ok) return {ok: false, errors: [graphVal.error.message]};
+  }
+  const normalized = normalizeCapsuleBody(capsule);
+  const validation = validateCapsule(normalized);
+  if (!validation.ok) return {ok: false, errors: [validation.error.message]};
+  return null;
+}
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -133,8 +149,8 @@ export function parsePipelineExport(data: unknown): PipelineExportFile | ImportP
   if (!result.ok) return {ok: false, errors: [result.error.message]};
 
   for (const cap of file.includedCapsules ?? []) {
-    const capVal = validateCapsule(cap);
-    if (!capVal.ok) return {ok: false, errors: [capVal.error.message]};
+    const capErr = validateCapsuleImportBody(cap);
+    if (capErr) return capErr;
   }
 
   return file;
@@ -148,10 +164,10 @@ export function parseCapsuleExport(data: unknown): CapsuleExportFile | ImportPar
   const schemaErr = capsuleImportSchemaVersionError(file.capsule.schemaVersion);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
 
-  const capsule = normalizeCapsuleBody(file.capsule);
-  const validation = validateCapsule(capsule);
-  if (!validation.ok) return {ok: false, errors: [validation.error.message]};
+  const importErr = validateCapsuleImportBody(file.capsule);
+  if (importErr) return importErr;
 
+  const capsule = normalizeCapsuleBody(file.capsule);
   return {...file, capsule};
 }
 

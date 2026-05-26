@@ -1,6 +1,7 @@
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
 import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
+import {validateGraphCapsuleForImport} from '@lorca/pipeline/legacyGraph';
 import {validateCapsule} from '../src/validate.js';
 
 function graphCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
@@ -60,13 +61,13 @@ function stepChainCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDe
   };
 }
 
-describe('validateCapsule (graph-only capsules, migration path)', () => {
+describe('validateGraphCapsuleForImport (graph-only import path)', () => {
   it('passes a minimal valid graph capsule', () => {
-    expect(validateCapsule(graphCapsule()).ok).toBe(true);
+    expect(validateGraphCapsuleForImport(graphCapsule()).ok).toBe(true);
   });
 
   it('allows zero InputNodes', () => {
-    expect(validateCapsule(graphCapsule()).ok).toBe(true);
+    expect(validateGraphCapsuleForImport(graphCapsule()).ok).toBe(true);
   });
 
   it('rejects two InputNodes', () => {
@@ -77,7 +78,7 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'in-1', outputName: 'xml'},
     });
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('invalid_pipeline_graph');
   });
@@ -90,7 +91,7 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'dup', outputName: 'text'},
     });
-    expect(validateCapsule(def).ok).toBe(false);
+    expect(validateGraphCapsuleForImport(def).ok).toBe(false);
   });
 
   it('detects duplicate .json key from two expectedOutput=json nodes with same prefix', () => {
@@ -104,14 +105,14 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       nodes: [jsonModelNode('mc1'), jsonModelNode('mc2')],
       outputRef: {nodeId: 'mc1', outputName: 'text'},
     });
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('duplicate_artifact_key');
   });
 
   it('rejects invalid outputRef node', () => {
     const def = graphCapsule({outputRef: {nodeId: 'nonexistent', outputName: 'text'}});
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('invalid_pipeline_graph');
   });
@@ -124,7 +125,7 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'cap', outputName: 'result'},
     });
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('missing_capsule');
   });
@@ -137,7 +138,7 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'mc', outputName: 'text'},
     });
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('invalid_capsule_interface');
   });
@@ -156,7 +157,7 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'mc', outputName: 'text'},
     });
-    expect(validateCapsule(def).ok).toBe(true);
+    expect(validateGraphCapsuleForImport(def).ok).toBe(true);
   });
 
   it('detects cycles', () => {
@@ -171,13 +172,19 @@ describe('validateCapsule (graph-only capsules, migration path)', () => {
       ],
       outputRef: {nodeId: 'a', outputName: 'text'},
     });
-    const result = validateCapsule(def);
+    const result = validateGraphCapsuleForImport(def);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('cycle_detected');
   });
 });
 
 describe('validateCapsule (step-chain capsules)', () => {
+  it('rejects graph-only capsules without steps[]', () => {
+    const result = validateCapsule(graphCapsule());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('steps[]');
+  });
+
   it('validates step-chain capsules without legacy graph fields', () => {
     expect(validateCapsule(stepChainCapsule()).ok).toBe(true);
   });
