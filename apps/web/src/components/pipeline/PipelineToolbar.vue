@@ -33,6 +33,7 @@
             <button class="more-menu-item ovf-drop ovf-drop-3" type="button" @click="emitAndClose('export')">Export</button>
             <button class="more-menu-item ovf-drop ovf-drop-4" type="button" @click="emitAndClose('import')">Import</button>
             <button class="more-menu-item" type="button" @click="emitAndClose('clear-all-pipelines')">Clear all pipelines…</button>
+            <button class="more-menu-item more-menu-item-destructive" type="button" @click="emitAndClose('reset-workspace')">Reset workspace…</button>
           </div>
         </div>
       </div>
@@ -75,6 +76,7 @@ const emit = defineEmits<{
   'pipeline-select': [id: string];
   'pipeline-delete': [id: string];
   'clear-all-pipelines': [];
+  'reset-workspace': [];
   'update:pipelineName': [name: string];
   'commit-pipeline-name': [];
   'build-from-description': [];
@@ -90,7 +92,7 @@ const emit = defineEmits<{
 const moreMenuOpen = ref(false);
 const moreMenuRef = ref<HTMLElement | null>(null);
 
-function emitAndClose(event: 'wrap-retry-loop' | 'lock-as-capsule' | 'export' | 'import' | 'clear-all-pipelines') {
+function emitAndClose(event: 'wrap-retry-loop' | 'lock-as-capsule' | 'export' | 'import' | 'clear-all-pipelines' | 'reset-workspace') {
   moreMenuOpen.value = false;
   switch (event) {
     case 'wrap-retry-loop': emit('wrap-retry-loop'); break;
@@ -98,6 +100,7 @@ function emitAndClose(event: 'wrap-retry-loop' | 'lock-as-capsule' | 'export' | 
     case 'export': emit('export'); break;
     case 'import': emit('import'); break;
     case 'clear-all-pipelines': emit('clear-all-pipelines'); break;
+    case 'reset-workspace': emit('reset-workspace'); break;
   }
 }
 
@@ -206,6 +209,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick, true));
   padding: 9px 16px; font-size: 0.85rem; cursor: pointer;
 }
 .more-menu-item:hover { background: #242424; color: #ccc; }
+.more-menu-item-destructive { color: #c87070; border-top: 1px solid #2a2a2a; margin-top: 0.15rem; padding-top: 0.65rem; }
+.more-menu-item-destructive:hover { background: #2a1818; color: #e89090; }
 
 @media (max-width: 767px) {
   .center-toolbar { padding: 0.55rem 0.75rem; gap: 0.4rem; }

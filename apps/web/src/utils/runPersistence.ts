@@ -44,3 +44,14 @@ export function loadCapsuleRunState(capsuleId: string): PersistedRunState | null
     return null;
   }
 }
+
+export function clearAllRunHistory(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(RUN_KEY_PREFIX) || key?.startsWith(CAPSULE_RUN_KEY_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) localStorage.removeItem(key);
+}

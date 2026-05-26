@@ -1,6 +1,6 @@
 # Legacy graph format decision
 
-Date: 2026-05-25
+Date: 2026-05-25 · **Status updated:** 2026-05-25 (migration complete)
 
 ## Decision
 
@@ -8,13 +8,14 @@ Lorca should migrate runtime execution to native V2 step chains only. The V1 gra
 
 Do not keep the V2-to-V1 bridge indefinitely. Do not drop V1 import yet.
 
-## Current state
+## Current state (post-migration)
 
-- Top-level pipelines are canonical V2 `steps[]` definitions.
-- `executeStepChain()` is the primary runtime path for V2 pipelines, loop groups, inline capsule chains, snapshots, history reads, and artifact refs.
-- V1 graph support still exists in `LegacyPipelineDefinition`, `executePipeline()`, `validateLegacyPipeline()`, `topologicalOrder()`, `migrateLegacyPipeline()`, and `compilePipelineToLegacyGraph()`.
-- Capsules created or edited after the step-chain migration carry `steps[]`, but `ensureCapsuleStepChain()` and capsule stores still refresh legacy `nodes`, `edges`, and `outputRef`.
-- Graph-only capsules and old graph pipeline records are still migrated on load/import.
+- Top-level pipelines and capsules are canonical V2 `steps[]` definitions at runtime, in IndexedDB, and in export files.
+- `executeStepChain()` is the only production executor for pipelines, loop groups, inline capsule chains, snapshots, history reads, and artifact refs.
+- **Removed from production:** `executePipeline()`, `compilePipelineToLegacyGraph()`, `syncCapsuleLegacyGraphFromSteps()`, and the V2→V1 bridge. Legacy graph validation helpers (`validateLegacyPipeline`, `topologicalOrder`, `outputKey`, `resolveOutputRef`) live in `packages/pipeline/src/legacyGraph.ts` and are exported only via the `@lorca/pipeline/legacyGraph` subpath for import/migration tests.
+- **Import/load only:** `migrateLegacyPipeline()` and `ensureCapsuleStepChain()` convert graph-only or legacy pipeline records to `steps[]`. Graph import validation uses `validateGraphCapsuleForImport()` on that path; `validateCapsule()` is step-chain-only.
+- **Persistence:** Capsule `schemaVersion` **2** is written for normalized step-chain bodies. Dexie v2 upgrade and load-time normalization strip `nodes`, `edges`, and `outputRef` once `steps[]` exists. Content signatures hash canonical `steps[]`, input, and interface — not stale graph fields.
+- Built-in examples are step-chain-first; narrow graph fixtures remain in migration tests only.
 
 ## Why
 
@@ -25,50 +26,54 @@ At the same time, V1 import/migration is still useful. Old IndexedDB records, ex
 ## Policy
 
 - New code must read and write V2 `steps[]` as the canonical pipeline and capsule body.
-- V1 `nodes`, `edges`, and `outputRef` are compatibility fields only.
+- V1 `nodes`, `edges`, and `outputRef` are compatibility fields only at import/load boundaries.
 - V1 graph-only definitions may be accepted at load/import boundaries and immediately migrated to `steps[]`.
-- Runtime execution should not require compiling V2 steps back into V1 graphs.
+- Runtime execution must not compile V2 steps back into V1 graphs.
 - V1 import can be removed only after an explicit schema cutoff or migration/export compatibility decision.
 
 ## Migration sequence
 
-1. Fix behavior gaps in the native executor first: JSON parsing parity, nested abort propagation, nested params, and relevant run options.
-2. Add real step-chain capsule validation before graph fields stop masking invalid capsule bodies.
-3. Stop writing refreshed legacy graph fields for capsules that already have `steps[]`; strip graph fields on save/export for migrated bodies.
-4. Make graph-only capsule execution migration-first in both fallback sites:
-   - `executeCapsuleStep()` in `packages/pipeline/src/stepExecutor.ts`, when the resolved capsule has no `steps[]`.
-   - `executeCapsuleTestRun()` in `packages/capsules/src/executor.ts`, when it currently builds a synthetic `LegacyPipelineDefinition`.
-5. Rewrite built-in example capsules as step-chain-first fixtures; keep one small graph fixture set for migration tests.
-6. Keep `migrateLegacyPipeline()` and `ensureCapsuleStepChain()` narrowly scoped to load/import compatibility.
-7. Remove the V2-to-V1 bridge and legacy runtime once no production path calls them.
-8. Later, decide whether V1 import itself remains supported or gets a documented schema cutoff.
+All steps below are **complete** as of 2026-05-25:
+
+1. ✅ Fix behavior gaps in the native executor: JSON parsing parity, nested abort propagation, nested params, and relevant run options.
+2. ✅ Add real step-chain capsule validation before graph fields stop masking invalid capsule bodies.
+3. ✅ Stop writing refreshed legacy graph fields for capsules that already have `steps[]`; strip graph fields on save/export for migrated bodies.
+4. ✅ Make graph-only capsule execution migration-first in both fallback sites (`executeCapsuleStep()`, `executeCapsuleTestRun()`).
+5. ✅ Rewrite built-in example capsules as step-chain-first fixtures; keep one small graph fixture set for migration tests.
+6. ✅ Keep `migrateLegacyPipeline()` and `ensureCapsuleStepChain()` narrowly scoped to load/import compatibility.
+7. ✅ Remove the V2-to-V1 bridge and legacy runtime (`executePipeline`, graph compiler, graph sync helpers).
+8. ⏳ **Future:** decide whether V1 import itself remains supported or gets a documented import cutoff (schema v2 persistence is done; graph import still accepted).
 
 ## Removal inventory
 
-Remove these only after the native paths, persistence rules, and migration tests are in place:
-
-- `compilePipelineToLegacyGraph()` and `expandLoopGroupsForLegacyCompile()`.
-- `syncCapsuleLegacyGraphFromSteps()`.
-- `executePipeline()` and V1-only capsule loop execution.
-- `validateLegacyPipeline()` and `topologicalOrder()`.
-- Graph remap helpers such as `applyModelRemapsToNodes()`.
-- Graph-based `outputKey()` / `resolveOutputRef()` production usage.
-- Legacy-only test coverage in `executor.test.ts`, most of `capsuleLoop.test.ts`, and graph-runtime branches in `capsuleInstance.test.ts`.
+| Item | Status |
+|------|--------|
+| `compilePipelineToLegacyGraph()` and `expandLoopGroupsForLegacyCompile()` | Removed |
+| `syncCapsuleLegacyGraphFromSteps()` | Removed |
+| `executePipeline()` and V1-only capsule loop execution | Removed |
+| `validateLegacyPipeline()` and `topologicalOrder()` | Moved to `legacyGraph.ts` (import path only) |
+| Graph remap helpers such as `applyModelRemapsToNodes()` | Removed; remaps apply to `steps[]` only |
+| Graph-based `outputKey()` / `resolveOutputRef()` production usage | Removed from public API |
+| Legacy-only tests in `executor.test.ts`, most of `capsuleLoop.test.ts` | Removed; migration coverage in `legacyGraph.test.ts`, `migration.test.ts`, `graphImportMigration.spec.ts` |
 
 ## Acceptance criteria for removal
 
-- All user-created pipelines and capsules persist without `nodes`, `edges`, or `outputRef` when `steps[]` exists.
-- Exported capsules do not reintroduce `nodes`, `edges`, or `outputRef` for migrated step-chain bodies.
-- Import/load tests cover graph-only pipeline and capsule migration into V2.
-- At least one import-migration e2e covers a graph-only capsule or pipeline export.
-- `validateCapsule()` validates `steps[]` when present; graph validation is migration-only.
-- Pipeline execution, capsule execution, inline capsule execution, inline lock/extract flows, capsule tests, loop groups, partial runs, snapshots, history reads, and model remapping all pass through native step-chain paths.
-- `rg "executePipeline\\(|compilePipelineToLegacyGraph\\(|validateLegacyPipeline|topologicalOrder\\(" packages apps` has no production call sites.
+All criteria **met** (2026-05-25):
+
+- ✅ User-created pipelines and capsules persist without `nodes`, `edges`, or `outputRef` when `steps[]` exists.
+- ✅ Exported capsules do not reintroduce graph fields for migrated step-chain bodies.
+- ✅ Import/load tests cover graph-only pipeline and capsule migration into V2 (`persistence.test.ts`, `importExport.test.ts`, `graphImportMigration.spec.ts`).
+- ✅ At least one import-migration e2e covers graph-only capsule or pipeline export.
+- ✅ `validateCapsule()` validates `steps[]` only; graph validation is migration-only (`validateGraphCapsuleForImport`).
+- ✅ Pipeline execution, capsule execution, inline capsule execution, inline lock/extract flows, capsule tests, loop groups, partial runs, snapshots, history reads, and model remapping pass through native step-chain paths (`nativePathSmoke.test.ts`, matrix in `docs/tmp-remaining-implementations.md`).
+- ✅ `rg "executePipeline\\(|compilePipelineToLegacyGraph\\(|validateLegacyPipeline|topologicalOrder\\(" packages apps` has no production call sites outside `legacyGraph.ts` and tests.
 
 ## Schema cutoff
 
-Dropping graph fields from `CapsuleDefinition` should be a schema decision, not an incidental cleanup:
+**Implemented (2026-05-25):**
 
-- Bump capsule `schemaVersion` when `nodes`, `edges`, and `outputRef` leave the persisted/exported shape.
-- Keep V1 graph import available through `migrateLegacyPipeline()` / `ensureCapsuleStepChain()` until there is an explicit cutoff.
-- Consider a one-time IndexedDB migration that rewrites existing step-chain capsules without graph fields.
+- Capsule `schemaVersion` bumped to **2** for persisted/exported step-chain bodies (`1` still accepted at import).
+- Dexie v2 upgrade rewrites existing capsule and pipeline records; load-time normalization catches missed rows.
+- V1 graph import remains available through `migrateLegacyPipeline()` / `ensureCapsuleStepChain()` until an explicit **import** cutoff is decided.
+
+**Future (optional):** reject graph-only imports without migration, or drop `LegacyPipelineDefinition` from the type surface entirely.

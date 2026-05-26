@@ -61,9 +61,18 @@ export const useEndpointsStore = defineStore('endpoints', () => {
     endpoints.value = endpoints.value.filter((e) => e.id !== id);
   }
 
+  async function resetToDefault(): Promise<AiEndpointConfig> {
+    await getDb().endpoints.clear();
+    const def = createDefaultEndpoint();
+    await getDb().endpoints.put(cloneForStorage(def));
+    endpoints.value = [def];
+    secretRefs.value = [];
+    return def;
+  }
+
   function getEndpoint(id: string): AiEndpointConfig | undefined {
     return endpoints.value.find((e) => e.id === id);
   }
 
-  return {endpoints, secretRefs, loaded, load, addEndpoint, updateEndpoint, removeEndpoint, getEndpoint};
+  return {endpoints, secretRefs, loaded, load, addEndpoint, updateEndpoint, removeEndpoint, resetToDefault, getEndpoint};
 });

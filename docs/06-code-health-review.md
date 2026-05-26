@@ -1,109 +1,105 @@
 # Code health review
 
-Date: 2026-05-25
+Date: 2026-05-25 · **Status updated:** 2026-05-25 (legacy graph cleanup complete)
 
 ## Scope
 
 This review focused on code smells, dead or stale paths, irrelevant tests, flows that no longer match the step-chain product, and opportunities to reduce project size without removing useful behavior.
 
+## Summary
+
+Findings **1–3, 4–9** from the original review are **resolved**. Finding **10** is **partially resolved** — the largest chain-editing hotspots were split; `LeftPane.vue` is now small. Optional follow-ups (V1 import cutoff, validation UX) are tracked in `docs/tmp-notes.md`.
+
 ## Findings
 
-### 1. Legacy graph runtime still duplicates native step-chain execution
+### 1. Legacy graph runtime still duplicates native step-chain execution — **Resolved**
 
-`packages/pipeline/src/executor.ts` keeps the V1 graph executor alive, including capsule instance execution and V1 capsule loop handling. Native execution still imports it through `packages/pipeline/src/stepExecutor.ts` for graph-only capsule fallback. This keeps two separate runtime models for model calls, templates, JSON parsing, traces, capsule output binding, abort behavior, and loops.
+~~`packages/pipeline/src/executor.ts` keeps the V1 graph executor alive…~~
 
-Impact: new runtime features must either be added twice or silently diverge. The legacy executor also keeps old `PipelineNode`, `manual-text`, and `template` runtime behavior looking production-grade even though V2 `PipelineStep` is canonical.
+**Resolution:** `executePipeline()` and `packages/pipeline/src/executor.ts` removed. All production execution goes through `executeStepChain()`. Graph-only capsules migrate via `ensureCapsuleStepChain()` at execution boundaries, then run natively.
 
-Follow-up: implement the migration sequence in `docs/05-legacy-graph-decision.md`. Remove production `executePipeline()` call sites only after native behavior, validation, persistence, fallback migration, and example fixtures are ready.
+### 2. Capsules still write legacy graph fields even when `steps[]` exists — **Resolved**
 
-### 2. Capsules still write legacy graph fields even when `steps[]` exists
+~~`syncCapsuleLegacyGraphFromSteps()` compiles V2 steps back to V1 graph fields…~~
 
-`syncCapsuleLegacyGraphFromSteps()` compiles V2 steps back to V1 graph fields. It is called when extracting capsules, loading capsule editor state, mutating capsule steps, and locking inline capsules. `ensureCapsuleStepChain()` also refreshes `nodes`, `edges`, and `outputRef` for already-migrated capsules.
+**Resolution:** V2→V1 bridge and `syncCapsuleLegacyGraphFromSteps()` removed. `stripCapsuleLegacyGraphFields()` runs on save/export/load. Content signatures hash canonical step-chain data only. Tests assert migration to `steps[]`, not graph sync.
 
-Impact: the supposedly deprecated capsule graph fields remain actively maintained, which makes it hard to know whether graph data is compatibility data or live product state. `capsuleMigration.test.ts` currently asserts this behavior, including loop-group flattening into legacy graph nodes.
+### 3. Capsule validation is still graph-era — **Resolved**
 
-Follow-up: stop writing refreshed graph fields for step-chain capsules. Update tests to assert graph-only capsules migrate to `steps[]`, not that migrated capsules keep graph fields synchronized.
+~~`validateCapsule()` validates `nodes`, `edges`, and `outputRef`…~~
 
-### 3. Capsule validation is still graph-era
+**Resolution:** `validateCapsule()` validates `steps[]` via `validateStepChainPipeline()` plus capsule interface checks. Graph validation is migration-only (`validateGraphCapsuleForImport` in import path).
 
-`validateCapsule()` in `packages/capsules/src/validate.ts` validates `nodes`, `edges`, and `outputRef`. For capsules with `steps[]` and empty graph fields, validation does not meaningfully validate the canonical body, yet `lockCapsule()`, import, and capsule test runs all call it.
+### 4. Step-chain validation is intentionally thin — **Resolved (core rules)**
 
-Impact: users can lock, export, or test structurally invalid step-chain capsules if the graph fields are missing or stale.
+~~`validatePipeline()` checks duplicate IDs and `primaryOutputName`…~~
 
-Follow-up: validate `steps[]` when present, reusing or extending `validatePipeline()` with capsule-specific checks. Demote graph validation to graph-only migration/import paths.
+**Resolution:** `stepChainValidation.ts` validates loop groups, history reads, template artifact refs, capsule input bindings, inline inner steps, duplicate artifact keys, and `outputStepId`. Covered by `stepChainValidation.test.ts`.
 
-### 4. Step-chain validation is intentionally thin
+**Optional:** surface validation errors in the editor before lock/export; validate opaque capsule output bindings against resolved capsule ports.
 
-`validatePipeline()` checks duplicate IDs and `primaryOutputName`, but not loop-group structure, history-read validity, capsule binding integrity, or whether referenced artifacts can exist.
+### 5. Native and legacy JSON parsing disagree — **Resolved**
 
-Impact: "validated" currently means "basic shape looks sane," not "this step-chain can run." That is acceptable as a starting point, but cleanup work should not assume validation is complete.
+~~`stepExecutor.ts` parses strict JSON or full fenced JSON only…~~
 
-Follow-up: add targeted validators for loop groups, history reads, capsule bindings, and output refs as native execution becomes the only runtime path.
+**Resolution:** Shared JSON parser extracted; native execution handles prose-wrapped JSON; tests cover parity.
 
-### 5. Native and legacy JSON parsing disagree
+### 6. Nested native execution drops run context — **Resolved**
 
-`stepExecutor.ts` parses strict JSON or full fenced JSON only. `executor.ts` also extracts the first object or array from prose-wrapped model output.
+~~`executeCapsuleStepChain()` does not forward the parent abort signal…~~
 
-Impact: JSON output can pass in legacy graph execution but fail in native step-chain execution, which is the path users actually use for current pipelines and loop groups.
+**Resolution:** Abort signal and params propagate through nested capsule and loop-group execution; focused tests added.
 
-Follow-up: extract a shared JSON parser, use it from native execution, and test prose-wrapped JSON for model-call JSON output and loop exit conditions.
+### 7. Persistence and import/export still have dual graph paths — **Resolved**
 
-### 6. Nested native execution drops run context
+~~`prepareImportedCapsule()` remaps both `steps` and `nodes`…~~
 
-`executeCapsuleStepChain()` calls `executeStepChain()` for inner capsule steps but only forwards seed artifacts, params, and optional inner start step. It does not forward the parent abort signal. Loop-group inner execution also calls `executeStepInternal()` without forwarding `params`, so parameterized templates inside a capsule loop cannot render capsule params.
+**Resolution:** Graph fields stripped on save/export/import normalization; model remaps apply to `steps[]` only; content signatures use canonical fields; Dexie v2 migration rewrites stored records.
 
-Impact: cancellation and parameter rendering can behave differently inside nested chains than they do in the parent chain.
+### 8. Built-in example capsules are still authored as V1 graphs — **Resolved**
 
-Follow-up: pass abort signal and relevant run options through native nested execution, pass params into loop inner steps, add focused tests for cancellation and `{{param.*}}` inside capsule loop groups, and remove stale user-facing "V1" wording from native loop errors.
+~~`definitions.ts` defines graph nodes…~~
 
-### 7. Persistence and import/export still have dual graph paths
+**Resolution:** Examples are step-chain-first; `graphFixtures.ts` holds narrow migration fixtures.
 
-`prepareImportedCapsule()` remaps both `steps` and `nodes`. Exports deep-clone the capsule, so graph fields continue to flow through exported files when present. `computeCapsuleContentSignature()` also hashes `outputRef` and falls back to `nodes`, which can make stale detection drift once graph fields stop syncing.
+### 9. Legacy tests need sorting, not blanket deletion — **Resolved**
 
-Impact: removing the legacy executor is not enough. Graph fields can still persist, export, and affect stale detection unless save/export/signature code is cleaned up too.
+~~Some graph tests should stay as migration coverage…~~
 
-Follow-up: strip graph fields for step-chain capsules on save/export, remove node remapping from the normal import path, and base content signatures on canonical `steps[]`, input, and interface data.
+**Resolution:** Native coverage in `nativePathSmoke.test.ts`, `capsuleInstance.test.ts`, etc.; migration coverage in `legacyGraph.test.ts`, `migration.test.ts`, `graphImportMigration.spec.ts`; V1 runtime tests removed.
 
-### 8. Built-in example capsules are still authored as V1 graphs
+### 10. Several UI/store modules are too large for safe maintenance — **Partially resolved**
 
-`packages/capsules/src/examples/definitions.ts` defines graph nodes, and `packages/capsules/src/examples/build.ts` derives step chains from those nodes. That keeps legacy `template`/`manual-text` node logic alive in the example builder and hides the real canonical shape of examples.
+Original hotspots (2026-05-25 review):
 
-Impact: example maintenance still requires understanding graph-era concepts. It also keeps graph fixtures broad when the useful compatibility surface should be narrow.
+| File | Was | Now (approx.) |
+|------|-----|---------------|
+| `ChainEditor.vue` | 2183 | ~600 |
+| `ChainStepCard.vue` | (inside ChainEditor) | ~330 + extracted subcomponents |
+| `pipelineEditor.ts` | 1085 | ~490 + `snapshot`, `nestedStepEdits`, `capsuleStepEdits` |
+| `CenterPane.vue` | 1066 | ~650 + `useModalDialogs` |
+| `StepInspector.vue` | 850 | ~560 + config/bottom tabs |
+| `LeftPane.vue` | 1246 | ~150 |
 
-Follow-up: rewrite built-in examples as step-chain definitions first. Keep a minimal graph-only fixture set for migration tests.
+Follow-up: further splits only if new hotspots emerge; no 1000+ line chain-editing files remain.
 
-### 9. Legacy tests need sorting, not blanket deletion
+### 11. Keep current planning in the tmp notes — **Current**
 
-Some graph tests should stay as migration coverage; others should move to native step-chain execution. The keep set is `migration.test.ts`, graph-only branches in `capsuleMigration.test.ts`, and import tests in `packages/storage/tests/importExport.test.ts`. Capsule instance, loop, inline-capsule, and executor scenarios should be rewritten toward native execution before deleting V1 runtime tests.
+The older long-form planning docs and UI guide have been removed from `docs/`. The active planning surface is `tmp-*` notes plus short decision/review docs like this one.
 
-Impact: deleting legacy tests too early would remove behavioral coverage; keeping all of them forever keeps V1 looking live.
-
-Follow-up: rewrite native coverage first, then trim `executor.test.ts`, most of `capsuleLoop.test.ts`, and graph-runtime branches in `capsuleInstance.test.ts`.
-
-### 10. Several UI/store modules are too large for safe maintenance
-
-Current largest hotspots include `ChainEditor.vue` (2183 lines), `LeftPane.vue` (1246), `pipelineEditor.ts` (1085), `CenterPane.vue` (1066), and `StepInspector.vue` (850). These files mix rendering, command orchestration, drag-and-drop, context menus, execution state display, inline capsule logic, and persistence-adjacent behavior.
-
-Impact: small UI changes have high review cost and higher regression risk. This is not dead code, but it is a strong refactor target after the graph cleanup.
-
-Follow-up: split by ownership rather than by aesthetics: command menus, drag/drop helpers, step-card rendering, capsule lock/extract flows, and inspector subpanels.
-
-### 11. Keep current planning in the tmp notes
-
-The older long-form planning docs and UI guide have been removed from `docs/`. The active planning surface is now the `tmp-*` notes plus short decision/review docs like this one.
-
-Impact: recreating broad plan docs would reintroduce stale acceptance criteria. Current cleanup should stay in focused TODOs and short decision notes.
-
-Follow-up: leave `tmp-*` notes as the source of active follow-up work, and add new short docs only for decisions or audits that need more context.
+Follow-up: `docs/tmp-notes.md` TODOs updated to reflect completed migration work; product backlog items (clear-all reset, inline collapse theme) stay open.
 
 ## Suggested cleanup order
 
-1. Fix native JSON parsing parity.
-2. Propagate abort/options/params through nested native execution.
-3. Add `validateCapsule()` step-chain validation and tighten `validatePipeline()` where needed.
-4. Stop writing/syncing legacy graph fields; strip them on save/export for step-chain capsules.
-5. Convert graph-only capsule execution to migration-first in both fallback sites.
-6. Rewrite examples step-chain-first; isolate graph fixtures to migration tests.
-7. Remove legacy executor, compiler, graph remap helpers, and graph runtime exports.
-8. Trim legacy-only tests to migration coverage after native tests exist.
-9. Split the largest UI/store files after runtime behavior is simpler.
+Original order — **items 1–8 complete**, **item 9 partially complete**, **item 4 remains optional follow-up**:
+
+1. ✅ Fix native JSON parsing parity.
+2. ✅ Propagate abort/options/params through nested native execution.
+3. ✅ Add `validateCapsule()` step-chain validation and tighten `validatePipeline()` where needed (capsule path done; deeper pipeline validators still optional).
+4. ✅ Stop writing/syncing legacy graph fields; strip them on save/export for step-chain capsules.
+5. ✅ Convert graph-only capsule execution to migration-first in both fallback sites.
+6. ✅ Rewrite examples step-chain-first; isolate graph fixtures to migration tests.
+7. ✅ Remove legacy executor, compiler, graph remap helpers, and graph runtime exports.
+8. ✅ Trim legacy-only tests to migration coverage after native tests exist.
+9. ✅ Split the largest UI/store files after runtime behavior is simpler (chain-editing hotspots; see finding 10).
+10. ⏳ Optional: editor-time validation UX and capsule output-binding checks (see `docs/tmp-notes.md`).

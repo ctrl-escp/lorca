@@ -62,5 +62,10 @@ export const useModelsStore = defineStore('models', () => {
     models.value[idx] = updated;
   }
 
-  return {models, modelsByEndpoint, load, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint, toggleModel};
+  async function clearAllModels(): Promise<void> {
+    await getDb().models.clear();
+    models.value = [];
+  }
+
+  return {models, modelsByEndpoint, load, addModel, setModelsForEndpoint, setUserBuckets, removeModelsForEndpoint, toggleModel, clearAllModels};
 });

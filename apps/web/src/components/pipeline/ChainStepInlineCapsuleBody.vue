@@ -6,9 +6,9 @@
       <span class="capsule-inline-version">{{ inlineConfig.capsuleVersion }}</span>
       <span v-if="inlineConfig.inlineModified" class="capsule-inline-modified-badge">modified</span>
       <div class="capsule-inline-actions">
-        <button type="button" @click.stop="emit('collapse')">Collapse</button>
-        <button type="button" @click.stop="emit('lock')">Lock as Capsule</button>
-        <button type="button" @click.stop="emit('detach')">Detach</button>
+        <button type="button" class="inline-action-btn" title="Fold inline steps back into a Capsule instance" @click.stop="emit('collapse')">Collapse</button>
+        <button type="button" class="inline-action-btn" title="Save inline steps as a new Capsule" @click.stop="emit('lock')">Lock as Capsule</button>
+        <button type="button" class="inline-action-btn" title="Convert back to an opaque Capsule reference" @click.stop="emit('detach')">Detach</button>
       </div>
     </div>
     <div v-if="!inlineConfig.inlineSteps?.length" class="capsule-inline-empty">
@@ -88,9 +88,9 @@ function innerExecutionClass(innerStepId: string): string {
 .capsule-inline-body {
   margin: 0.45rem 0 0.2rem;
   padding: 0.55rem 0.65rem;
-  background: #111316;
-  border: 1px solid #333842;
-  border-left: 3px solid #8e6db2;
+  background: var(--accent-bg-muted);
+  border: 1px solid var(--border-divider);
+  border-left: 3px solid var(--accent-border);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -101,30 +101,21 @@ function innerExecutionClass(innerStepId: string): string {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.4rem;
-  color: #c6b4d8;
+  color: var(--text-label);
   font-size: clamp(0.72rem, 1.4cqh, 0.88rem);
 }
-.capsule-inline-icon { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+.capsule-inline-icon { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--accent); }
 .capsule-inline-title { color: #ddd; }
-.capsule-inline-version { color: #8b7a9c; font-family: monospace; font-size: 0.85em; }
+.capsule-inline-version { color: var(--text-secondary); font-family: monospace; font-size: 0.85em; }
 .capsule-inline-modified-badge {
   padding: 1px 6px;
-  background: #2a2418;
-  color: #d0a85a;
+  background: var(--accent-bg);
+  color: var(--accent);
   border-radius: 3px;
   font-size: 0.64rem;
 }
-.capsule-inline-actions { display: flex; gap: 0.35rem; margin-left: auto; }
-.capsule-inline-actions button {
-  border: 1px solid #3a3245;
-  background: #17131c;
-  color: #c6b4d8;
-  border-radius: 4px;
-  padding: 0.2rem 0.45rem;
-  font-size: 0.68rem;
-  cursor: pointer;
-}
-.capsule-inline-actions button:hover { border-color: #5a4770; background: #21182a; }
+.capsule-inline-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-left: auto; }
+.capsule-inline-actions .inline-action-btn { grid-column: auto; min-width: 0; }
 .capsule-inline-empty { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
 .capsule-inline-step-list {
   margin: 0;
@@ -145,8 +136,8 @@ function innerExecutionClass(innerStepId: string): string {
   cursor: pointer;
   font-size: clamp(0.75rem, 1.45cqh, 0.92rem);
 }
-.capsule-inline-step-item:hover { border-color: #4a3f5a; background: #15121a; }
-.capsule-inline-selected { border-color: #7d5aa0; background: #1d1628; }
+.capsule-inline-step-item:hover { border-color: var(--accent-border); background: var(--accent-bg-muted); }
+.capsule-inline-selected { border-color: var(--accent); background: var(--accent-bg); }
 .inner-exec-running:not(.capsule-inline-selected) { border-color: #805010; background: #241a08; }
 .inner-exec-completed:not(.capsule-inline-selected) { border-color: #2a5a3a; }
 .inner-exec-failed:not(.capsule-inline-selected) { border-color: #7a3030; background: #2a1414; }

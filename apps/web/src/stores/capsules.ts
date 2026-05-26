@@ -81,6 +81,11 @@ export const useCapsulesStore = defineStore('capsules', () => {
     void getDb().capsules.delete(id);
   }
 
+  async function clearAllUserCapsules(): Promise<void> {
+    await getDb().capsules.clear();
+    capsules.value = [];
+  }
+
   function getCapsule(id: string, version?: string): CapsuleDefinition | undefined {
     if (version) {
       const match = capsules.value.find((c) => c.id === id && c.version === version);
@@ -159,5 +164,6 @@ export const useCapsulesStore = defineStore('capsules', () => {
     editLockedCapsule,
     duplicateFromExample,
     duplicateCapsule,
+    clearAllUserCapsules,
   };
 });

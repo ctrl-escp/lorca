@@ -17,9 +17,7 @@
       <p v-if="definitionStale" class="pci-inline-warning">
         Saved Capsule changed after this inline copy was created.
       </p>
-      <button type="button" class="btn btn-sm" @click="collapseInline">
-        Collapse
-      </button>
+      <p class="pci-inline-hint">Use <strong>Collapse</strong> on the step card to fold this back into a Capsule instance.</p>
     </div>
 
     <template v-else>
@@ -200,10 +198,6 @@ function rebindDefinition() {
 function spreadInline() {
   pipelineEditor.spreadCapsule(props.step.id);
 }
-
-function collapseInline() {
-  pipelineEditor.collapseInlineCapsule(props.step.id);
-}
 </script>
 
 <style scoped>
@@ -260,6 +254,12 @@ function collapseInline() {
 .pci-inline-warning {
   margin: 0;
   color: #c8a050;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.pci-inline-hint {
+  margin: 0;
+  color: var(--text-secondary);
   font-size: 0.72rem;
   line-height: 1.35;
 }

@@ -12,6 +12,7 @@
       @pipeline-select="handlePipelineSelect"
       @pipeline-delete="handlePipelineDelete"
       @clear-all-pipelines="handleClearAllPipelines"
+      @reset-workspace="handleResetWorkspace"
       @commit-pipeline-name="commitPipelineName"
       @build-from-description="openGeneratorModal()"
       @wrap-retry-loop="handleWrapInRetryLoop"
@@ -172,6 +173,9 @@ import {useSuggestionInsert} from '../../composables/useSuggestionInsert.js';
 import {usePipelineGeneratorFlow} from '../../composables/usePipelineGeneratorFlow.js';
 import {usePipelineCapsuleActions} from '../../composables/usePipelineCapsuleActions.js';
 import {useModalDialogs} from '../../composables/useModalDialogs.js';
+import {resetWorkspace} from '../../utils/workspaceReset.js';
+import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
+import {useUiStore} from '../../stores/ui.js';
 import ChainEditor from './ChainEditor.vue';
 import PipelineToolbar from './PipelineToolbar.vue';
 import {ConfirmDialog, PromptDialog} from '@lorca/ui-kit';
@@ -185,6 +189,8 @@ const props = defineProps<{def: PipelineDefinition}>();
 const emit = defineEmits<{update: [def: PipelineDefinition]; new: []}>();
 
 const runStore = useActiveRunStore();
+const capsuleRunStore = useCapsuleRunStore();
+const uiStore = useUiStore();
 const pipelinesStore = usePipelinesStore();
 const capsulesStore = useCapsulesStore();
 const importStore = useImportExportStore();
@@ -607,6 +613,31 @@ async function handleClearAllPipelines() {
     emit('new');
   } catch (error) {
     inlineError.value = error instanceof Error ? error.message : 'Could not clear pipelines.';
+  }
+}
+
+async function handleResetWorkspace() {
+  const confirmed = await showConfirm({
+    title: 'Reset Workspace',
+    message:
+      'Delete all pipelines, user capsules, endpoints, discovered models, and saved run history?\n\n' +
+      'A fresh default pipeline and disabled Local Ollama endpoint will be created. Built-in example capsules are kept. This cannot be undone.',
+    confirmLabel: 'Reset everything',
+    destructive: true,
+  });
+  if (!confirmed) return;
+  if (runStore.isRunning) runStore.cancel();
+  runStore.reset();
+  capsuleRunStore.reset();
+  importStore.cancelImport();
+  uiStore.closeCapsuleEditor();
+  try {
+    await resetWorkspace();
+    userPrompt.value = '';
+    localPipelineName.value = 'New Pipeline';
+    emit('new');
+  } catch (error) {
+    inlineError.value = error instanceof Error ? error.message : 'Could not reset workspace.';
   }
 }
 
