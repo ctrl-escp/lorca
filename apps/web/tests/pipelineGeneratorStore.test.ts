@@ -1,5 +1,6 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {createPinia, setActivePinia} from 'pinia';
+import type {PipelineStep} from '@lorca/core';
 import {usePipelineGeneratorStore} from '../src/stores/pipelineGenerator.js';
 import {PIPELINE_GENERATOR_SCHEMA_VERSION} from '@lorca/pipeline';
 
@@ -59,5 +60,45 @@ describe('pipelineGenerator store', () => {
     await Promise.resolve();
     expect(store.applyMode).toBe('append');
     expect(store.previewSteps.length).toBeGreaterThan(0);
+  });
+
+  it('blocks Apply and enables Resolve when preview steps lack configured models', () => {
+    const store = usePipelineGeneratorStore();
+    const unconfiguredStep: PipelineStep = {
+      id: 'step_gen',
+      type: 'model-call',
+      label: 'Summarize',
+      enabled: true,
+      outputNamespace: 'summarize',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00Z',
+      config: {
+        type: 'model-call',
+        modelRef: {kind: 'fixed', endpointId: '', modelName: ''},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
+      },
+    };
+    store.previewSteps = [unconfiguredStep];
+    store.buildResult = {
+      ok: true,
+      steps: [unconfiguredStep],
+      errors: [],
+      unresolvedModels: [{stepId: 'step_gen', stepKey: 'summarize', reason: 'Model not configured'}],
+      assumptions: [],
+      warnings: [],
+    };
+
+    expect(store.canApply).toBe(false);
+    expect(store.canResolveModels).toBe(true);
+    expect(store.missingModelRefs.length).toBe(1);
+  });
+
+  it('blocks Apply when parse fails', () => {
+    const store = usePipelineGeneratorStore();
+    store.ingestBuild('[{"suggestionId":"legacy"}]');
+    expect(store.canApply).toBe(false);
+    expect(store.canResolveModels).toBe(false);
+    expect(store.validationErrors.length).toBeGreaterThan(0);
   });
 });

@@ -586,19 +586,19 @@ Use debate prompt from `docs/tmp-notes.md`:
 
 ## Definition of done
 
-- [ ] Generator logic in packages; `apps/web` is UI + composition + orchestration only.
-- [ ] **No `pipeline` ↔ `capsules` or `prompt` ↔ `capsules` cycles**; Phase 0 dep checks in CI or `npm run validate`.
-- [ ] `buildStepsFromGeneratorPlan` uses injected resolvers; pipeline does not import capsules.
-- [ ] `PipelineGeneratorPlan` v1 wrapper; no legacy bare array.
-- [ ] Canonical ref grammar enforced; no forward refs.
-- [ ] Recursive ≤25 entry cap.
-- [ ] `inputSource` on first step; append/replace defaults correct.
-- [ ] `isDefaultPipelineStub()` — not single-step heuristic.
-- [ ] Presentation via existing step kind; templates use ref grammar.
-- [ ] Pinia session persistence + Clear all.
-- [ ] Resolve models… + Apply gating (no UX contradiction).
-- [ ] All invariant tests listed above.
-- [ ] Debate acceptance manual checklist passes.
+- [x] Generator logic in packages; `apps/web` is UI + composition + orchestration only.
+- [x] **No `pipeline` ↔ `capsules` or `prompt` ↔ `capsules` cycles**; Phase 0 dep checks in CI or `npm run validate`.
+- [x] `buildStepsFromGeneratorPlan` uses injected resolvers; pipeline does not import capsules.
+- [x] `PipelineGeneratorPlan` v1 wrapper; no legacy bare array.
+- [x] Canonical ref grammar enforced; no forward refs.
+- [x] Recursive ≤25 entry cap.
+- [x] `inputSource` on first step; append/replace defaults correct.
+- [x] `isDefaultPipelineStub()` — not single-step heuristic.
+- [x] Presentation via existing step kind; templates use ref grammar.
+- [x] Pinia session persistence + Clear all.
+- [x] Resolve models… + Apply gating (no UX contradiction).
+- [x] All invariant tests listed above.
+- [ ] Debate acceptance manual checklist passes (automated: debate fixture + E2E multi-step mock; full LLM run still manual).
 
 ---
 

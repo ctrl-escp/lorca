@@ -1,4 +1,6 @@
+import {listStepOutputArtifacts} from '../historyReads.js';
 import {validateStepChainBody} from '../stepChainValidation.js';
+import type {PipelineStep} from '@lorca/core';
 import type {
   GeneratorBuildContext,
   GeneratorBuildResult,
@@ -74,12 +76,31 @@ export function buildStepsFromGeneratorPlan(
   };
 }
 
+function collectArtifactRefsFromSteps(steps: readonly PipelineStep[]): string[] {
+  const refs: string[] = [];
+  function visit(step: PipelineStep) {
+    for (const artifact of listStepOutputArtifacts(step)) refs.push(artifact.ref);
+    if (step.config.type === 'loop-group') {
+      for (const inner of step.config.steps) visit(inner);
+    }
+    if (step.config.type === 'capsule-instance' && step.config.inlineSteps?.length) {
+      for (const inner of step.config.inlineSteps) visit(inner);
+    }
+  }
+  for (const step of steps) visit(step);
+  return refs;
+}
+
 export function validateBuiltGeneratorSteps(
   steps: import('@lorca/core').PipelineStep[],
   context: GeneratorBuildContext,
 ): string[] {
+  const extraArtifactRefs = context.applyMode === 'append' && context.existingPipeline
+    ? collectArtifactRefsFromSteps(context.existingPipeline.steps)
+    : undefined;
   const result = validateStepChainBody(steps, {
     resolveCapsule: context.resolveCapsule,
+    ...(extraArtifactRefs?.length ? {extraArtifactRefs} : {}),
   });
   if (result.ok) return [];
   return [result.error.message];

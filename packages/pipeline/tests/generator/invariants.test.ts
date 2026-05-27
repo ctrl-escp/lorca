@@ -154,4 +154,53 @@ describe('build catalog invariants', () => {
     expect(built.ok).toBe(false);
     expect(built.errors.some((e) => e.includes('Capsule step'))).toBe(true);
   });
+
+  it('errors on unresolved generated ref in presentation text', () => {
+    const plan = {
+      schemaVersion: SCHEMA,
+      steps: [{
+        kind: 'presentation' as const,
+        stepKey: 'out',
+        text: 'Missing: {{generated:never_defined.text}}',
+      }],
+    };
+    const built = buildStepsFromGeneratorPlan(plan, mockContext());
+    expect(built.ok).toBe(false);
+    expect(built.errors.some((e) => e.includes('Could not resolve template ref'))).toBe(true);
+  });
+
+  it('errors on invalid capsule output binding ref', () => {
+    const plan = {
+      schemaVersion: SCHEMA,
+      steps: [{
+        kind: 'capsule' as const,
+        stepKey: 'cap',
+        capsuleId: 'test-cap',
+        capsuleVersion: 'v1',
+        outputBindings: {result: 'generated:missing.text'},
+      }],
+    };
+    const built = buildStepsFromGeneratorPlan(plan, mockContext({
+      allowCapsules: true,
+      resolveCapsule: () => ({
+        id: 'test-cap',
+        version: 'v1',
+        name: 'Test',
+        status: 'locked',
+        schemaVersion: 2,
+        interface: {
+          inputs: [],
+          outputs: [{name: 'result', kind: 'text' as const}],
+          parameters: [],
+          modelSlots: [],
+        },
+        steps: [],
+        tests: [],
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+    }));
+    expect(built.ok).toBe(false);
+    expect(built.errors.some((e) => e.includes('Could not resolve output binding'))).toBe(true);
+  });
 });

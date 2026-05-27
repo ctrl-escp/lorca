@@ -5,6 +5,7 @@ import {
   expectGeneratorDescription,
   fillGeneratorDescription,
   generatorDialog,
+  GENERATOR_PLAN_DEBATE_SHORT,
   GENERATOR_PLAN_RESOLVED,
   GENERATOR_PLAN_UNRESOLVED,
   mockOllamaWithGeneratorPlan,
@@ -64,6 +65,25 @@ test('resolve models then apply commits generated steps', async ({page}) => {
   await remapDialog.getByRole('button', {name: 'Import'}).click();
   await expect(remapDialog).toBeHidden({timeout: 5000});
   await expect(stepCard(page, 'Summarize')).toBeVisible({timeout: 10000});
+});
+
+test('multi-step debate-shaped plan previews and applies', async ({page}) => {
+  await mockOllamaWithGeneratorPlan(page, GENERATOR_PLAN_DEBATE_SHORT);
+  await addOllamaEndpoint(page);
+  await openGeneratorModal(page);
+
+  const dialog = generatorDialog(page);
+  await fillGeneratorDescription(page, 'Debate pipeline from tmp-notes');
+  await dialog.getByRole('button', {name: 'Generate'}).click();
+
+  await expect(dialog.getByText('Extract hypothesis')).toBeVisible({timeout: 15000});
+  await expect(dialog.getByText('Expert — support')).toBeVisible();
+  await expect(dialog.getByText('Debate summary')).toBeVisible();
+  await dialog.getByRole('button', {name: 'Apply'}).click();
+
+  await expect(stepCard(page, 'Extract hypothesis')).toBeVisible({timeout: 10000});
+  await expect(stepCard(page, 'Expert — support')).toBeVisible();
+  await expect(stepCard(page, 'Debate summary')).toBeVisible();
 });
 
 test('session persists on close; Clear all resets', async ({page}) => {

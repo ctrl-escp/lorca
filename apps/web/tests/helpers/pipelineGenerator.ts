@@ -13,6 +13,34 @@ export const GENERATOR_PLAN_UNRESOLVED = {
   }],
 };
 
+/** Multi-step plan (debate-shaped) for preview/apply smoke without a live LLM. */
+export const GENERATOR_PLAN_DEBATE_SHORT = {
+  schemaVersion: 1,
+  steps: [
+    {
+      kind: 'custom',
+      stepKey: 'hypothesis',
+      label: 'Extract hypothesis',
+      prompt: {mode: 'custom', text: 'Extract a hypothesis from the question.'},
+      modelBucket: 'general',
+    },
+    {
+      kind: 'custom',
+      stepKey: 'expert_pro',
+      label: 'Expert — support',
+      prompt: {mode: 'custom', text: 'Argue for the hypothesis.'},
+      historyReads: [{ref: 'generated:hypothesis.text', tagName: 'hypothesis'}],
+      modelBucket: 'thinking',
+    },
+    {
+      kind: 'presentation',
+      stepKey: 'summary',
+      label: 'Debate summary',
+      text: 'Hypothesis: {{generated:hypothesis.text}}',
+    },
+  ],
+};
+
 export const GENERATOR_PLAN_RESOLVED = {
   schemaVersion: 1,
   steps: [{
