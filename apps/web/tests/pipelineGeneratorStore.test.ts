@@ -1,10 +1,47 @@
-import {beforeEach, describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {createPinia, setActivePinia} from 'pinia';
-import type {PipelineStep} from '@lorca/core';
+import type {PipelineDefinition, PipelineStep} from '@lorca/core';
 import {usePipelineGeneratorStore} from '../src/stores/pipelineGenerator.js';
 import {usePipelineEditorStore} from '../src/stores/pipelineEditor.js';
 import {createDefaultPipeline} from '../src/stores/pipelines.js';
 import {PIPELINE_GENERATOR_SCHEMA_VERSION} from '@lorca/pipeline';
+
+const pipelinesTable = new Map<string, PipelineDefinition>();
+
+vi.mock('@lorca/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@lorca/storage')>();
+  return {
+    ...actual,
+    getDb: () => ({
+      pipelines: {
+        put: async (pipe: PipelineDefinition) => { pipelinesTable.set(pipe.id, pipe); },
+        delete: async (id: string) => { pipelinesTable.delete(id); },
+        toArray: async () => [...pipelinesTable.values()],
+        clear: async () => { pipelinesTable.clear(); },
+      },
+      capsules: {
+        put: async () => {},
+        delete: async () => {},
+        toArray: async () => [],
+        clear: async () => {},
+      },
+      endpoints: {
+        put: async () => {},
+        delete: async () => {},
+        toArray: async () => [],
+        clear: async () => {},
+      },
+      models: {
+        put: async () => {},
+        delete: async () => {},
+        toArray: async () => [],
+        clear: async () => {},
+        where: () => ({equals: () => ({delete: async () => {}})}),
+        bulkPut: async () => {},
+      },
+    }),
+  };
+});
 
 const MINIMAL_PLAN = {
   schemaVersion: PIPELINE_GENERATOR_SCHEMA_VERSION,
@@ -19,6 +56,7 @@ const MINIMAL_PLAN = {
 
 describe('pipelineGenerator store', () => {
   beforeEach(() => {
+    pipelinesTable.clear();
     setActivePinia(createPinia());
     usePipelineGeneratorStore().clearAll();
   });
