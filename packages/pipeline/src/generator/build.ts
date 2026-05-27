@@ -4,10 +4,11 @@ import type {
   GeneratorBuildResult,
   PipelineGeneratorPlan,
 } from './types.js';
+import {validatePlanCatalogIds} from './validateCatalog.js';
 
 /**
  * Materialize pipeline steps from a parsed generator plan.
- * Phase 0: empty plan returns success; non-empty kinds filled in Phase 2.
+ * Phase 2 will implement full entry materialization.
  */
 export function buildStepsFromGeneratorPlan(
   plan: PipelineGeneratorPlan,
@@ -28,7 +29,17 @@ export function buildStepsFromGeneratorPlan(
     };
   }
 
-  void context;
+  errors.push(...validatePlanCatalogIds(plan.steps, context));
+  if (errors.length > 0) {
+    return {
+      ok: false,
+      steps: [],
+      errors,
+      unresolvedModels: [],
+      assumptions,
+      warnings,
+    };
+  }
 
   errors.push('Step builder for plan entries is not implemented yet (Phase 2)');
 

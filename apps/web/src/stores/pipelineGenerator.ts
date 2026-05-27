@@ -3,6 +3,7 @@ import {ref, computed, type Ref, type ComputedRef} from 'vue';
 import type {PipelineStep} from '@lorca/core';
 import {
   buildStepsFromGeneratorPlan,
+  isDefaultPipelineStub,
   parsePipelineGeneratorPlan,
   type GeneratorApplyMode,
 } from '@lorca/pipeline';
@@ -78,9 +79,14 @@ export const usePipelineGeneratorStore = defineStore('pipelineGenerator', () => 
     errorMessage.value = '';
     parseMessage.value = '';
 
+    const editor = usePipelineEditorStore();
+    const hasPipelineContext =
+      applyMode.value === 'append' && !isDefaultPipelineStub(editor.pipeline);
+
     const parsed = parsePipelineGeneratorPlan(text, {
       allowCapsules: allowCapsules.value,
       applyMode: applyMode.value,
+      hasPipelineContext,
     });
     if (!parsed.ok) {
       parseMessage.value = parsed.message;
@@ -89,7 +95,6 @@ export const usePipelineGeneratorStore = defineStore('pipelineGenerator', () => 
       return;
     }
 
-    const editor = usePipelineEditorStore();
     const context = composeGeneratorBuildContext({
       allowCapsules: allowCapsules.value,
       applyMode: applyMode.value,

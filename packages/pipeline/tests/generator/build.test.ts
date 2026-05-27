@@ -28,13 +28,27 @@ describe('buildStepsFromGeneratorPlan', () => {
     expect(result.steps).toEqual([]);
   });
 
-  it('reports not-implemented for non-empty plans in Phase 0', () => {
+  it('reports unknown suggestionId via catalog validation', () => {
     const result = buildStepsFromGeneratorPlan(
       {
         schemaVersion: PIPELINE_GENERATOR_SCHEMA_VERSION,
-        steps: [{kind: 'custom', stepKey: 'a'}],
+        steps: [{kind: 'suggestion', stepKey: 'x', suggestionId: 'no-such-suggestion'}],
       },
       mockContext(),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('Unknown suggestionId'))).toBe(true);
+  });
+
+  it('reports not-implemented for valid catalog ids before Phase 2 materialization', () => {
+    const result = buildStepsFromGeneratorPlan(
+      {
+        schemaVersion: PIPELINE_GENERATOR_SCHEMA_VERSION,
+        steps: [{kind: 'suggestion', stepKey: 'a', suggestionId: 'known'}],
+      },
+      mockContext({
+        instantiateSuggestion: (id) => (id === 'known' ? [{id: 's'} as never] : null),
+      }),
     );
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('Phase 2'))).toBe(true);

@@ -31,4 +31,7 @@ export {
 export {countPlanEntries, type CountPlanEntriesOptions} from './count.js';
 export {isDefaultPipelineStub} from './stub.js';
 export {parsePipelineGeneratorPlan, type ParsePipelineGeneratorPlanOptions} from './parse.js';
+export {validatePlanRefs, type ValidatePlanRefsOptions} from './validateRefs.js';
+export {validatePlanCatalogIds} from './validateCatalog.js';
+export {coercePlanEntry} from './coerce.js';
 export {buildStepsFromGeneratorPlan, validateBuiltGeneratorSteps} from './build.js';

@@ -1,6 +1,7 @@
 import type {CapsuleDefinition} from '@lorca/core';
 import {ALL_SUGGESTIONS} from '../suggestions/index.js';
 import {buildExampleCapsule, modelCallStep, withAnswerVerifyRetryLoop} from './build.js';
+import {PIPELINE_GENERATOR_SYSTEM_PROMPT} from './generatorPrompt.js';
 
 const GENERATOR_SUGGESTION_CATALOG = JSON.stringify(
   ALL_SUGGESTIONS.map((suggestion) => ({
@@ -36,7 +37,7 @@ export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
       {
         name: 'pipeline_steps_json',
         kind: 'json',
-        description: 'JSON plan describing suggestion steps to instantiate.',
+        description: 'PipelineGeneratorPlan v1 JSON (schemaVersion 1 wrapper).',
         sourceArtifactKey: 'generate.text',
       },
     ],
@@ -61,27 +62,13 @@ export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
       slotName: 'generator',
       mode: 'chat',
       temperature: 0.2,
-      maxTokens: 1200,
+      maxTokens: 4096,
       outputType: 'json',
       previousOutputTag: 'description',
-      prompt: [
-        'You are a pipeline architect for Lorca, a local AI orchestration tool.',
-        'Given a user description, produce a JSON step sequence using only these built-in suggestions.',
-        'Return a concise ordered array. Prefer 2-5 steps unless the request clearly needs more.',
-        'Use only suggestion IDs from the catalog. Do not invent IDs.',
-        'Output format:',
-        '[',
-        '  { "suggestionId": "suggestion-intent-extraction" },',
-        '  { "suggestionId": "suggestion-acceptance-criteria" }',
-        ']',
-        'Respond with JSON only. No prose, no markdown fences.',
-        '',
-        'Available suggestions:',
+      prompt: PIPELINE_GENERATOR_SYSTEM_PROMPT.replace(
+        '{{SUGGESTION_CATALOG}}',
         GENERATOR_SUGGESTION_CATALOG,
-        '',
-        'Pipeline description:',
-        '{{artifact.description.text}}',
-      ].join('\n'),
+      ),
     }),
   ],
   input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},

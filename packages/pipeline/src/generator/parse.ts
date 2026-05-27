@@ -1,3 +1,4 @@
+import {coercePlanEntry} from './coerce.js';
 import {countPlanEntries} from './count.js';
 import {
   PIPELINE_GENERATOR_HARD_ENTRY_CAP,
@@ -6,10 +7,13 @@ import {
   type PipelineGeneratorParseResult,
   type PipelineGeneratorPlan,
 } from './types.js';
+import {validatePlanRefs} from './validateRefs.js';
 
 export interface ParsePipelineGeneratorPlanOptions {
   allowCapsules?: boolean;
   applyMode?: 'replace' | 'append';
+  /** When true, `current:*` refs are allowed (append + non-stub pipeline context). */
+  hasPipelineContext?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -39,41 +43,6 @@ function extractJsonObject(text: string): unknown {
   return null;
 }
 
-function coercePlanEntry(raw: unknown): GeneratorPlanEntry | null {
-  if (!isRecord(raw) || typeof raw.kind !== 'string' || typeof raw.stepKey !== 'string') {
-    return null;
-  }
-  const base = {stepKey: raw.stepKey, ...(typeof raw.label === 'string' ? {label: raw.label} : {})};
-
-  switch (raw.kind) {
-    case 'suggestion':
-      if (typeof raw.suggestionId !== 'string') return null;
-      return {kind: 'suggestion', ...base, suggestionId: raw.suggestionId};
-    case 'custom':
-      return {kind: 'custom', ...base};
-    case 'capsule':
-      if (typeof raw.capsuleId !== 'string' || typeof raw.capsuleVersion !== 'string') return null;
-      return {
-        kind: 'capsule',
-        ...base,
-        capsuleId: raw.capsuleId,
-        capsuleVersion: raw.capsuleVersion,
-      };
-    case 'loop':
-      if (!Array.isArray(raw.steps)) return null;
-      return {
-        kind: 'loop',
-        ...base,
-        steps: raw.steps.map(coercePlanEntry).filter((e): e is GeneratorPlanEntry => e !== null),
-      };
-    case 'presentation':
-      if (typeof raw.text !== 'string') return null;
-      return {kind: 'presentation', ...base, text: raw.text};
-    default:
-      return null;
-  }
-}
-
 function collectStepKeys(entries: readonly GeneratorPlanEntry[], out: string[]): void {
   for (const entry of entries) {
     out.push(entry.stepKey);
@@ -92,10 +61,6 @@ function findDuplicateStepKeys(entries: readonly GeneratorPlanEntry[]): string |
   return null;
 }
 
-/**
- * Parse versioned generator plan JSON. Phase 0: schema wrapper, entry cap, duplicate stepKey.
- * Ref grammar and forward-ref checks expand in Phase 1.
- */
 export function parsePipelineGeneratorPlan(
   text: string,
   options: ParsePipelineGeneratorPlanOptions = {},
@@ -147,6 +112,13 @@ export function parsePipelineGeneratorPlan(
     };
   }
 
+  const applyMode = options.applyMode ?? 'replace';
+  const hasPipelineContext = options.hasPipelineContext ?? false;
+  const refError = validatePlanRefs(steps, {applyMode, hasPipelineContext});
+  if (refError) {
+    return {ok: false, message: refError};
+  }
+
   const plan: PipelineGeneratorPlan = {
     schemaVersion: PIPELINE_GENERATOR_SCHEMA_VERSION,
     steps,
@@ -157,8 +129,6 @@ export function parsePipelineGeneratorPlan(
       ? {warnings: parsed.warnings.filter((w): w is string => typeof w === 'string')}
       : {}),
   };
-
-  void options.applyMode;
 
   return {ok: true, plan};
 }
