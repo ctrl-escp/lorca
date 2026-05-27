@@ -9,6 +9,8 @@ describe('LORCA_PIPELINE_GENERATOR', () => {
     expect(step.config.maxTokens).toBe(4096);
     const body = step.prompt?.blocks?.[0]?.body ?? '';
     expect(body).toContain('"schemaVersion": 1');
+    expect(body).toContain('Prefer ≤12 plan entries');
+    expect(body).toContain('"stepKey": "hypothesis"');
     expect(body).not.toMatch(/Return a concise ordered array/);
   });
 });

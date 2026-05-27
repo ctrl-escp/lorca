@@ -2,6 +2,7 @@ import type {AiEndpointConfig, CapsuleDefinition, DiscoveredModel, PipelineArtif
 import {
   buildPipelineGeneratorRequest,
   executeCapsuleTestRun,
+  formatPipelineGeneratorUserMessage,
   LORCA_PIPELINE_GENERATOR,
   LORCA_PIPELINE_GENERATOR_ID,
 } from '@lorca/capsules';
@@ -80,6 +81,8 @@ export function usePipelineGenerator() {
     const requestPayload = buildPipelineGeneratorRequest({
       description,
       currentPipeline: editorStore.pipeline,
+      models: modelsStore.models,
+      endpoints: endpointsStore.endpoints,
       ...(options.allowCapsules !== undefined ? {allowCapsules: options.allowCapsules} : {}),
       ...(options.applyMode ? {applyMode: options.applyMode} : {}),
       ...(options.refinePreviousPlan ? {refinePreviousPlan: options.refinePreviousPlan} : {}),
@@ -87,13 +90,7 @@ export function usePipelineGenerator() {
       ...(options.previousErrors?.length ? {previousErrors: options.previousErrors} : {}),
     });
 
-    const descriptionBlock = [
-      description,
-      '',
-      '---',
-      'Generator catalogs and context (JSON):',
-      JSON.stringify(requestPayload, null, 2),
-    ].join('\n');
+    const descriptionBlock = formatPipelineGeneratorUserMessage(requestPayload);
 
     const artifacts: Record<string, PipelineArtifact> = {};
     const slotAssignments = Object.fromEntries(

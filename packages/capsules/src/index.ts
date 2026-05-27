@@ -39,8 +39,10 @@ export {buildRolePromptCatalog} from './rolePromptCatalog.js';
 export type {BuildRolePromptCatalogOptions} from './rolePromptCatalog.js';
 export {
   buildPipelineGeneratorRequest,
+  formatPipelineGeneratorUserMessage,
 } from './pipelineGeneratorRequest.js';
 export type {
   BuildPipelineGeneratorRequestInput,
   PipelineGeneratorRequestPayload,
+  GeneratorApplyMode,
 } from './pipelineGeneratorRequest.js';
