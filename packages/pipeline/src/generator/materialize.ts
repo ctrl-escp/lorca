@@ -186,13 +186,13 @@ function materializeCustom(
       historyReads: [],
       blocks: body
         ? [{
-            id: newStepId('block'),
-            label: 'Instructions',
-            tagName: 'system',
-            body,
-            enabled: true,
-            source: 'custom',
-          }]
+          id: newStepId('block'),
+          label: 'Instructions',
+          tagName: 'system',
+          body,
+          enabled: true,
+          source: 'custom',
+        }]
         : [],
     },
   };

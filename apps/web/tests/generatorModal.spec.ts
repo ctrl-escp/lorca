@@ -1,20 +1,18 @@
 import {test, expect} from '@playwright/test';
 import {expectUserPromptReady} from './helpers/promptEditor.js';
+import {
+  addOllamaEndpoint,
+  expectGeneratorDescription,
+  fillGeneratorDescription,
+  generatorDialog,
+  GENERATOR_PLAN_RESOLVED,
+  GENERATOR_PLAN_UNRESOLVED,
+  mockOllamaWithGeneratorPlan,
+  openGeneratorModal,
+  stepCard,
+} from './helpers/pipelineGenerator.js';
 
-const OLLAMA_BASE = 'http://localhost:11434';
-
-const GENERATOR_PLAN = {
-  schemaVersion: 1,
-  steps: [
-    {
-      kind: 'custom',
-      stepKey: 'summarize',
-      label: 'Summarize',
-      prompt: {mode: 'custom', text: 'Summarize the request.'},
-      modelId: 'ep::nonexistent-model',
-    },
-  ],
-};
+test.setTimeout(60_000);
 
 test.beforeEach(async ({page}) => {
   await page.goto('/');
@@ -26,79 +24,67 @@ test.beforeEach(async ({page}) => {
       req.onblocked = () => resolve();
     }),
   );
-
-  const planJson = JSON.stringify(GENERATOR_PLAN);
-
-  await page.route(`${OLLAMA_BASE}/api/tags`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        models: [{name: 'llama3:latest', modified_at: '', size: 0, digest: '', details: {}}],
-      }),
-    }),
-  );
-  await page.route(`${OLLAMA_BASE}/api/chat`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/x-ndjson',
-      body: `${JSON.stringify({
-        message: {role: 'assistant', content: planJson},
-        done: true,
-      })}\n`,
-    }),
-  );
-  await page.route(`${OLLAMA_BASE}/api/generate`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/x-ndjson',
-      body: `${JSON.stringify({response: planJson, done: true})}\n`,
-    }),
-  );
-
   await page.reload();
   await expectUserPromptReady(page);
 });
 
-async function expandLeftSection(
-  page: import('@playwright/test').Page,
-  section: 'Endpoints' | 'Step library' | 'Capsules' | 'Models',
-) {
-  const toggle = page.locator('.section-toggle').filter({hasText: section}).first();
-  await expect(toggle).toBeVisible({timeout: 10000});
-  if (await toggle.getAttribute('aria-expanded') !== 'true') {
-    await toggle.click();
-  }
-}
+test('generate with bucket-assigned model enables Apply directly', async ({page}) => {
+  await mockOllamaWithGeneratorPlan(page, GENERATOR_PLAN_RESOLVED);
+  await addOllamaEndpoint(page);
+  await openGeneratorModal(page);
 
-async function addEndpoint(page: import('@playwright/test').Page) {
-  await expandLeftSection(page, 'Endpoints');
-  await page.getByTitle('Add a new AI endpoint').click();
-  await page.getByPlaceholder('Local Ollama').fill('Test Ollama');
-  await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
-  await page.getByRole('button', {name: 'Add endpoint'}).click();
-  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 10000});
-}
-
-test('build from description shows preview and resolve models before apply', async ({page}) => {
-  await addEndpoint(page);
-
-  await page.getByRole('button', {name: '✨ Build from description…'}).click();
-  const dialog = page.getByRole('dialog', {name: 'Build from description'});
-  await expect(dialog).toBeVisible();
-
-  await dialog.locator('textarea').first().fill('A one-step summarizer pipeline');
+  const dialog = generatorDialog(page);
+  await fillGeneratorDescription(page, 'Summarize the user request');
   await dialog.getByRole('button', {name: 'Generate'}).click();
 
   await expect(dialog.getByText('Summarize')).toBeVisible({timeout: 15000});
+  await expect(dialog.getByRole('button', {name: 'Apply'})).toBeEnabled({timeout: 5000});
+  await expect(dialog.getByRole('button', {name: 'Resolve models…'})).toBeDisabled();
 
-  const applyBtn = dialog.getByRole('button', {name: 'Apply'});
-  const resolveBtn = dialog.getByRole('button', {name: 'Resolve models…'});
-  await expect(applyBtn).toBeDisabled();
-  await expect(resolveBtn).toBeEnabled();
+  await dialog.getByRole('button', {name: 'Apply'}).click();
+  await expect(stepCard(page, 'Summarize')).toBeVisible({timeout: 10000});
+});
+
+test('resolve models then apply commits generated steps', async ({page}) => {
+  await mockOllamaWithGeneratorPlan(page, GENERATOR_PLAN_UNRESOLVED);
+  await addOllamaEndpoint(page);
+  await openGeneratorModal(page);
+
+  const dialog = generatorDialog(page);
+  await fillGeneratorDescription(page, 'Summarize with remap');
+  await dialog.getByRole('button', {name: 'Generate'}).click();
+  await expect(dialog.getByText('Summarize')).toBeVisible({timeout: 15000});
+
+  await expect(dialog.getByRole('button', {name: 'Apply'})).toBeDisabled();
+  await dialog.getByRole('button', {name: 'Resolve models…'}).click();
+
+  const remapDialog = page.getByRole('dialog', {name: 'Import pipeline'});
+  await expect(remapDialog).toBeVisible();
+  await remapDialog.locator('select').first().selectOption({index: 1});
+  await remapDialog.getByRole('button', {name: 'Import'}).click();
+  await expect(remapDialog).toBeHidden({timeout: 5000});
+  await expect(stepCard(page, 'Summarize')).toBeVisible({timeout: 10000});
+});
+
+test('session persists on close; Clear all resets', async ({page}) => {
+  await mockOllamaWithGeneratorPlan(page, GENERATOR_PLAN_RESOLVED);
+  await addOllamaEndpoint(page);
+  await openGeneratorModal(page);
+
+  const dialog = generatorDialog(page);
+  const description = 'Persistent debate pipeline';
+  await fillGeneratorDescription(page, description);
+  await dialog.getByRole('button', {name: 'Generate'}).click();
+  await expect(dialog.getByText('Summarize')).toBeVisible({timeout: 15000});
 
   await dialog.getByRole('button', {name: 'Cancel'}).click();
-  await page.getByRole('button', {name: '✨ Build from description…'}).click();
+  await expect(dialog).toBeHidden();
+
+  await openGeneratorModal(page);
+  await expectGeneratorDescription(page, description);
   await expect(dialog.getByText('Summarize')).toBeVisible();
-  await expect(dialog.locator('textarea').first()).toHaveValue('A one-step summarizer pipeline');
+
+  await dialog.getByRole('button', {name: 'Clear all'}).click();
+  await expectGeneratorDescription(page, '');
+  await expect(dialog.getByText('Summarize')).toHaveCount(0);
 });

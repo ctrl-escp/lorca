@@ -11,16 +11,16 @@ export interface GeneratorPreviewItem {
 
 function modelHintForStep(step: PipelineStep): string | undefined {
   if (step.config.type === 'model-call') {
-    const ref = step.config.modelRef;
-    if (ref.kind === 'fixed' && ref.endpointId && ref.modelName) {
-      return `${ref.endpointId} · ${ref.modelName}`;
+    const modelRef = step.config.modelRef;
+    if (modelRef.kind === 'fixed' && modelRef.endpointId && modelRef.modelName) {
+      return `${modelRef.endpointId} · ${modelRef.modelName}`;
     }
     return 'Model not set';
   }
   if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
-    const parts = Object.entries(step.config.modelSlotBindings).map(([slot, ref]) => {
-      if (ref.kind === 'fixed' && ref.endpointId && ref.modelName) {
-        return `${slot}: ${ref.modelName}`;
+    const parts = Object.entries(step.config.modelSlotBindings).map(([slot, slotRef]) => {
+      if (slotRef.kind === 'fixed' && slotRef.endpointId && slotRef.modelName) {
+        return `${slot}: ${slotRef.modelName}`;
       }
       return `${slot}: unset`;
     });

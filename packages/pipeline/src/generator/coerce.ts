@@ -1,6 +1,5 @@
 import type {LoopExitCondition, ModelUsageBucket} from '@lorca/core';
 import type {
-  GeneratorCustomEntry,
   GeneratorHistoryRead,
   GeneratorInputSource,
   GeneratorPlanEntry,

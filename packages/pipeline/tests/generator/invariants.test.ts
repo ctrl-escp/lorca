@@ -1,7 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
   buildStepsFromGeneratorPlan,
-  isDefaultPipelineStub,
   parsePipelineGeneratorPlan,
   PIPELINE_GENERATOR_SCHEMA_VERSION,
   type GeneratorBuildContext,
@@ -156,4 +155,3 @@ describe('build catalog invariants', () => {
     expect(built.errors.some((e) => e.includes('Capsule step'))).toBe(true);
   });
 });
-

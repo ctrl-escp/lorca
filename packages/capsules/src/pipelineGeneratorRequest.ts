@@ -51,16 +51,16 @@ export function buildPipelineGeneratorRequest(
 
   const modelCatalog = input.models && input.endpoints
     ? buildGeneratorModelCatalog({models: input.models, endpoints: input.endpoints}).map((m) => ({
-        modelId: m.modelId,
-        displayName: m.displayName,
-        buckets: m.buckets,
-      }))
+      modelId: m.modelId,
+      displayName: m.displayName,
+      buckets: m.buckets,
+    }))
     : [];
 
   const capsuleCatalog = allowCapsules
     ? getBuiltinExamples()
-        .filter((ex) => ex.status === 'locked')
-        .map((ex) => ({id: ex.id, name: ex.name, version: ex.version}))
+      .filter((ex) => ex.status === 'locked')
+      .map((ex) => ({id: ex.id, name: ex.name, version: ex.version}))
     : [];
 
   let pipelineContext: PipelineGeneratorRequestPayload['pipelineContext'];
