@@ -10,25 +10,45 @@
         <label class="field">
           <span class="hdr-prompt">Description</span>
           <TextEditor
-            v-model="description"
+            :model-value="description"
             :rows="5"
             placeholder="Describe the pipeline you want…"
             :disabled="loading"
+            @update:model-value="emit('update:description', $event)"
           />
         </label>
 
-        <label class="field">
-          <span class="hdr-model">Generator</span>
-          <select v-model="selectedCapsuleId" :disabled="loading || generatorCapsules.length === 0">
-            <option
-              v-for="capsule in generatorCapsules"
-              :key="capsule.id"
-              :value="capsule.id"
+        <div class="options-row">
+          <label class="option">
+            <span>Apply mode</span>
+            <select
+              :value="applyMode"
+              :disabled="loading"
+              @change="emit('update:applyMode', ($event.target as HTMLSelectElement).value as 'replace' | 'append')"
             >
-              {{ capsule.name }} ({{ capsule.status }})
-            </option>
-          </select>
-        </label>
+              <option value="replace">Replace pipeline</option>
+              <option value="append">Append to current</option>
+            </select>
+          </label>
+          <label class="option checkbox">
+            <input
+              type="checkbox"
+              :checked="allowCapsules"
+              :disabled="loading"
+              @change="emit('update:allowCapsules', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>Allow capsule steps</span>
+          </label>
+          <label class="option checkbox">
+            <input
+              type="checkbox"
+              :checked="refinePreviousPlan"
+              :disabled="loading || !rawResponse"
+              @change="emit('update:refinePreviousPlan', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>Refine previous plan</span>
+          </label>
+        </div>
 
         <div v-if="errorMessage" class="error-box">
           <span>{{ errorMessage }}</span>
@@ -39,14 +59,33 @@
 
         <pre v-if="showRaw && rawResponse" class="raw-response">{{ rawResponse }}</pre>
 
-        <div v-if="warnings.length > 0" class="warning-box">
-          Unknown suggestion IDs were skipped: {{ warnings.join(', ') }}
+        <div v-if="validationErrors.length > 0" class="error-box">
+          <ul class="msg-list">
+            <li v-for="(msg, i) in validationErrors" :key="`err-${i}`">{{ msg }}</li>
+          </ul>
         </div>
 
-        <div v-if="previewLabels.length > 0" class="preview">
+        <div v-if="assumptions.length > 0" class="info-box">
+          <span class="box-title">Assumptions</span>
+          <ul class="msg-list">
+            <li v-for="(item, i) in assumptions" :key="`asm-${i}`">{{ item }}</li>
+          </ul>
+        </div>
+
+        <div v-if="warnings.length > 0" class="warning-box">
+          <span class="box-title">Warnings</span>
+          <ul class="msg-list">
+            <li v-for="(item, i) in warnings" :key="`warn-${i}`">{{ item }}</li>
+          </ul>
+        </div>
+
+        <div v-if="previewItems.length > 0" class="preview">
           <span class="preview-title hdr-preview">Preview</span>
           <ol>
-            <li v-for="(label, index) in previewLabels" :key="`${label}-${index}`">{{ label }}</li>
+            <li v-for="(item, index) in previewItems" :key="`${item.label}-${index}`">
+              <span class="preview-label">{{ item.label }}</span>
+              <span v-if="item.modelHint" class="preview-meta">{{ item.modelHint }}</span>
+            </li>
           </ol>
         </div>
       </div>
@@ -61,11 +100,36 @@
         >
           Manual import
         </button>
-        <button class="btn btn-secondary" type="button" :disabled="loading" @click="emit('close')">Cancel</button>
-        <button class="btn btn-secondary" type="button" :disabled="loading || !canGenerate" @click="submit">
+        <button class="btn btn-secondary" type="button" :disabled="loading" @click="emit('clear-all')">
+          Clear all
+        </button>
+        <button class="btn btn-secondary" type="button" :disabled="loading" @click="emit('close')">
+          Cancel
+        </button>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          :disabled="loading || !canResolveModels"
+          title="Map missing models before applying"
+          @click="emit('resolve-models')"
+        >
+          Resolve models…
+        </button>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          :disabled="loading || !canGenerate"
+          @click="emit('generate')"
+        >
           {{ loading ? 'Building…' : 'Generate' }}
         </button>
-        <button class="btn btn-primary" type="button" :disabled="loading || previewLabels.length === 0" @click="emit('apply')">
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="loading || !canApply"
+          title="Commit preview to the pipeline editor"
+          @click="emit('apply')"
+        >
           Apply
         </button>
       </footer>
@@ -74,59 +138,44 @@
 </template>
 
 <script setup lang="ts">
-import {computed, ref, watch} from 'vue';
-import type {CapsuleDefinition} from '@lorca/core';
+import {ref} from 'vue';
 import TextEditor from '../shared/TextEditor.vue';
 
-const props = defineProps<{
+import type {GeneratorPreviewItem} from '../../composables/usePipelineGeneratorFlow.js';
+
+defineProps<{
+  previewItems: GeneratorPreviewItem[];
   open: boolean;
-  generatorCapsules: CapsuleDefinition[];
-  defaultCapsuleId: string;
+  description: string;
+  applyMode: 'replace' | 'append';
+  allowCapsules: boolean;
+  refinePreviousPlan: boolean;
   loading: boolean;
   errorMessage: string | null;
   rawResponse: string | null;
-  previewLabels: string[];
+  assumptions: string[];
   warnings: string[];
+  validationErrors: string[];
   manualImportAvailable: boolean;
+  canGenerate: boolean;
+  canApply: boolean;
+  canResolveModels: boolean;
 }>();
 
 const emit = defineEmits<{
   close: [];
-  generate: [payload: {description: string; capsuleId: string}];
+  generate: [];
   apply: [];
+  'resolve-models': [];
   'manual-import': [];
+  'clear-all': [];
+  'update:description': [value: string];
+  'update:applyMode': [value: 'replace' | 'append'];
+  'update:allowCapsules': [value: boolean];
+  'update:refinePreviousPlan': [value: boolean];
 }>();
 
-const description = ref('');
-const selectedCapsuleId = ref(props.defaultCapsuleId);
 const showRaw = ref(false);
-
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) return;
-    description.value = '';
-    selectedCapsuleId.value = props.defaultCapsuleId;
-    showRaw.value = false;
-  },
-);
-
-watch(
-  () => props.rawResponse,
-  () => { showRaw.value = false; },
-);
-
-const canGenerate = computed(() =>
-  description.value.trim().length > 0 && selectedCapsuleId.value.length > 0,
-);
-
-function submit() {
-  if (!canGenerate.value) return;
-  emit('generate', {
-    description: description.value.trim(),
-    capsuleId: selectedCapsuleId.value,
-  });
-}
 </script>
 
 <style scoped>
@@ -140,7 +189,7 @@ function submit() {
   z-index: 1000;
 }
 .dialog {
-  width: min(620px, calc(100vw - 2rem));
+  width: min(680px, calc(100vw - 2rem));
   max-height: calc(100vh - 4rem);
   background: #141414;
   border: 1px solid #333;
@@ -172,29 +221,48 @@ function submit() {
   gap: 0.85rem;
 }
 .field { display: flex; flex-direction: column; gap: 0.35rem; }
-.field span, .preview-title {
+.field span, .preview-title, .box-title {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
+}
+.options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-end;
+}
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-label);
+}
+.option.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
 }
 select {
   background: #111;
   border: 1px solid #2a2a2a;
   color: #e8e8e8;
   border-radius: 4px;
-  padding: 0.5rem 0.6rem;
+  padding: 0.45rem 0.55rem;
   font: inherit;
+  min-width: 10rem;
 }
 select:focus { outline: none; border-color: var(--accent-border); }
-.error-box, .warning-box {
+.error-box, .warning-box, .info-box {
   border-radius: 4px;
   padding: 0.5rem 0.6rem;
   font-size: 0.82rem;
 }
 .error-box {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
   color: #e07070;
@@ -205,6 +273,15 @@ select:focus { outline: none; border-color: var(--accent-border); }
   color: #c8a050;
   background: #1a180f;
   border: 1px solid #4a4020;
+}
+.info-box {
+  color: #9ab0c8;
+  background: #0f141a;
+  border: 1px solid #2a3544;
+}
+.msg-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
 }
 .link-btn {
   background: none;
@@ -226,18 +303,20 @@ select:focus { outline: none; border-color: var(--accent-border); }
   font-size: 0.78rem;
   white-space: pre-wrap;
 }
-.preview {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
 .preview ol {
   margin: 0;
   padding-left: 1.4rem;
   color: #ddd;
   font-size: 0.86rem;
 }
-.preview li + li { margin-top: 0.25rem; }
+.preview li + li { margin-top: 0.35rem; }
+.preview-label { display: inline; }
+.preview-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 0.1rem;
+}
 .dialog-footer {
   display: flex;
   justify-content: flex-end;

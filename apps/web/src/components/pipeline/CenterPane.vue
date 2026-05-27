@@ -111,17 +111,26 @@
     />
     <PipelineGeneratorModal
       :open="generatorModalOpen"
-      :generator-capsules="generatorCapsules"
-      :default-capsule-id="defaultGeneratorCapsuleId"
+      v-model:description="generatorDescription"
+      v-model:apply-mode="generatorApplyMode"
+      v-model:allow-capsules="generatorAllowCapsules"
+      v-model:refine-previous-plan="generatorRefinePreviousPlan"
       :loading="generatorLoading"
       :error-message="generatorError"
       :raw-response="generatorRawResponse"
-      :preview-labels="generatorPreviewLabels"
+      :preview-items="generatorPreviewItems"
+      :assumptions="generatorAssumptions"
       :warnings="generatorWarnings"
+      :validation-errors="generatorValidationErrors"
       :manual-import-available="generatorManualImportAvailable"
+      :can-generate="generatorCanGenerate"
+      :can-apply="generatorCanApply"
+      :can-resolve-models="generatorCanResolveModels"
       @close="closeGeneratorModal()"
       @generate="handleGeneratePipeline"
-      @apply="openGeneratedModelRemap()"
+      @apply="applyGeneratedPipelineDirect()"
+      @resolve-models="openGeneratedModelRemap()"
+      @clear-all="clearGeneratorSession()"
       @manual-import="openManualImportFromGenerator(() => { importModalOpen = true; })"
     />
     <ImportRemapDialog
@@ -131,7 +140,7 @@
       :missing-models="generatedModelRefs"
       :models="modelsStore.models"
       :endpoints="endpointsStore.endpoints"
-      :replaces-active-pipeline="true"
+      :replaces-active-pipeline="generatorReplacesPipeline"
       @cancel="generatedModelRemapOpen = false"
       @confirm="applyGeneratedPipeline"
     />
@@ -215,19 +224,29 @@ const {
   generatorError,
   generatorRawResponse,
   generatorWarnings,
+  generatorAssumptions,
+  generatorValidationErrors,
   generatedModelRemapOpen,
-  generatorCapsules,
-  defaultGeneratorCapsuleId,
-  generatorPreviewLabels,
+  generatorPreviewItems,
   generatedModelRefs,
   generatorManualImportAvailable,
+  generatorCanApply,
+  generatorCanResolveModels,
+  generatorCanGenerate,
+  generatorDescription,
+  generatorApplyMode,
+  generatorAllowCapsules,
+  generatorRefinePreviousPlan,
+  generatorReplacesPipeline,
   openGeneratorModal,
   closeGeneratorModal,
   abortGeneratorOnUnmount,
   handleGeneratePipeline,
   openGeneratedModelRemap,
   applyGeneratedPipeline,
+  applyGeneratedPipelineDirect,
   openManualImportFromGenerator,
+  clearGeneratorSession,
 } = usePipelineGeneratorFlow();
 
 const userPrompt = ref(props.def.input.raw);

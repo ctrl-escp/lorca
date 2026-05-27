@@ -1,5 +1,12 @@
-import type {AiEndpointConfig, DiscoveredModel, ModelUsageBucket, PipelineStep} from '@lorca/core';
+import type {
+  AiEndpointConfig,
+  DiscoveredModel,
+  ModelRef,
+  ModelUsageBucket,
+  PipelineStep,
+} from '@lorca/core';
 import {
+  applyModelRefToStep,
   isModelRefConfigured,
   pickModelRef,
   pickModelRefMatchingBuckets,
@@ -34,7 +41,6 @@ export interface UnresolvedModelRef {
   reason: string;
 }
 
-/** Stable `endpointId::modelName` ids for generator plan modelId fields. */
 export function formatGeneratorModelId(endpointId: string, modelName: string): string {
   return `${endpointId}::${modelName}`;
 }
@@ -69,41 +75,182 @@ export interface ResolveGeneratorModelAssignmentsInput {
   endpoints: readonly AiEndpointConfig[];
 }
 
-/**
- * Apply generator-requested models to materialized steps.
- * Phase 0: passthrough steps; full step/slot wiring in Phase 3.
- */
-export function resolveGeneratorModelAssignments(
-  input: ResolveGeneratorModelAssignmentsInput,
-): {steps: PipelineStep[]; unresolved: UnresolvedModelRef[]} {
-  const catalog = buildGeneratorModelCatalog({
-    models: input.models,
-    endpoints: input.endpoints,
-  });
-  const catalogIds = new Set(catalog.map((e) => e.modelId));
-  const unresolved: UnresolvedModelRef[] = [];
+function cloneSteps(steps: PipelineStep[]): PipelineStep[] {
+  return JSON.parse(JSON.stringify(steps)) as PipelineStep[];
+}
 
-  for (const request of input.requests) {
-    if (request.modelId && !catalogIds.has(request.modelId)) {
-      if (request.modelBucket) {
-        const ref = pickModelRefMatchingBuckets(input.models, [request.modelBucket])
-          ?? pickModelRef(input.models, request.modelBucket);
-        if (!ref || !isModelRefConfigured(ref)) {
-          unresolved.push({
-            stepId: request.stepId,
-            stepKey: request.stepKey,
-            reason: `No model available for bucket ${request.modelBucket}`,
-          });
-        }
-        continue;
-      }
-      unresolved.push({
-        stepId: request.stepId,
-        stepKey: request.stepKey,
-        reason: `Unknown modelId: ${request.modelId}`,
-      });
+function resolveModelRef(
+  modelId: string | undefined,
+  modelBucket: ModelUsageBucket | undefined,
+  models: readonly DiscoveredModel[],
+  catalogIds: ReadonlySet<string>,
+): ModelRef | null {
+  if (modelId && catalogIds.has(modelId)) {
+    const parsed = parseGeneratorModelId(modelId);
+    if (parsed) {
+      return {kind: 'fixed', endpointId: parsed.endpointId, modelName: parsed.modelName};
     }
   }
 
-  return {steps: input.steps, unresolved};
+  if (modelBucket) {
+    const ref = pickModelRefMatchingBuckets(models, [modelBucket])
+      ?? pickModelRef(models, modelBucket);
+    if (ref && isModelRefConfigured(ref)) return ref;
+  }
+
+  if (modelId && !catalogIds.has(modelId)) {
+    return null;
+  }
+
+  if (!modelId && !modelBucket) {
+    const fallback = pickModelRef(models, 'general');
+    if (fallback && isModelRefConfigured(fallback)) return fallback;
+  }
+
+  return null;
+}
+
+function applyRequestToStep(
+  step: PipelineStep,
+  request: GeneratorModelAssignmentRequest,
+  models: readonly DiscoveredModel[],
+  catalogIds: ReadonlySet<string>,
+  unresolved: UnresolvedModelRef[],
+): PipelineStep {
+  if (step.config.type === 'model-call') {
+    const ref = resolveModelRef(request.modelId, request.modelBucket, models, catalogIds);
+    if (!ref || !isModelRefConfigured(ref)) {
+      unresolved.push({
+        stepId: step.id,
+        stepKey: request.stepKey,
+        reason: request.modelId
+          ? `Could not resolve model ${request.modelId}`
+          : `No model available${request.modelBucket ? ` for bucket ${request.modelBucket}` : ''}`,
+      });
+      return step;
+    }
+    return applyModelRefToStep(step, ref);
+  }
+
+  if (step.config.type === 'capsule-instance' && request.slotModels) {
+    const bindings = {...(step.config.modelSlotBindings ?? {})};
+    for (const [slotName, slotReq] of Object.entries(request.slotModels)) {
+      const ref = resolveModelRef(slotReq.modelId, slotReq.modelBucket, models, catalogIds);
+      if (!ref || !isModelRefConfigured(ref)) {
+        unresolved.push({
+          stepId: step.id,
+          stepKey: request.stepKey,
+          slotName,
+          reason: slotReq.modelId
+            ? `Could not resolve slot model ${slotReq.modelId}`
+            : `No model for slot ${slotName}${slotReq.modelBucket ? ` (bucket ${slotReq.modelBucket})` : ''}`,
+        });
+        continue;
+      }
+      bindings[slotName] = ref;
+    }
+    return {
+      ...step,
+      config: {...step.config, modelSlotBindings: bindings},
+    };
+  }
+
+  return step;
+}
+
+function applyRequestsRecursive(
+  steps: PipelineStep[],
+  requestByStepId: Map<string, GeneratorModelAssignmentRequest>,
+  models: readonly DiscoveredModel[],
+  catalogIds: ReadonlySet<string>,
+  unresolved: UnresolvedModelRef[],
+): PipelineStep[] {
+  return steps.map((step) => {
+    if (step.config.type === 'loop-group') {
+      return {
+        ...step,
+        config: {
+          ...step.config,
+          steps: applyRequestsRecursive(
+            step.config.steps,
+            requestByStepId,
+            models,
+            catalogIds,
+            unresolved,
+          ),
+        },
+      };
+    }
+
+    const request = requestByStepId.get(step.id);
+    if (request) {
+      return applyRequestToStep(step, request, models, catalogIds, unresolved);
+    }
+
+    return step;
+  });
+}
+
+function collectUnconfiguredSteps(
+  steps: PipelineStep[],
+  unresolved: UnresolvedModelRef[],
+  requestByStepId: Map<string, GeneratorModelAssignmentRequest>,
+): void {
+  for (const step of steps) {
+    if (step.config.type === 'model-call') {
+      const ref = step.config.modelRef;
+      if (!isModelRefConfigured(ref)) {
+        const req = requestByStepId.get(step.id);
+        const already = unresolved.some((u) => u.stepId === step.id && !u.slotName);
+        if (!already) {
+          unresolved.push({
+            stepId: step.id,
+            stepKey: req?.stepKey ?? step.id,
+            reason: 'Model not configured',
+          });
+        }
+      }
+    }
+    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+      for (const [slotName, slotRef] of Object.entries(step.config.modelSlotBindings)) {
+        if (!isModelRefConfigured(slotRef)) {
+          const req = requestByStepId.get(step.id);
+          const already = unresolved.some((u) => u.stepId === step.id && u.slotName === slotName);
+          if (!already) {
+            unresolved.push({
+              stepId: step.id,
+              stepKey: req?.stepKey ?? step.id,
+              slotName,
+              reason: `Slot ${slotName} not configured`,
+            });
+          }
+        }
+      }
+    }
+    if (step.config.type === 'loop-group') {
+      collectUnconfiguredSteps(step.config.steps, unresolved, requestByStepId);
+    }
+  }
+}
+
+export function resolveGeneratorModelAssignments(
+  input: ResolveGeneratorModelAssignmentsInput,
+): {steps: PipelineStep[]; unresolved: UnresolvedModelRef[]} {
+  const catalogIds = new Set(
+    buildGeneratorModelCatalog({
+      models: input.models,
+      endpoints: input.endpoints,
+    }).map((e) => e.modelId),
+  );
+
+  const requestByStepId = new Map(
+    input.requests.map((request) => [request.stepId, request]),
+  );
+
+  const unresolved: UnresolvedModelRef[] = [];
+  let steps = cloneSteps(input.steps);
+  steps = applyRequestsRecursive(steps, requestByStepId, input.models, catalogIds, unresolved);
+  collectUnconfiguredSteps(steps, unresolved, requestByStepId);
+
+  return {steps, unresolved};
 }

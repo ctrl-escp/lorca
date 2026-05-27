@@ -1,193 +1,140 @@
 import {ref, computed} from 'vue';
 import type {PipelineStep} from '@lorca/core';
-import {ALL_SUGGESTIONS, LORCA_PIPELINE_GENERATOR_ID, resolveModelCallSuggestedBuckets} from '@lorca/capsules';
-import {applyModelRemapsToSteps} from '@lorca/storage';
-import {
-  buildStepsFromGeneratorPlan,
-  generatorCapsuleCompatible,
-  usePipelineGenerator,
-} from './usePipelineGenerator.js';
-import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
+import {usePipelineGeneratorStore} from '../stores/pipelineGenerator.js';
 import {useActiveRunStore} from '../stores/activeRun.js';
-import {useCapsulesStore} from '../stores/capsules.js';
 import {useUiStore} from '../stores/ui.js';
-import type {MissingModelReference, ModelRemap} from '../stores/importExport.js';
+import type {ModelRemap} from '../stores/importExport.js';
+export interface GeneratorPreviewItem {
+  label: string;
+  modelHint?: string;
+}
 
-export function usePipelineGeneratorFlow() {
-  const editorStore = usePipelineEditorStore();
-  const runStore = useActiveRunStore();
-  const capsulesStore = useCapsulesStore();
-  const uiStore = useUiStore();
-  const pipelineGenerator = usePipelineGenerator();
-
-  const generatorModalOpen = ref(false);
-  const generatorLoading = ref(false);
-  const generatorError = ref<string | null>(null);
-  const generatorRawResponse = ref<string | null>(null);
-  const generatorPreviewSteps = ref<PipelineStep[]>([]);
-  const generatorWarnings = ref<string[]>([]);
-  const generatedModelRemapOpen = ref(false);
-  let generatorAbortController: AbortController | null = null;
-
-  const generatorCapsules = computed(() => {
-    const all = [...capsulesStore.lockedCapsules, ...capsulesStore.draftCapsules];
-    const seen = new Set<string>();
-    return all.filter((capsule) => {
-      if (seen.has(capsule.id)) return false;
-      seen.add(capsule.id);
-      return generatorCapsuleCompatible(capsule);
+function modelHintForStep(step: PipelineStep): string | undefined {
+  if (step.config.type === 'model-call') {
+    const ref = step.config.modelRef;
+    if (ref.kind === 'fixed' && ref.endpointId && ref.modelName) {
+      return `${ref.endpointId} · ${ref.modelName}`;
+    }
+    return 'Model not set';
+  }
+  if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
+    const parts = Object.entries(step.config.modelSlotBindings).map(([slot, ref]) => {
+      if (ref.kind === 'fixed' && ref.endpointId && ref.modelName) {
+        return `${slot}: ${ref.modelName}`;
+      }
+      return `${slot}: unset`;
     });
-  });
+    return parts.length ? parts.join('; ') : undefined;
+  }
+  return undefined;
+}
 
-  const defaultGeneratorCapsuleId = computed(() =>
-    generatorCapsules.value.find((capsule) => capsule.id === LORCA_PIPELINE_GENERATOR_ID)?.id
-    ?? generatorCapsules.value[0]?.id
-    ?? '',
-  );
+function flattenPreviewSteps(steps: readonly PipelineStep[]): GeneratorPreviewItem[] {
+  const items: GeneratorPreviewItem[] = [];
+  function visit(step: PipelineStep) {
+    const hint = modelHintForStep(step);
+    items.push(hint ? {label: step.label, modelHint: hint} : {label: step.label});
+    if (step.config.type === 'loop-group') {
+      for (const inner of step.config.steps) visit(inner);
+    }
+  }
+  for (const step of steps) visit(step);
+  return items;
+}
 
-  const generatorPreviewLabels = computed(() =>
-    generatorPreviewSteps.value.map((step) => step.label),
-  );
-
-  const generatedModelRefs = computed<MissingModelReference[]>(() =>
-    collectGeneratedModelRefs(generatorPreviewSteps.value),
-  );
-
-  const generatorManualImportAvailable = computed(() =>
-    generatorError.value !== null && generatorRawResponse.value !== null,
-  );
+/** Thin bridge from CenterPane to the Pinia generator session + remap dialog. */
+export function usePipelineGeneratorFlow() {
+  const store = usePipelineGeneratorStore();
+  const runStore = useActiveRunStore();
+  const uiStore = useUiStore();
+  const generatedModelRemapOpen = ref(false);
 
   function openGeneratorModal() {
-    generatorError.value = null;
-    generatorRawResponse.value = null;
-    generatorPreviewSteps.value = [];
-    generatorWarnings.value = [];
-    generatorModalOpen.value = true;
+    store.openModal();
   }
 
   function closeGeneratorModal() {
-    generatorAbortController?.abort();
-    generatorAbortController = null;
-    generatorLoading.value = false;
-    generatorModalOpen.value = false;
+    store.closeModal();
   }
 
   function abortGeneratorOnUnmount() {
-    generatorAbortController?.abort();
+    store.closeModal();
   }
 
-  async function handleGeneratePipeline(payload: {description: string; capsuleId: string}) {
-    generatorAbortController?.abort();
-    const controller = new AbortController();
-    generatorAbortController = controller;
-    generatorLoading.value = true;
-    generatorError.value = null;
-    generatorRawResponse.value = null;
-    generatorPreviewSteps.value = [];
-    generatorWarnings.value = [];
-
-    const result = await pipelineGenerator.generatePipelinePlan(
-      payload.capsuleId,
-      payload.description,
-      controller.signal,
-    );
-    if (generatorAbortController === controller) generatorAbortController = null;
-    generatorLoading.value = false;
-
-    if (!result.ok) {
-      generatorError.value = result.message;
-      generatorRawResponse.value = result.rawResponse ?? null;
-      return;
-    }
-
-    const steps = buildStepsFromGeneratorPlan(result.entries);
-    if (steps.length === 0) {
-      generatorError.value = "Couldn't build steps from the generated plan";
-      generatorRawResponse.value = result.rawResponse;
-      return;
-    }
-
-    generatorRawResponse.value = result.rawResponse;
-    generatorWarnings.value = result.unknownSuggestionIds;
-    generatorPreviewSteps.value = steps;
+  async function handleGeneratePipeline() {
+    await store.runGenerate();
   }
 
   function openGeneratedModelRemap() {
-    if (generatorPreviewSteps.value.length === 0) return;
+    if (!store.canResolveModels) return;
     generatedModelRemapOpen.value = true;
   }
 
   function applyGeneratedPipeline(remaps: Record<string, ModelRemap>) {
-    const steps = applyModelRemapsToSteps(generatorPreviewSteps.value, remaps);
-    editorStore.replaceSteps(steps, 'Build pipeline from description');
-    runStore.reset();
+    store.applyRemaps(remaps);
+    if (store.canApply) {
+      store.applyPreviewToEditor();
+      runStore.reset();
+      uiStore.setRightPaneTab('inspector');
+    }
     generatedModelRemapOpen.value = false;
-    generatorModalOpen.value = false;
-    generatorPreviewSteps.value = [];
-    generatorRawResponse.value = null;
-    generatorError.value = null;
-    generatorWarnings.value = [];
+  }
+
+  function applyGeneratedPipelineDirect() {
+    store.applyPreviewToEditor();
+    runStore.reset();
     uiStore.setRightPaneTab('inspector');
   }
 
   function openManualImportFromGenerator(onOpenImport: () => void) {
-    generatorModalOpen.value = false;
+    store.closeModal();
     onOpenImport();
   }
 
+  const generatorReplacesPipeline = computed(() => store.applyMode === 'replace');
+
   return {
-    generatorModalOpen,
-    generatorLoading,
-    generatorError,
-    generatorRawResponse,
-    generatorPreviewSteps,
-    generatorWarnings,
+    generatorModalOpen: computed(() => store.modalOpen),
+    generatorLoading: computed(() => store.loading),
+    generatorError: computed(() => store.errorMessage || store.parseMessage || null),
+    generatorRawResponse: computed(() => store.rawResponse || null),
+    generatorPreviewSteps: computed(() => store.previewSteps),
+    generatorWarnings: computed(() => store.planWarnings),
+    generatorAssumptions: computed(() => store.assumptions),
+    generatorValidationErrors: computed(() => store.validationErrors),
     generatedModelRemapOpen,
-    generatorCapsules,
-    defaultGeneratorCapsuleId,
-    generatorPreviewLabels,
-    generatedModelRefs,
-    generatorManualImportAvailable,
+    generatorPreviewLabels: computed(() => store.previewLabels),
+    generatorPreviewItems: computed(() => flattenPreviewSteps(store.previewSteps)),
+    generatedModelRefs: computed(() => store.missingModelRefs),
+    generatorManualImportAvailable: computed(() => store.manualImportAvailable),
+    generatorCanApply: computed(() => store.canApply),
+    generatorCanResolveModels: computed(() => store.canResolveModels),
+    generatorCanGenerate: computed(() => store.canGenerate),
+    generatorApplyMode: computed({
+      get: () => store.applyMode,
+      set: (v) => { store.applyMode = v; },
+    }),
+    generatorAllowCapsules: computed({
+      get: () => store.allowCapsules,
+      set: (v) => { store.allowCapsules = v; },
+    }),
+    generatorRefinePreviousPlan: computed({
+      get: () => store.refinePreviousPlan,
+      set: (v) => { store.refinePreviousPlan = v; },
+    }),
+    generatorDescription: computed({
+      get: () => store.description,
+      set: (v) => { store.description = v; },
+    }),
+    generatorReplacesPipeline,
     openGeneratorModal,
     closeGeneratorModal,
     abortGeneratorOnUnmount,
     handleGeneratePipeline,
     openGeneratedModelRemap,
     applyGeneratedPipeline,
+    applyGeneratedPipelineDirect,
     openManualImportFromGenerator,
+    clearGeneratorSession: () => store.clearAll(),
   };
-}
-
-function collectGeneratedModelRefs(steps: PipelineStep[]): MissingModelReference[] {
-  const refs: MissingModelReference[] = [];
-  const visit = (step: PipelineStep) => {
-    if (step.config.type === 'model-call') {
-      refs.push({
-        key: step.id,
-        nodeId: step.id,
-        endpointId: '',
-        modelName: step.config.modelRef.kind === 'slot' ? '' : step.config.modelRef.modelName,
-        label: `Model call ${step.label || step.id}`,
-        suggestedBuckets: resolveModelCallSuggestedBuckets(step),
-      });
-    }
-    if (step.config.type === 'capsule-instance' && step.config.modelSlotBindings) {
-      const suggestion = ALL_SUGGESTIONS.find((item) => item.id === step.createdFromSuggestionId);
-      for (const [slotName, modelRef] of Object.entries(step.config.modelSlotBindings)) {
-        refs.push({
-          key: `${step.id}::${slotName}`,
-          nodeId: step.id,
-          endpointId: '',
-          modelName: modelRef.kind === 'slot' ? '' : modelRef.modelName,
-          label: `Capsule slot ${slotName} (${step.label || suggestion?.name || step.id})`,
-          suggestedBuckets: suggestion?.preferredModelBucket ? [suggestion.preferredModelBucket] : ['general'],
-        });
-      }
-    }
-    if (step.config.type === 'loop-group') {
-      for (const inner of step.config.steps) visit(inner);
-    }
-  };
-  for (const step of steps) visit(step);
-  return refs;
 }

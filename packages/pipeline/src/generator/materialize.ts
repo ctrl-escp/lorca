@@ -1,4 +1,4 @@
-import type {LoopExitCondition, PipelineStep, PromptBlock, StepHistoryReadConfig} from '@lorca/core';
+import type {LoopExitCondition, ModelRef, PipelineStep, PromptBlock, StepHistoryReadConfig} from '@lorca/core';
 import {parseGeneratorArtifactRef} from './refs.js';
 import {computeCapsuleContentSignature} from '../capsuleExtraction.js';
 import {newStepId} from '../stepId.js';
@@ -256,6 +256,11 @@ function materializeCapsule(
     ? (lastOut.sourceArtifactKey?.split('.').pop() ?? 'text')
     : 'text';
 
+  const modelSlotBindings: Record<string, ModelRef> = {};
+  for (const slot of capsule.interface.modelSlots) {
+    modelSlotBindings[slot.name] = {kind: 'fixed', endpointId: '', modelName: ''};
+  }
+
   const step: PipelineStep = {
     id,
     type: 'capsule-instance',
@@ -272,16 +277,19 @@ function materializeCapsule(
       outputBindings,
       displayMode: 'opaque',
       boundContentSignature: computeCapsuleContentSignature(capsule),
+      ...(Object.keys(modelSlotBindings).length > 0 ? {modelSlotBindings} : {}),
     },
   };
 
   state.steps.push(step);
   state.registerStepKey(entry.stepKey, step);
-  if (entry.slotModels && Object.keys(entry.slotModels).length > 0) {
+  if (capsule.interface.modelSlots.length > 0) {
     state.modelRequests.push({
       stepId: id,
       stepKey: entry.stepKey,
-      slotModels: entry.slotModels,
+      ...(entry.slotModels && Object.keys(entry.slotModels).length > 0
+        ? {slotModels: entry.slotModels}
+        : {}),
     });
   }
 }
