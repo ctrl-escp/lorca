@@ -43,6 +43,7 @@ test('generate with bucket-assigned model enables Apply directly', async ({page}
   await expect(dialog.getByRole('button', {name: 'Resolve models…'})).toBeDisabled();
 
   await dialog.getByRole('button', {name: 'Apply'}).click();
+  await expect(dialog).toBeHidden();
   await expect(stepCard(page, 'Summarize')).toBeVisible({timeout: 10000});
 });
 
@@ -64,6 +65,7 @@ test('resolve models then apply commits generated steps', async ({page}) => {
   await remapDialog.locator('select').first().selectOption({index: 1});
   await remapDialog.getByRole('button', {name: 'Import'}).click();
   await expect(remapDialog).toBeHidden({timeout: 5000});
+  await expect(dialog).toBeHidden();
   await expect(stepCard(page, 'Summarize')).toBeVisible({timeout: 10000});
 });
 
@@ -80,6 +82,7 @@ test('multi-step debate-shaped plan previews and applies', async ({page}) => {
   await expect(dialog.getByText('Expert — support')).toBeVisible();
   await expect(dialog.getByText('Debate summary')).toBeVisible();
   await dialog.getByRole('button', {name: 'Apply'}).click();
+  await expect(dialog).toBeHidden();
 
   await expect(stepCard(page, 'Extract hypothesis')).toBeVisible({timeout: 10000});
   await expect(stepCard(page, 'Expert — support')).toBeVisible();

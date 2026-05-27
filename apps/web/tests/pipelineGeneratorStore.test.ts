@@ -2,6 +2,8 @@ import {beforeEach, describe, expect, it} from 'vitest';
 import {createPinia, setActivePinia} from 'pinia';
 import type {PipelineStep} from '@lorca/core';
 import {usePipelineGeneratorStore} from '../src/stores/pipelineGenerator.js';
+import {usePipelineEditorStore} from '../src/stores/pipelineEditor.js';
+import {createDefaultPipeline} from '../src/stores/pipelines.js';
 import {PIPELINE_GENERATOR_SCHEMA_VERSION} from '@lorca/pipeline';
 
 const MINIMAL_PLAN = {
@@ -100,5 +102,39 @@ describe('pipelineGenerator store', () => {
     expect(store.canApply).toBe(false);
     expect(store.canResolveModels).toBe(false);
     expect(store.validationErrors.length).toBeGreaterThan(0);
+  });
+
+  it('applyPreviewToEditor replaces editor steps when preview is apply-ready', () => {
+    const editor = usePipelineEditorStore();
+    editor.loadPipeline(createDefaultPipeline());
+    const store = usePipelineGeneratorStore();
+    const configuredStep: PipelineStep = {
+      id: 'step_gen',
+      type: 'model-call',
+      label: 'Summarize input',
+      enabled: true,
+      outputNamespace: 'summarize',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00Z',
+      config: {
+        type: 'model-call',
+        modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'llama3:latest'},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
+      },
+    };
+    store.previewSteps = [configuredStep];
+    store.buildResult = {
+      ok: true,
+      steps: [configuredStep],
+      errors: [],
+      unresolvedModels: [],
+      assumptions: [],
+      warnings: [],
+    };
+
+    store.applyPreviewToEditor();
+    expect(editor.steps).toHaveLength(1);
+    expect(editor.steps[0]?.label).toBe('Summarize input');
   });
 });

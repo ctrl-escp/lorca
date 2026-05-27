@@ -335,11 +335,18 @@ const onKeyDown = (e: KeyboardEvent) => {
 
 watch(() => props.def, (def) => {
   const cur = editorStore.pipeline;
-  if (def.id !== cur.id || def.updatedAt !== cur.updatedAt) {
+  if (def.id !== cur.id) {
     editorStore.loadPipeline(def);
     userPrompt.value = def.input.raw;
     localPipelineName.value = def.name;
-    if (def.id !== cur.id) runStore.restoreForPipeline(def.id);
+    runStore.restoreForPipeline(def.id);
+    return;
+  }
+  // Only adopt store state when it is newer — avoid clobbering in-flight editor edits (e.g. generator Apply).
+  if (def.updatedAt > cur.updatedAt) {
+    editorStore.loadPipeline(def);
+    userPrompt.value = def.input.raw;
+    localPipelineName.value = def.name;
   }
 });
 

@@ -70,20 +70,22 @@ export function usePipelineGeneratorFlow() {
     generatedModelRemapOpen.value = true;
   }
 
+  function commitGeneratedPipelineToEditor() {
+    if (!store.canApply) return;
+    store.applyPreviewToEditor();
+    runStore.reset();
+    uiStore.setRightPaneTab('inspector');
+    store.closeModal();
+  }
+
   function applyGeneratedPipeline(remaps: Record<string, ModelRemap>) {
     store.applyRemaps(remaps);
-    if (store.canApply) {
-      store.applyPreviewToEditor();
-      runStore.reset();
-      uiStore.setRightPaneTab('inspector');
-    }
+    commitGeneratedPipelineToEditor();
     generatedModelRemapOpen.value = false;
   }
 
   function applyGeneratedPipelineDirect() {
-    store.applyPreviewToEditor();
-    runStore.reset();
-    uiStore.setRightPaneTab('inspector');
+    commitGeneratedPipelineToEditor();
   }
 
   function openManualImportFromGenerator(onOpenImport: () => void) {
