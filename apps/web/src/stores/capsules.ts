@@ -9,7 +9,7 @@ import {
   getBuiltinExample,
   duplicateExampleCapsule,
 } from '@lorca/capsules';
-import {ensureCapsuleStepChain} from '@lorca/pipeline';
+import {normalizeCapsuleStepChain} from '@lorca/pipeline';
 import {newId} from '../utils/id.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -143,7 +143,7 @@ export const useCapsulesStore = defineStore('capsules', () => {
     const locked = getCapsule(id);
     if (locked?.status !== 'locked') return null;
     const newCapsuleId = newId('cap');
-    const draft = normalizePersistedCapsule(ensureCapsuleStepChain(createDraftFromLocked(locked, newCapsuleId)));
+    const draft = normalizePersistedCapsule(normalizeCapsuleStepChain(createDraftFromLocked(locked, newCapsuleId)));
     capsules.value.push(draft);
     void getDb().capsules.put(cloneForStorage(draft));
     return newCapsuleId;

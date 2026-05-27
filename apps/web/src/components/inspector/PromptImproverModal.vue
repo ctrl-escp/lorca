@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue';
 import type {AiEndpointConfig, DiscoveredModel, PromptBlock} from '@lorca/core';
+import type {RenderedPromptPayload} from '@lorca/prompt';
 import {executeModelCall} from '@lorca/endpoints';
 import {useEndpointsStore} from '../../stores/endpoints.js';
 import {useModelsStore} from '../../stores/models.js';
@@ -111,6 +112,16 @@ const props = defineProps<{
   stepId: string;
   block: PromptBlock | null;
 }>();
+
+function modelPrompt(systemPrompt: string, userContent: string): RenderedPromptPayload {
+  return {
+    blocks: [
+      {tagName: 'system', body: systemPrompt, source: 'system-default'},
+      {tagName: 'user', body: userContent, source: 'user-input'},
+    ],
+    xmlText: `<system>\n${systemPrompt}\n</system>\n\n<user>\n${userContent}\n</user>`,
+  };
+}
 
 const emit = defineEmits<{
   close: [];
@@ -282,8 +293,7 @@ async function requestRewrite(
     mode: 'chat',
     endpointId: endpoint.id,
     modelName,
-    systemPrompt: request.systemPrompt,
-    userContent: request.userContent,
+    prompt: modelPrompt(request.systemPrompt, request.userContent),
     temperature: 0.2,
     maxTokens,
   });

@@ -1,6 +1,7 @@
 import type {AiEndpointConfig, DiscoveredModel, PipelineDefinition, ModelUsageBucket} from '@lorca/core';
 import {MODEL_CALL_TIMEOUT_MS} from '@lorca/core';
 import type {PipelineSuggestion} from '@lorca/capsules';
+import type {RenderedPromptPayload} from '@lorca/prompt';
 import {executeModelCall, modelMatchesBucket} from '@lorca/endpoints';
 import {useEndpointsStore} from '../stores/endpoints.js';
 import {useModelsStore} from '../stores/models.js';
@@ -20,6 +21,16 @@ interface AdvisorModelChoice {
 }
 
 const ADVISOR_BUCKET: ModelUsageBucket = 'general';
+
+function modelPrompt(systemPrompt: string, userContent: string): RenderedPromptPayload {
+  return {
+    blocks: [
+      {tagName: 'system', body: systemPrompt, source: 'system-default'},
+      {tagName: 'user', body: userContent, source: 'user-input'},
+    ],
+    xmlText: `<system>\n${systemPrompt}\n</system>\n\n<user>\n${userContent}\n</user>`,
+  };
+}
 
 export function selectStepAdvisorModel(
   models: readonly DiscoveredModel[],
@@ -138,8 +149,7 @@ export function useStepAdvisor() {
       mode: 'chat',
       endpointId: choice.endpoint.id,
       modelName: choice.model.providerModelName,
-      systemPrompt: request.systemPrompt,
-      userContent: request.userContent,
+      prompt: modelPrompt(request.systemPrompt, request.userContent),
       temperature: 0.2,
       maxTokens: 900,
       abortSignal: combinedSignal,

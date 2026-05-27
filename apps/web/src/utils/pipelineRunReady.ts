@@ -76,7 +76,7 @@ export function pipelineRunReady(
   return userPrompt.trim().length > 0 && pipelineHasConfiguredModel(def, getCapsule);
 }
 
-// ── V2 step-chain helpers ────────────────────────────────────────────────────
+// ── Step-chain helpers ───────────────────────────────────────────────────────
 
 export function pipelineStepChainRunReady(
   def: PipelineDefinition,

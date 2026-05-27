@@ -2,12 +2,8 @@ import type {
   PipelineDefinition,
   PipelineStep,
   StepType,
-  PipelineNode,
-  PipelineEdge,
 } from '@lorca/core';
-import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
-import {newStepId} from './stepId.js';
 
 // ── Active chain ──────────────────────────────────────────────────────────────
 
@@ -22,7 +18,7 @@ export interface CompiledExecutionStep {
   stepOrder: number;
   type: StepType;
   inputArtifactRefs: string[];
-  historyReads?: PipelineStep['historyReads'];
+  historyReads?: import('@lorca/core').StepHistoryReadConfig[];
   previousOutputArtifactRef?: string;
   outputNamespace: string;
   execute: 'run' | 'skip' | 'blocked';
@@ -127,227 +123,6 @@ export function compileActiveStepsToExecutionPlan(
   };
 }
 
-// ── Legacy V1 → V2 migration ─────────────────────────────────────────────────
-
-export function migrateLegacyPipeline(legacy: LegacyPipelineDefinition): PipelineDefinition {
-  const inputNode = legacy.nodes.find((n) => n.type === 'input');
-  if (!inputNode) {
-    return makeEmptyPipeline(legacy.id, legacy.name, legacy.createdAt);
-  }
-
-  // Build ordered chain by following edges from input
-  const orderedNodes = buildLinearChain(legacy.nodes, legacy.edges, inputNode.id);
-  const nonInputNodes = orderedNodes.filter((n) => n.type !== 'input');
-
-  const steps: PipelineStep[] = nonInputNodes.map((node, i) =>
-    legacyNodeToStep(node, nonInputNodes, i),
-  );
-
-  const migrated: PipelineDefinition = {
-    schemaVersion: 2,
-    id: legacy.id,
-    name: legacy.name,
-    input: {
-      raw: '',
-      tagName: 'user',
-      outputNamespace: 'user_prompt',
-    },
-    steps,
-    createdAt: legacy.createdAt,
-    updatedAt: legacy.updatedAt,
-  };
-  if (legacy.description !== undefined) migrated.description = legacy.description;
-  return migrated;
-}
-
-function buildLinearChain(
-  nodes: PipelineNode[],
-  edges: PipelineEdge[],
-  startId: string,
-): PipelineNode[] {
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const edgeMap = new Map<string, string>(); // fromNodeId -> toNodeId
-  for (const edge of edges) edgeMap.set(edge.fromNodeId, edge.toNodeId);
-
-  const chain: PipelineNode[] = [];
-  const visited = new Set<string>();
-  let current = startId;
-
-  while (current && !visited.has(current)) {
-    visited.add(current);
-    const node = nodeMap.get(current);
-    if (node) chain.push(node);
-    current = edgeMap.get(current) ?? '';
-  }
-
-  return chain;
-}
-
-function legacyNodeToStep(
-  node: PipelineNode,
-  _allNonInputNodes: PipelineNode[],
-  _index: number,
-): PipelineStep {
-  const prefix = node.artifactPrefix ?? node.id;
-  const now = new Date().toISOString();
-  const label = node.title ?? labelForNodeType(node.type);
-
-  switch (node.type) {
-    case 'model-call': {
-      const modelStep: PipelineStep = {
-        id: node.id,
-        type: 'model-call',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {
-          type: 'model-call',
-          modelRef: node.config.modelRef,
-          mode: node.config.mode,
-          outputNames: ['text', 'rawResponse'],
-        },
-      };
-      if (node.config.temperature !== undefined) (modelStep.config as {temperature?: number}).temperature = node.config.temperature;
-      if (node.config.maxTokens !== undefined) (modelStep.config as {maxTokens?: number}).maxTokens = node.config.maxTokens;
-      if (node.config.expectedOutput === 'json') (modelStep.config as {outputType?: string}).outputType = 'json';
-      if (node.config.systemPrompt) {
-        modelStep.prompt = {
-          previousOutput: {enabled: true, placement: 'beforeOwnPrompt', tagName: 'previous_output'},
-          historyReads: [],
-          blocks: [{
-            id: newStepId('block'),
-            label: 'System',
-            tagName: 'system',
-            body: node.config.systemPrompt,
-            enabled: true,
-            source: 'system-default',
-          }],
-        };
-      }
-      return modelStep;
-    }
-
-    case 'prompt-wrapper': {
-      const {tagName, instructionText, includeInputArtifact, inputPlacement, template, inputArtifactRef} = node.config;
-      const ref = inputArtifactRef ?? 'user_prompt.xml';
-      let text: string;
-      if (!includeInputArtifact) {
-        text = `<${tagName}>\n${instructionText}\n</${tagName}>`;
-      } else if (inputPlacement === 'inside-template' && template) {
-        text = `<${tagName}>\n${template.replace('{{input}}', `{{artifact.${ref}}}`)}\n</${tagName}>`;
-      } else if (inputPlacement === 'before-instructions') {
-        text = `<${tagName}>\n{{artifact.${ref}}}\n${instructionText}\n</${tagName}>`;
-      } else {
-        text = `<${tagName}>\n${instructionText}\n{{artifact.${ref}}}\n</${tagName}>`;
-      }
-      return {
-        id: node.id,
-        type: 'presentation',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {type: 'presentation', text, outputNames: ['text']},
-      } satisfies PipelineStep;
-    }
-
-    case 'template':
-      return {
-        id: node.id,
-        type: 'presentation',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {
-          type: 'presentation',
-          text: node.template,
-          outputNames: ['text'],
-        },
-      } satisfies PipelineStep;
-
-    case 'json-extract':
-      // V2 has no step type that parses JSON without a model call. Best-effort: pass through
-      // the raw text so the step chain still runs. Downstream refs to {prefix}.json will be
-      // broken; users should instead reference {predecessor}.json which V2 model-call steps
-      // now produce directly when outputType === 'json'.
-      return {
-        id: node.id,
-        type: 'presentation',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {
-          type: 'presentation',
-          text: `{{artifact.${node.inputArtifactRef}}}`,
-          outputNames: ['text'],
-        },
-      } satisfies PipelineStep;
-
-    case 'manual-text':
-      return {
-        id: node.id,
-        type: 'presentation',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {
-          type: 'presentation',
-          text: node.text,
-          outputNames: ['text'],
-        },
-      } satisfies PipelineStep;
-
-    case 'capsule-instance':
-      return {
-        id: node.id,
-        type: 'capsule-instance',
-        label,
-        enabled: true,
-        outputNamespace: prefix,
-        primaryOutputName: 'text',
-        lastEditedAt: now,
-        config: {
-          type: 'capsule-instance',
-          capsuleId: node.config.capsuleDefinitionId,
-          capsuleVersion: node.config.capsuleVersion,
-          inputBindings: node.config.inputBindings,
-          outputBindings: node.config.outputBindings,
-          parameterValues: Object.fromEntries(
-            Object.entries(node.config.parameterValues).map(([k, v]) => [k, String(v)]),
-          ),
-        },
-      } satisfies PipelineStep;
-
-    case 'input':
-      throw new Error('input node should not appear in legacyNodeToStep');
-
-    default: {
-      const _exhaustive: never = node;
-      throw new Error(`Unknown node type: ${String(_exhaustive)}`);
-    }
-  }
-}
-
-function labelForNodeType(type: string): string {
-  const labels: Record<string, string> = {
-    'model-call': 'Model Call',
-    'prompt-wrapper': 'Text',
-    'presentation': 'Text',
-    'json-extract': 'Text',
-    'capsule-instance': 'Capsule',
-  };
-  return labels[type] ?? type;
-}
-
 export function makeEmptyPipeline(id: string, name: string, createdAt?: string): PipelineDefinition {
   const now = createdAt ?? new Date().toISOString();
   return {
@@ -359,30 +134,4 @@ export function makeEmptyPipeline(id: string, name: string, createdAt?: string):
     createdAt: now,
     updatedAt: now,
   };
-}
-
-// ── V2 manual-text → template migration ─────────────────────────────────────
-
-/** Converts persisted V2 `manual-text` and `template` steps into `presentation` steps. */
-export function migrateManualTextSteps(pipeline: PipelineDefinition): PipelineDefinition {
-  function migrateStep(step: PipelineStep): PipelineStep {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = step.config as any;
-    const t = raw.type as string;
-    if (t === 'manual-text') {
-      return {...step, type: 'presentation', config: {type: 'presentation', text: String(raw.text ?? ''), outputNames: ['text']}};
-    }
-    if (t === 'template') {
-      return {...step, type: 'presentation', config: {type: 'presentation', text: String(raw.template ?? ''), outputNames: ['text']}};
-    }
-    return step;
-  }
-  const steps = pipeline.steps.map((s) => {
-    if (s.config.type === 'loop-group') {
-      const innerSteps = s.config.steps.map(migrateStep);
-      return {...s, config: {...s.config, steps: innerSteps}};
-    }
-    return migrateStep(s);
-  });
-  return {...pipeline, steps};
 }

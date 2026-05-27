@@ -7,10 +7,9 @@ import type {
   PipelineError,
   CapsuleTestRunSummary,
 } from '../src/index.js';
-import type {LegacyPipelineDefinition} from '../src/types/legacy.js';
 import {ok, err, CAPSULE_LOOP_MAX_COUNT} from '../src/index.js';
 
-// ── V2 Pipeline fixtures ──────────────────────────────────────────────────────
+// ── Pipeline fixtures ─────────────────────────────────────────────────────────
 
 function makeMinimalPipeline(): PipelineDefinition {
   const now = '2026-01-01T00:00:00Z';
@@ -38,36 +37,6 @@ function makeMinimalPipeline(): PipelineDefinition {
     ],
     createdAt: now,
     updatedAt: now,
-  };
-}
-
-// ── Legacy V1 fixtures (Capsule still uses V1 graph) ─────────────────────────
-
-function makeMinimalLegacyPipeline(): LegacyPipelineDefinition {
-  return {
-    schemaVersion: 1,
-    id: 'pipe-legacy',
-    name: 'Legacy Pipeline',
-    inputArtifactName: 'user_prompt',
-    nodes: [
-      {id: 'input-1', type: 'input'},
-      {
-        id: 'model-1',
-        type: 'model-call',
-        artifactPrefix: 'answer',
-        config: {
-          modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'llama3'},
-          mode: 'generate',
-          inputArtifactRef: 'user_prompt.xml',
-        },
-      },
-    ],
-    edges: [
-      {id: 'e-1', fromNodeId: 'input-1', fromOutput: 'xml', toNodeId: 'model-1', toInput: 'input'},
-    ],
-    outputRef: {nodeId: 'model-1', outputName: 'text'},
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
   };
 }
 
@@ -109,8 +78,8 @@ function makeMinimalCapsule(): CapsuleDefinition {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('PipelineDefinition V2 (step-chain)', () => {
-  it('accepts a minimal valid V2 pipeline', () => {
+describe('PipelineDefinition (step-chain)', () => {
+  it('accepts a minimal valid pipeline', () => {
     const pipeline = makeMinimalPipeline();
     expect(pipeline.schemaVersion).toBe(2);
     expect(pipeline.steps).toHaveLength(1);
@@ -160,22 +129,6 @@ describe('PipelineDefinition V2 (step-chain)', () => {
       outputStepId: 'model-1',
     };
     expect(pipeline.outputStepId).toBe('model-1');
-  });
-});
-
-describe('LegacyPipelineDefinition V1 (graph)', () => {
-  it('accepts a minimal V1 pipeline', () => {
-    const pipeline = makeMinimalLegacyPipeline();
-    expect(pipeline.schemaVersion).toBe(1);
-    expect(pipeline.nodes).toHaveLength(2);
-    expect(pipeline.edges).toHaveLength(1);
-    expect(pipeline.outputRef.nodeId).toBe('model-1');
-  });
-
-  it('nodes carry optional artifactPrefix', () => {
-    const pipeline = makeMinimalLegacyPipeline();
-    const modelNode = pipeline.nodes.find((n) => n.type === 'model-call');
-    expect(modelNode?.artifactPrefix).toBe('answer');
   });
 });
 

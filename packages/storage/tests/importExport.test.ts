@@ -1,7 +1,5 @@
 import {describe, it, expect} from 'vitest';
 import type {CapsuleDefinition, PipelineDefinition, StepOutputsExport} from '@lorca/core';
-import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
-import {migrateLegacyPipeline} from '@lorca/pipeline/legacyGraph';
 import {
   exportPipeline,
   exportCapsule,
@@ -13,51 +11,6 @@ import {
   prepareImportedCapsule,
   applyModelRemapsToSteps,
 } from '../src/importExport.js';
-
-function makeLegacyPipeline(): LegacyPipelineDefinition {
-  const inputId = 'input-1';
-  const wrapperId = 'wrap-1';
-  const modelId = 'model-1';
-  return {
-    schemaVersion: 1,
-    id: 'pipe-legacy',
-    name: 'Legacy Pipeline',
-    inputArtifactName: 'user_prompt',
-    nodes: [
-      {id: inputId, type: 'input'},
-      {
-        id: wrapperId,
-        type: 'prompt-wrapper',
-        artifactPrefix: 'wrapped',
-        config: {
-          tagName: 'user',
-          instructionText: 'Wrap the input.',
-          includeInputArtifact: true,
-          inputPlacement: 'before-instructions',
-        },
-      },
-      {
-        id: modelId,
-        type: 'model-call',
-        title: 'Main Model',
-        artifactPrefix: 'answer',
-        config: {
-          modelRef: {kind: 'fixed', endpointId: 'ep-old', modelName: 'llama3:latest'},
-          mode: 'generate',
-          inputArtifactRef: 'wrapped.text',
-          systemPrompt: 'Answer the user.',
-        },
-      },
-    ],
-    edges: [
-      {id: 'e1', fromNodeId: inputId, fromOutput: 'xml', toNodeId: wrapperId, toInput: 'input'},
-      {id: 'e2', fromNodeId: wrapperId, fromOutput: 'text', toNodeId: modelId, toInput: 'input'},
-    ],
-    outputRef: {nodeId: modelId, outputName: 'text'},
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  };
-}
 
 function makeRichPipeline(): PipelineDefinition {
   return {
@@ -282,29 +235,6 @@ function makeStepChainCapsule(): CapsuleDefinition {
   };
 }
 
-function legacyGraphCapsuleExport() {
-  return {
-    exportedAt: '2026-01-01T00:00:00Z',
-    app: 'lorca',
-    kind: 'capsule',
-    capsule: {
-      schemaVersion: 2,
-      id: 'cap-legacy',
-      name: 'Legacy Graph Capsule',
-      version: 'v1',
-      status: 'locked',
-      interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-      steps: [],
-      nodes: [{id: 'input-1', type: 'input'}],
-      edges: [],
-      outputRef: {nodeId: 'input-1', outputName: 'xml'},
-      tests: [],
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    },
-  };
-}
-
 const localCtx = {
   knownEndpointIds: new Set(['ep-local']),
   knownModelKeys: new Set(['ep-local::llama3:latest']),
@@ -519,15 +449,12 @@ describe('importExport', () => {
     expect(parsed.stepOutputs?.artifacts['answer.text']?.stepId).toBe('step-1');
   });
 
-  it('exports step-chain capsules without legacy graph fields', () => {
+  it('exports step-chain capsules with steps', () => {
     const file = exportCapsule(makeStepChainCapsule());
     expect(file.capsule.steps).toHaveLength(1);
-    expect('nodes' in file.capsule).toBe(false);
-    expect('edges' in file.capsule).toBe(false);
-    expect('outputRef' in file.capsule).toBe(false);
   });
 
-  it('strips legacy graph fields from included step-chain capsules in pipeline exports', () => {
+  it('includes step-chain capsules in pipeline exports', () => {
     const pipeline: PipelineDefinition = {
       ...makePipeline(),
       steps: [{
@@ -551,9 +478,6 @@ describe('importExport', () => {
     const file = exportPipeline(pipeline, [makeStepChainCapsule()]);
     const cap = file.includedCapsules?.[0];
     expect(cap?.steps).toHaveLength(1);
-    expect(cap && 'nodes' in cap).toBe(false);
-    expect(cap && 'edges' in cap).toBe(false);
-    expect(cap && 'outputRef' in cap).toBe(false);
   });
 
   it('prepareImportedCapsule assigns a new id', () => {
@@ -562,30 +486,16 @@ describe('importExport', () => {
     expect(next.id).not.toBe('cap-1');
   });
 
-  it('prepareImportedCapsule stores step-chain fields only', () => {
+  it('prepareImportedCapsule stores step-chain fields', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
     expect(next.schemaVersion).toBe(2);
     expect(next.steps.length).toBeGreaterThan(0);
-    expect('nodes' in next).toBe(false);
-    expect('edges' in next).toBe(false);
-    expect('outputRef' in next).toBe(false);
-  });
-
-  it('rejects legacy graph-only capsule imports', () => {
-    const parsed = parseCapsuleExport(legacyGraphCapsuleExport());
-    expect('errors' in parsed).toBe(true);
-    if ('errors' in parsed) {
-      expect(parsed.errors.some((e) => e.includes('legacy graph-only'))).toBe(true);
-    }
   });
 
   it('parseCapsuleExport normalizes step-chain capsules', () => {
     const parsed = parseCapsuleExport({...exportCapsule(makeStepChainCapsule())});
     if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
     expect(parsed.capsule.steps).toHaveLength(1);
-    expect('nodes' in parsed.capsule).toBe(false);
-    expect('edges' in parsed.capsule).toBe(false);
-    expect('outputRef' in parsed.capsule).toBe(false);
   });
 
   it('round-trips prompt blocks, history reads, enabled flags, and primaryOutputName', () => {
@@ -623,24 +533,4 @@ describe('importExport', () => {
     expect(main?.prompt?.historyReads[1]?.required).toBe(false);
   });
 
-  it('migrates legacy V1 pipeline and round-trips through export', () => {
-    const migrated = migrateLegacyPipeline(makeLegacyPipeline());
-    const file = exportPipeline(migrated);
-    const parsed = parsePipelineExport(file);
-    if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
-
-    expect(parsed.pipeline.schemaVersion).toBe(2);
-    expect(parsed.pipeline.name).toBe('Legacy Pipeline');
-    expect(parsed.pipeline.steps).toHaveLength(2);
-    expect(parsed.pipeline.steps.map((s) => s.type)).toEqual(['presentation', 'model-call']);
-
-    const wrapper = parsed.pipeline.steps[0];
-    // Legacy prompt-wrapper nodes migrate to presentation steps with instruction text as config.text
-    expect(wrapper?.config.type === 'presentation' && wrapper.config.text).toContain('Wrap the input');
-
-    const model = parsed.pipeline.steps[1];
-    expect(model?.label).toBe('Main Model');
-    expect(model?.primaryOutputName).toBe('text');
-    expect(model?.prompt?.blocks[0]?.body).toContain('Answer the user');
-  });
 });

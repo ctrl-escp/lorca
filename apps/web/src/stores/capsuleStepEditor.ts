@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed, toRaw} from 'vue';
 import type {CapsuleDefinition, PipelineDefinition, PipelineStep, StepType} from '@lorca/core';
-import {ensureCapsuleStepChain, stripCapsuleLegacyGraphFields} from '@lorca/pipeline';
+import {normalizeCapsuleStepChain} from '@lorca/pipeline';
 import {buildDefaultStep, newStepId} from '../utils/stepBuilders.js';
 import {cloneForStorage} from '../utils/storage.js';
 
@@ -22,7 +22,7 @@ const MAX_UNDO = 30;
 function applyStepChainUpdate(capsule: CapsuleDefinition): CapsuleDefinition {
   const input = capsule.input ?? {raw: '', tagName: 'user', outputNamespace: 'user_prompt'};
   const steps = capsule.steps ?? [];
-  return stripCapsuleLegacyGraphFields({...capsule, input, steps, updatedAt: new Date().toISOString()});
+  return {...capsule, input, steps, updatedAt: new Date().toISOString()};
 }
 
 export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => {
@@ -164,7 +164,7 @@ export const useCapsuleStepEditorStore = defineStore('capsuleStepEditor', () => 
   }
 
   function loadCapsule(def: CapsuleDefinition) {
-    capsule.value = cloneForStorage(ensureCapsuleStepChain(def));
+    capsule.value = cloneForStorage(normalizeCapsuleStepChain(def));
     selectedStepId.value = null;
     undoStack.value = [];
     redoStack.value = [];

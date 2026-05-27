@@ -157,19 +157,4 @@ describe('computeCapsuleContentSignature', () => {
     expect(sig1).not.toBe(sig2);
   });
 
-  it('ignores stale legacy graph fields when steps are canonical', () => {
-    const pipeline = makePipeline([
-      makeStep({id: 'a', type: 'presentation', config: {type: 'presentation', text: 'v1', outputNames: ['text']}}),
-    ]);
-    const r1 = extractFullPipelineToCapsule(pipeline, 'cap-sig', 'Sig');
-    expect(r1.ok).toBe(true);
-    if (!r1.ok) return;
-    const withStaleGraph = {
-      ...r1.value.capsule,
-      nodes: [{id: 'ghost', type: 'manual-text' as const, text: 'stale'}],
-      edges: [],
-      outputRef: {nodeId: 'ghost', outputName: 'text'},
-    };
-    expect(computeCapsuleContentSignature(withStaleGraph)).toBe(computeCapsuleContentSignature(r1.value.capsule));
-  });
 });

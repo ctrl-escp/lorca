@@ -1,8 +1,8 @@
 // @vitest-environment node
 /**
- * Native-path smoke matrix (legacy cleanup Step 3).
+ * Step-chain smoke matrix.
  *
- * Covers executeStepChain flows that must pass before schema cutoff.
+ * Covers executeStepChain flows that exercise the current pipeline representation.
  * Related coverage elsewhere:
  * - Loop groups: loopGroup.test.ts
  * - Capsule instance opaque/inline: capsuleInstance.test.ts

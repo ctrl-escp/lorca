@@ -145,54 +145,31 @@ export const ollamaAdapter: EndpointAdapter = {
     const options = request.temperature !== undefined ? {temperature: request.temperature} : undefined;
 
     let body: unknown;
-    if (request.prompt) {
-      // New path: structured RenderedPromptPayload
-      if (isChat) {
-        const systemContent = request.prompt.blocks
-          .filter((b) => b.tagName === 'system')
-          .map((b) => b.body)
-          .join('\n\n');
-        const userContent = request.prompt.blocks
-          .filter((b) => b.tagName !== 'system')
-          .map((b) => `<${b.tagName}>\n${b.body}\n</${b.tagName}>`)
-          .join('\n\n') || request.prompt.xmlText;
-        body = {
-          model: request.modelName,
-          stream: false,
-          messages: [
-            ...(systemContent ? [{role: 'system', content: systemContent}] : []),
-            {role: 'user', content: userContent || request.prompt.xmlText},
-          ],
-          ...(options !== undefined && {options}),
-        };
-      } else {
-        body = {
-          model: request.modelName,
-          prompt: request.prompt.xmlText,
-          stream: false,
-          ...(options !== undefined && {options}),
-        };
-      }
+    if (isChat) {
+      const systemContent = request.prompt.blocks
+        .filter((b) => b.tagName === 'system')
+        .map((b) => b.body)
+        .join('\n\n');
+      const userContent = request.prompt.blocks
+        .filter((b) => b.tagName !== 'system')
+        .map((b) => `<${b.tagName}>\n${b.body}\n</${b.tagName}>`)
+        .join('\n\n') || request.prompt.xmlText;
+      body = {
+        model: request.modelName,
+        stream: false,
+        messages: [
+          ...(systemContent ? [{role: 'system', content: systemContent}] : []),
+          {role: 'user', content: userContent || request.prompt.xmlText},
+        ],
+        ...(options !== undefined && {options}),
+      };
     } else {
-      // Legacy path: userContent + optional systemPrompt
-      const userContent = request.userContent ?? '';
-      body = isChat
-        ? {
-          model: request.modelName,
-          stream: false,
-          messages: [
-            ...(request.systemPrompt ? [{role: 'system', content: request.systemPrompt}] : []),
-            {role: 'user', content: userContent},
-          ],
-          ...(options !== undefined && {options}),
-        }
-        : {
-          model: request.modelName,
-          prompt: userContent,
-          stream: false,
-          ...(request.systemPrompt && {system: request.systemPrompt}),
-          ...(options !== undefined && {options}),
-        };
+      body = {
+        model: request.modelName,
+        prompt: request.prompt.xmlText,
+        stream: false,
+        ...(options !== undefined && {options}),
+      };
     }
 
     const fetchResult = await safeFetch(url, {

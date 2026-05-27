@@ -5,7 +5,7 @@ import type {
   Result,
 } from '@lorca/core';
 import {buildUserPromptArtifacts} from '@lorca/prompt';
-import {ensureCapsuleStepChain, executeStepChain} from '@lorca/pipeline';
+import {normalizeCapsuleStepChain, executeStepChain} from '@lorca/pipeline';
 import type {ExecutorCallbacks, EndpointResolver, ModelEndpointResolver, StepChainRunResult} from '@lorca/pipeline';
 import type {PipelineDefinition} from '@lorca/core';
 import {validateCapsule} from './validate.js';
@@ -30,7 +30,7 @@ export async function executeCapsuleTestRun(
   callbacks: ExecutorCallbacks,
   resolveEndpointForModel?: ModelEndpointResolver,
 ): Promise<Result<CapsuleTestRunResult, PipelineError>> {
-  const executionDef = ensureCapsuleStepChain(def);
+  const executionDef = normalizeCapsuleStepChain(def);
   const validation = validateCapsule(executionDef);
   if (!validation.ok) return validation;
 

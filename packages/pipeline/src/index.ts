@@ -6,7 +6,6 @@ export {
   buildActiveStepChain,
   compileStepChainToExecutionPlan,
   compileActiveStepsToExecutionPlan,
-  migrateManualTextSteps,
   makeEmptyPipeline,
 } from './chainCompiler.js';
 export type {CompiledExecutionStep, ExecutionPlan, ExecutePipelineOptions} from './chainCompiler.js';
@@ -32,8 +31,7 @@ export {
   extractStepsToCapsule,
   extractFullPipelineToCapsule,
   computeCapsuleContentSignature,
-  ensureCapsuleStepChain,
-  stripCapsuleLegacyGraphFields,
+  normalizeCapsuleStepChain,
 } from './capsuleExtraction.js';
 export type {
   CapsuleExtractionRequest,

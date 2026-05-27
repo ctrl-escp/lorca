@@ -7,8 +7,6 @@ export type {
   CapsuleModelSlot,
   CapsuleTestCase,
   CapsuleTestRunSummary,
-  CapsuleLoopConfig,
-  CapsuleInstanceConfig,
   CapsuleValueKind,
   CapsuleParameterKind,
 } from '@lorca/core';

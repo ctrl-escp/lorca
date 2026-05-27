@@ -18,33 +18,18 @@ import {
 
 const PIPELINE_SCHEMA_VERSION = 2;
 
-function hasLegacyGraphCapsuleFields(capsule: unknown): boolean {
-  if (typeof capsule !== 'object' || capsule === null) return false;
-  const record = capsule as Record<string, unknown>;
-  return (
-    Array.isArray(record.nodes) && record.nodes.length > 0
-    && !(Array.isArray(record.steps) && record.steps.length > 0)
-  );
-}
-
-function legacyCapsuleImportError(capsule: CapsuleDefinition): ImportParseError | null {
+function capsuleImportShapeError(capsule: CapsuleDefinition): ImportParseError | null {
   const schemaErr = capsuleImportSchemaVersionError(capsule.schemaVersion);
   if (schemaErr) return {ok: false, errors: [schemaErr]};
   if ((capsule.steps?.length ?? 0) === 0) {
-    return {ok: false, errors: ['Capsule must define steps[]; legacy graph-only imports are no longer supported']};
-  }
-  if (hasLegacyGraphCapsuleFields(capsule)) {
-    return {
-      ok: false,
-      errors: ['Legacy graph-only capsule imports are no longer supported; re-export with steps[]'],
-    };
+    return {ok: false, errors: ['Capsule must define steps[]']};
   }
   return null;
 }
 
 function validateCapsuleImportBody(capsule: CapsuleDefinition): ImportParseError | null {
-  const legacyErr = legacyCapsuleImportError(capsule);
-  if (legacyErr) return legacyErr;
+  const shapeErr = capsuleImportShapeError(capsule);
+  if (shapeErr) return shapeErr;
   const normalized = normalizeCapsuleBody(capsule);
   const validation = validateCapsule(normalized);
   if (!validation.ok) return {ok: false, errors: [validation.error.message]};
@@ -55,7 +40,6 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Drop legacy graph fields for persistence/export/import. */
 function normalizeCapsuleBody(capsule: CapsuleDefinition): CapsuleDefinition {
   return normalizePersistedCapsule(capsule);
 }
@@ -223,7 +207,6 @@ export function previewCapsuleImport(
   };
 }
 
-// Used for V2 pipeline steps
 export function applyModelRemapsToSteps(
   steps: PipelineStep[],
   remaps: Record<string, ModelRemap>,
@@ -298,10 +281,10 @@ export function prepareImportedCapsule(
   remaps: Record<string, ModelRemap>,
 ): CapsuleDefinition {
   const now = new Date().toISOString();
-  const migrated = normalizeCapsuleBody(capsule);
+  const normalized = normalizeCapsuleBody(capsule);
   const withRemaps: CapsuleDefinition = {
-    ...migrated,
-    steps: applyModelRemapsToSteps(migrated.steps ?? [], remaps),
+    ...normalized,
+    steps: applyModelRemapsToSteps(normalized.steps, remaps),
   };
   return {...withRemaps, id: newId, updatedAt: now, createdAt: now};
 }

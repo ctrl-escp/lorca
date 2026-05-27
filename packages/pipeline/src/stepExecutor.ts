@@ -33,7 +33,7 @@ import {
   rawResponsePreview,
 } from './stepTrace.js';
 import {tryParseJson} from './jsonParser.js';
-import {ensureCapsuleStepChain} from './capsuleExtraction.js';
+import {normalizeCapsuleStepChain} from './capsuleExtraction.js';
 
 interface StepExecutionResult {
   artifacts: PipelineArtifact[];
@@ -658,7 +658,7 @@ async function executeCapsuleStep(
     ? {...capsule, steps: step.config.inlineSteps}
     : capsule;
 
-  const stepChainCapsule = ensureCapsuleStepChain(executionCapsule);
+  const stepChainCapsule = normalizeCapsuleStepChain(executionCapsule);
   return executeCapsuleStepChain(step, stepChainCapsule, artifacts, resolveEndpoint, resolveCapsule, pipeline, callbacks, resolveEndpointForModel, runOptions);
 }
 

@@ -278,7 +278,7 @@ test('happy path: suggestions, partial run, stale, disable, undo, capsule', asyn
   await expect(stepCard(page, 'Mid Steps Capsule')).toBeVisible();
   await expect(stepCard(page, 'Model Call')).toBeVisible();
 
-  // Convert a simple pipeline to Capsule (V1 cannot convert pipelines that already contain instances)
+  // Convert a simple pipeline to Capsule.
   await page.getByTitle('Start a new empty pipeline').click();
   await expect(page.getByPlaceholder('Enter your prompt…')).toHaveValue('', {timeout: 5000});
   await selectStep(page, 'Model Call');

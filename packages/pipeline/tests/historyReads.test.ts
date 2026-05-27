@@ -30,7 +30,7 @@ function makeStep(id: string, label: string, overrides?: Partial<PipelineStep>):
 }
 
 describe('getStepHistoryReads', () => {
-  it('prefers prompt.historyReads over step.historyReads', () => {
+  it('reads prompt history sources', () => {
     const read: StepHistoryReadConfig = {
       sourceStepId: PIPELINE_INPUT_STEP_ID,
       sourceArtifactRef: 'user_prompt.xml',
@@ -38,7 +38,6 @@ describe('getStepHistoryReads', () => {
       required: true,
     };
     const step = makeStep('s1', 'One', {
-      historyReads: [{...read, tagName: 'legacy'}],
       prompt: {
         previousOutput: {enabled: false, placement: 'afterOwnPrompt', tagName: 'previous_output'},
         historyReads: [read],

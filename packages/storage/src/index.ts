@@ -5,11 +5,8 @@ export {
   CAPSULE_IMPORT_SCHEMA_VERSIONS,
   DB_SCHEMA_VERSION,
   isCapsuleImportSchemaVersion,
-  isLegacyPipelineRecord,
   normalizePersistedCapsule,
-  normalizePersistedPipeline,
   capsuleNeedsPersistenceRewrite,
-  pipelineNeedsPersistenceRewrite,
 } from './persistence.js';
 export {
   exportPipeline,

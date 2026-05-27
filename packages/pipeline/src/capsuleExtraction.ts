@@ -10,7 +10,6 @@ import type {
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';
-import type {LegacyGraphCapsuleRecord} from '@lorca/core/legacy';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
 import {buildActiveStepChain, compileActiveStepsToExecutionPlan} from './chainCompiler.js';
 import {getStepHistoryReads} from './historyReads.js';
@@ -207,9 +206,6 @@ function remapStepForCapsule(
   if (clone.prompt?.historyReads) {
     clone.prompt = {...clone.prompt, historyReads: remapReads(clone.prompt.historyReads)};
   }
-  if (clone.historyReads) {
-    clone.historyReads = remapReads(clone.historyReads);
-  }
 
   if (clone.prompt?.previousOutput.enabled) {
     const prevRef = compileActiveStepsToExecutionPlan([clone], {allSteps: [clone]}).steps[0]
@@ -274,13 +270,6 @@ const DEFAULT_CAPSULE_INPUT: PipelineInputConfig = {
   outputNamespace: 'user_prompt',
 };
 
-export function stripCapsuleLegacyGraphFields(
-  capsule: CapsuleDefinition & LegacyGraphCapsuleRecord,
-): CapsuleDefinition {
-  const {nodes: _nodes, edges: _edges, outputRef: _outputRef, ...rest} = capsule;
-  return rest;
-}
-
 export function extractStepsToCapsule(
   request: CapsuleExtractionRequest,
 ): {ok: true; value: CapsuleExtractionResult} | {ok: false; error: CapsuleExtractionError} {
@@ -304,7 +293,7 @@ export function extractStepsToCapsule(
         ok: false,
         error: {
           code: code === 'nested_capsule' ? 'nested_capsule' : 'nested_loop',
-          message: `Cannot extract ${step.type} steps into a Capsule in V1`,
+          message: `Cannot extract ${step.type} steps into a Capsule`,
           stepId: step.id,
         },
       };
@@ -421,19 +410,18 @@ export function extractFullPipelineToCapsule(
   });
 }
 
-/** Normalize capsule bodies to canonical step-chain shape and strip stale graph fields. */
-export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefinition {
+export function normalizeCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefinition {
   const input = capsule.input ?? DEFAULT_CAPSULE_INPUT;
-  return stripCapsuleLegacyGraphFields({
+  return {
     ...capsule,
     input,
     steps: capsule.steps ?? [],
-  });
+  };
 }
 
 /** Stable hash of capsule body for instance staleness when definition changes. */
 export function computeCapsuleContentSignature(capsule: CapsuleDefinition): string {
-  const canonical = ensureCapsuleStepChain(capsule);
+  const canonical = normalizeCapsuleStepChain(capsule);
   const json = JSON.stringify({
     interface: canonical.interface,
     steps: canonical.steps ?? [],

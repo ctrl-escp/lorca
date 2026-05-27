@@ -51,7 +51,7 @@ export interface CapsuleInterface {
   modelSlots: CapsuleModelSlot[];
 }
 
-// ── V2 Step-chain types ──────────────────────────────────────────────────────
+// ── Step-chain types ─────────────────────────────────────────────────────────
 
 export type StepType =
   | 'model-call'
@@ -156,7 +156,6 @@ export interface PipelineStep {
   primaryOutputName: string;
   config: StepConfig;
   prompt?: PromptCompositionConfig;
-  historyReads?: StepHistoryReadConfig[];
   lastEditedAt: string;
 }
 
@@ -166,7 +165,7 @@ export interface PipelineInputConfig {
   outputNamespace: 'user_prompt';
 }
 
-// ── Pipeline definition (V2 step-chain) ─────────────────────────────────────
+// ── Pipeline definition ──────────────────────────────────────────────────────
 
 export interface PipelineDefinition {
   schemaVersion: 2;
@@ -179,115 +178,6 @@ export interface PipelineDefinition {
   createdAt: string;
   updatedAt: string;
 }
-
-// ── Legacy graph types (V1 — used only for Capsule internals and migration) ──
-
-export interface PipelineOutputRef {
-  nodeId: string;
-  outputName: string;
-}
-
-export interface PipelineEdge {
-  id: string;
-  fromNodeId: string;
-  fromOutput: string;
-  toNodeId: string;
-  toInput: string;
-}
-
-export interface NodeLayout {
-  x: number;
-  y: number;
-}
-
-export interface PipelineNodeBase {
-  id: string;
-  title?: string;
-  artifactPrefix?: string;
-  layout?: NodeLayout;
-}
-
-export interface PromptWrapperConfig {
-  tagName: string;
-  instructionText: string;
-  includeInputArtifact: boolean;
-  inputPlacement: 'before-instructions' | 'after-instructions' | 'inside-template';
-  template?: string;
-  inputArtifactRef?: string;
-}
-
-export interface ModelCallConfig {
-  modelRef: ModelRef;
-  mode: 'generate' | 'chat';
-  systemPrompt?: string;
-  inputArtifactRef: string;
-  temperature?: number;
-  topP?: number;
-  maxTokens?: number;
-  expectedOutput?: 'text' | 'json';
-  jsonSchema?: unknown;
-}
-
-export interface CapsuleLoopConfig {
-  enabled: boolean;
-  count: number;
-  inputCarryMode: 'first-input-then-previous-output';
-  carriedInputName: string;
-  carriedOutputName: string;
-}
-
-export interface CapsuleInstanceConfig {
-  capsuleDefinitionId: string;
-  capsuleVersion: string;
-  inputBindings: Record<string, string>;
-  outputBindings: Record<string, string>;
-  parameterValues: Record<string, unknown>;
-  modelSlotAssignments: Record<string, { endpointId: string; modelName: string }>;
-  loop?: CapsuleLoopConfig;
-}
-
-export interface InputNode extends PipelineNodeBase {
-  type: 'input';
-}
-
-export interface PromptWrapperNode extends PipelineNodeBase {
-  type: 'prompt-wrapper';
-  config: PromptWrapperConfig;
-}
-
-export interface TemplateNode extends PipelineNodeBase {
-  type: 'template';
-  template: string;
-}
-
-export interface ModelCallNode extends PipelineNodeBase {
-  type: 'model-call';
-  config: ModelCallConfig;
-}
-
-export interface JsonExtractNode extends PipelineNodeBase {
-  type: 'json-extract';
-  inputArtifactRef: string;
-}
-
-export interface ManualTextNode extends PipelineNodeBase {
-  type: 'manual-text';
-  text: string;
-}
-
-export interface CapsuleInstanceNode extends PipelineNodeBase {
-  type: 'capsule-instance';
-  config: CapsuleInstanceConfig;
-}
-
-export type PipelineNode =
-  | InputNode
-  | PromptWrapperNode
-  | TemplateNode
-  | ModelCallNode
-  | JsonExtractNode
-  | ManualTextNode
-  | CapsuleInstanceNode;
 
 // ── Capsule definition ───────────────────────────────────────────────────────
 

@@ -111,7 +111,7 @@ describe('builtin examples', () => {
           assertStepPrompts(def, step.config.steps);
           continue;
         }
-        expect(step.type, `${def.id}:${step.id} should not expose legacy prompt text as a separate step`).toBe('model-call');
+        expect(step.type, `${def.id}:${step.id} should keep prompt text on the model step`).toBe('model-call');
         if (step.config.type === 'model-call') {
           expect(step.prompt?.blocks.length || step.prompt?.previousOutput.enabled, `${def.id}:${step.id} should have a prompt`).toBeTruthy();
         }

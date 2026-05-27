@@ -1,65 +1,32 @@
 import {describe, it, expect} from 'vitest';
 import type {CapsuleDefinition} from '@lorca/core';
-import type {LegacyGraphCapsuleRecord, LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {
   CAPSULE_SCHEMA_VERSION,
   normalizePersistedCapsule,
-  normalizePersistedPipeline,
   capsuleNeedsPersistenceRewrite,
-  pipelineNeedsPersistenceRewrite,
   isCapsuleImportSchemaVersion,
 } from '../src/persistence.js';
 
-type StoredCapsuleRecord = CapsuleDefinition & LegacyGraphCapsuleRecord;
-
-function graphCapsule(): StoredCapsuleRecord {
+function capsule(): CapsuleDefinition {
   return {
-    schemaVersion: 1,
-    id: 'cap-graph',
-    name: 'Graph Capsule',
+    schemaVersion: 2,
+    id: 'cap-chain',
+    name: 'Step Capsule',
     version: 'v1',
     status: 'locked',
-    interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    steps: [],
-    nodes: [
-      {id: 'in', type: 'input'},
-      {id: 'mt', type: 'manual-text', artifactPrefix: 'note', text: 'legacy note'},
-    ],
-    edges: [
-      {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mt', toInput: 'input'},
-    ],
-    outputRef: {nodeId: 'mt', outputName: 'text'},
+    interface: {inputs: [], outputs: [{name: 'body', kind: 'text', sourceArtifactKey: 'body.text'}], parameters: [], modelSlots: []},
+    steps: [{
+      id: 'body',
+      type: 'presentation',
+      label: 'Body',
+      enabled: true,
+      outputNamespace: 'body',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00.000Z',
+      config: {type: 'presentation', text: 'hello', outputNames: ['text']},
+    }],
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
     tests: [],
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  } as unknown as StoredCapsuleRecord;
-}
-
-function legacyPipeline(): LegacyPipelineDefinition {
-  const inputId = 'input-1';
-  const modelId = 'model-1';
-  return {
-    schemaVersion: 1,
-    id: 'pipe-legacy',
-    name: 'Legacy Pipeline',
-    inputArtifactName: 'user_prompt',
-    nodes: [
-      {id: inputId, type: 'input'},
-      {
-        id: modelId,
-        type: 'model-call',
-        artifactPrefix: 'answer',
-        config: {
-          modelRef: {kind: 'fixed', endpointId: 'ep', modelName: 'm'},
-          mode: 'generate',
-          inputArtifactRef: 'user_prompt.xml',
-        },
-      },
-    ],
-    edges: [
-      {id: 'e1', fromNodeId: inputId, fromOutput: 'xml', toNodeId: modelId, toInput: 'input'},
-    ],
-    outputRef: {nodeId: modelId, outputName: 'text'},
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -72,49 +39,19 @@ describe('persistence normalization', () => {
     expect(isCapsuleImportSchemaVersion(3)).toBe(false);
   });
 
-  it('migrates graph-only capsules to schemaVersion 2 without legacy graph fields', () => {
-    const normalized = normalizePersistedCapsule(graphCapsule());
+  it('normalizes current capsule records', () => {
+    const normalized = normalizePersistedCapsule(capsule());
     expect(normalized.schemaVersion).toBe(CAPSULE_SCHEMA_VERSION);
-    expect(normalized.steps.length).toBeGreaterThan(0);
-    expect('nodes' in normalized).toBe(false);
-    expect('edges' in normalized).toBe(false);
-    expect('outputRef' in normalized).toBe(false);
-  });
-
-  it('bumps step-chain capsules from schemaVersion 1 to 2', () => {
-    const capsule = {
-      ...graphCapsule(),
-      schemaVersion: 1,
-      steps: [{
-        id: 'body',
-        type: 'presentation',
-        label: 'Body',
-        enabled: true,
-        outputNamespace: 'body',
-        primaryOutputName: 'text',
-        lastEditedAt: '2026-01-01T00:00:00.000Z',
-        config: {type: 'presentation', text: 'hello', outputNames: ['text']},
-      }],
-      nodes: undefined,
-      edges: undefined,
-      outputRef: undefined,
-    } as unknown as StoredCapsuleRecord;
-    const normalized = normalizePersistedCapsule(capsule);
-    expect(normalized.schemaVersion).toBe(2);
+    expect(normalized.steps).toHaveLength(1);
+    expect(normalized.input?.outputNamespace).toBe('user_prompt');
   });
 
   it('detects when a capsule record needs a persistence rewrite', () => {
-    const before = graphCapsule();
+    const before = capsule();
+    delete before.input;
     const after = normalizePersistedCapsule(before);
     expect(capsuleNeedsPersistenceRewrite(before, after)).toBe(true);
     expect(capsuleNeedsPersistenceRewrite(after, after)).toBe(false);
   });
 
-  it('migrates legacy graph pipelines to V2 step chains', () => {
-    const normalized = normalizePersistedPipeline(legacyPipeline());
-    expect(normalized.schemaVersion).toBe(2);
-    expect(normalized.steps.length).toBeGreaterThan(0);
-    expect(pipelineNeedsPersistenceRewrite(legacyPipeline())).toBe(true);
-    expect(pipelineNeedsPersistenceRewrite(normalized)).toBe(false);
-  });
 });

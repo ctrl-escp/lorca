@@ -3,9 +3,6 @@ import {modelMatchesBucket} from '@lorca/endpoints';
 
 const MODEL_STORAGE_KEY = 'promptImprover.model';
 const PROMPT_STORAGE_PREFIX = 'promptImprover.prompt.';
-const LEGACY_MODEL_STORAGE_KEY = 'lorca.promptImprover.model';
-const LEGACY_PROMPT_STORAGE_PREFIX = 'lorca.promptImprover.prompt.';
-const LEGACY_DEFAULT_PROMPT_START = 'Improve this Lorca prompt block.';
 
 export const PROMPT_IMPROVER_BUCKET: ModelUsageBucket = 'rewrite-prose';
 
@@ -204,7 +201,7 @@ function levenshteinDistance(a: string, b: string): number {
 }
 
 export function loadPromptImproverModelKey(): string | null {
-  return readStorage(MODEL_STORAGE_KEY) ?? readStorage(LEGACY_MODEL_STORAGE_KEY);
+  return readStorage(MODEL_STORAGE_KEY);
 }
 
 export function savePromptImproverModelKey(key: string) {
@@ -213,11 +210,7 @@ export function savePromptImproverModelKey(key: string) {
 
 export function loadPromptImproverPrompt(stepId: string): string | null {
   const key = PROMPT_STORAGE_PREFIX + stepId;
-  const raw = readStorage(key) ?? readStorage(LEGACY_PROMPT_STORAGE_PREFIX + stepId);
-  if (raw === null) return null;
-  const migrated = migrateStoredPrompt(raw);
-  if (migrated !== raw) writeStorage(key, migrated);
-  return migrated;
+  return readStorage(key);
 }
 
 export function savePromptImproverPrompt(stepId: string, prompt: string) {
@@ -238,10 +231,6 @@ function writeStorage(key: string, value: string) {
   } catch {
     // Ignore quota or privacy-mode failures; the action still works for this session.
   }
-}
-
-function migrateStoredPrompt(prompt: string): string {
-  return prompt.replace(LEGACY_DEFAULT_PROMPT_START, 'Rewrite this prompt block.');
 }
 
 function rankPromptImproverModels(models: readonly DiscoveredModel[]): DiscoveredModel[] {

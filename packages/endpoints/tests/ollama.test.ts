@@ -119,7 +119,7 @@ describe('ollamaAdapter.executeModelCall — generate mode', () => {
       mode: 'generate',
       endpointId: 'ep-test',
       modelName: 'llama3.2:3b',
-      userContent: 'Say hello',
+      prompt: {blocks: [{tagName: 'user', body: 'Say hello', source: 'user-input'}], xmlText: '<user>\nSay hello\n</user>'},
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -132,7 +132,7 @@ describe('ollamaAdapter.executeModelCall — generate mode', () => {
       mode: 'generate',
       endpointId: 'ep-test',
       modelName: 'llama3.2:3b',
-      userContent: 'Say hello',
+      prompt: {blocks: [{tagName: 'user', body: 'Say hello', source: 'user-input'}], xmlText: '<user>\nSay hello\n</user>'},
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('endpoint_browser_access_blocked');
@@ -145,7 +145,7 @@ describe('ollamaAdapter.executeModelCall — chat mode', () => {
       mode: 'chat',
       endpointId: 'ep-test',
       modelName: 'llama3.2:3b',
-      userContent: 'Hello',
+      prompt: {blocks: [{tagName: 'user', body: 'Hello', source: 'user-input'}], xmlText: '<user>\nHello\n</user>'},
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;

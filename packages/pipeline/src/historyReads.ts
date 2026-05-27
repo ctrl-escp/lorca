@@ -31,9 +31,8 @@ export interface HistoryReadValidation {
   issues: HistoryReadIssue[];
 }
 
-/** History reads live on prompt config; step-level field is a legacy fallback. */
 export function getStepHistoryReads(step: PipelineStep): StepHistoryReadConfig[] {
-  return step.prompt?.historyReads ?? step.historyReads ?? [];
+  return step.prompt?.historyReads ?? [];
 }
 
 export function listPipelineInputArtifacts(): ArtifactOption[] {

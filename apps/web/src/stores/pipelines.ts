@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {ref, computed} from 'vue';
 import type {PipelineDefinition} from '@lorca/core';
-import {getDb, normalizePersistedPipeline, pipelineNeedsPersistenceRewrite} from '@lorca/storage';
+import {getDb} from '@lorca/storage';
 import {cloneForStorage} from '../utils/storage.js';
 import {newId} from '../utils/id.js';
 
@@ -53,16 +53,10 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     if (loaded.value) return;
     const stored = await getDb().pipelines.toArray();
     if (stored.length > 0) {
-      const migrated = stored.map((p) => normalizePersistedPipeline(p));
-      for (let i = 0; i < stored.length; i++) {
-        if (pipelineNeedsPersistenceRewrite(stored[i])) {
-          await getDb().pipelines.put(cloneForStorage(migrated[i]!));
-        }
-      }
-      pipelines.value = migrated;
+      pipelines.value = stored;
       const savedId = localStorage.getItem(ACTIVE_PIPELINE_KEY);
-      const match = savedId ? migrated.find((p) => p.id === savedId) : undefined;
-      activePipelineId.value = (match ?? migrated[0]!).id;
+      const match = savedId ? stored.find((p) => p.id === savedId) : undefined;
+      activePipelineId.value = (match ?? stored[0]!).id;
     } else {
       const def = createDefaultPipeline();
       await getDb().pipelines.put(cloneForStorage(def));

@@ -175,7 +175,7 @@ describe('capsule-instance step-chain execution', () => {
   it('namespaces internal outputBindings to parent artifact keys', async () => {
     const capsule = makeStepChainCapsule('saved body');
     const instance: PipelineStep = {
-      id: 'inst-legacy-bindings',
+      id: 'inst-output-bindings',
       type: 'capsule-instance',
       label: 'Capsule',
       enabled: true,
