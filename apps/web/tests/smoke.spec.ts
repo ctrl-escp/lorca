@@ -1,4 +1,9 @@
 import {test, expect} from '@playwright/test';
+import {
+  expectUserPromptReady,
+  expectUserPromptText,
+  fillUserPrompt,
+} from './helpers/promptEditor.js';
 
 const OLLAMA_BASE = 'http://localhost:11434';
 
@@ -40,7 +45,7 @@ test.beforeEach(async ({page}) => {
   );
 
   await page.reload();
-  await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible({timeout: 10000});
+  await expectUserPromptReady(page);
 });
 
 // Helper: add endpoint, auto-test access, and auto-discover models
@@ -50,34 +55,52 @@ async function addEndpoint(page: import('@playwright/test').Page, name = 'Test O
   await page.getByPlaceholder('Local Ollama').fill(name);
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
-  await expect(page.getByText(name)).toBeVisible();
-  await expect(page.getByRole('button', {name: 'Discover models'})).toBeEnabled({timeout: 10000});
+  await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 10000});
 }
 
 async function expandLeftSection(
   page: import('@playwright/test').Page,
-  section: 'Endpoints' | 'Step Suggestions' | 'Capsules' | 'Models' | 'Step types',
+  section: 'Endpoints' | 'Step library' | 'Capsules' | 'Models',
 ) {
-  const toggle = page.locator('.section-toggle').filter({hasText: section});
+  const toggle = page.locator('.section-toggle').filter({hasText: section}).first();
+  await expect(toggle).toBeVisible({timeout: 10000});
   if (await toggle.getAttribute('aria-expanded') !== 'true') {
     await toggle.click();
   }
 }
 
+function endpointCard(page: import('@playwright/test').Page, name: string) {
+  return page.locator('.ep-card').filter({
+    has: page.locator('.ep-name', {hasText: name}),
+  }).first();
+}
+
 function stepCard(page: import('@playwright/test').Page, label: string) {
   return page.locator('.chain-step').filter({
-    has: page.locator('.step-title', {hasText: label}),
+    has: page.locator('.step-title').filter({hasText: new RegExp(`^${label}$`)}),
+  }).first();
+}
+
+async function insertBlankStepType(page: import('@playwright/test').Page, label: 'Model call' | 'Text' | 'Loop') {
+  await expandLeftSection(page, 'Step library');
+  const group = page.locator('.type-group').filter({
+    has: page.locator('.type-group-name', {hasText: label}),
+  }).first();
+  await expect(group).toBeVisible();
+  await group.getByRole('button', {name: '↓ Insert'}).click();
+}
+
+function capsuleRow(page: import('@playwright/test').Page, name: string) {
+  return page.locator('.capsule-row').filter({
+    has: page.locator('.capsule-row-name', {hasText: name}),
   }).first();
 }
 
 // 1. Add endpoint
 test('smoke: add endpoint', async ({page}) => {
+  await addEndpoint(page, 'My Endpoint');
   await expandLeftSection(page, 'Endpoints');
-  await page.getByTitle('Add a new AI endpoint').click();
-  await page.getByPlaceholder('Local Ollama').fill('My Endpoint');
-  await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
-  await page.getByRole('button', {name: 'Add endpoint'}).click();
-  await expect(page.getByText('My Endpoint')).toBeVisible();
+  await expect(endpointCard(page, 'My Endpoint')).toBeVisible();
 });
 
 // 2. Discover models
@@ -88,22 +111,22 @@ test('smoke: discover models', async ({page}) => {
 
 // 3. Enter target prompt
 test('smoke: enter prompt', async ({page}) => {
-  await page.getByPlaceholder('Enter your prompt…').fill('Hello world');
-  await expect(page.getByPlaceholder('Enter your prompt…')).toHaveValue('Hello world');
+  await fillUserPrompt(page, 'Hello world');
+  await expectUserPromptText(page, 'Hello world');
 });
 
 // 4. Add wrapper step
-test('smoke: add prompt wrapper step', async ({page}) => {
+test('smoke: add text step', async ({page}) => {
   const before = await page.locator('.chain-editor .chain-step').count();
-  await page.getByRole('button', {name: '+ Prompt wrapper'}).click();
+  await insertBlankStepType(page, 'Text');
   await expect(page.locator('.chain-editor .chain-step')).toHaveCount(before + 1);
-  await expect(page.locator('.chain-editor .step-type-badge').filter({hasText: 'Wrapper'})).toBeVisible();
+  await expect(page.locator('.chain-editor .step-type-badge').filter({hasText: 'Text'})).toBeVisible();
 });
 
 // 5. Add model-call step
 test('smoke: add model-call step', async ({page}) => {
   const before = await page.locator('.chain-editor .chain-step').count();
-  await page.getByRole('button', {name: '+ Model call'}).click();
+  await insertBlankStepType(page, 'Model call');
   await expect(page.locator('.chain-editor .chain-step')).toHaveCount(before + 1);
 });
 
@@ -118,8 +141,9 @@ test('smoke: lock capsule', async ({page}) => {
   await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Test Cap');
+  await page.getByRole('button', {name: '+ Add Model Call'}).click();
   await page.getByRole('button', {name: 'Lock'}).click();
-  await expect(page.getByText('locked')).toBeVisible();
+  await expect(capsuleRow(page, 'Test Cap').locator('.capsule-status.cs-locked')).toBeVisible();
 });
 
 // 8. Insert capsule into pipeline
@@ -128,14 +152,15 @@ test('smoke: insert capsule instance into pipeline', async ({page}) => {
   await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('My Capsule');
+  await page.getByRole('button', {name: '+ Add Model Call'}).click();
   await page.getByRole('button', {name: 'Lock'}).click();
 
   // Go back to pipeline
   await page.getByRole('button', {name: '← Pipeline'}).click();
-  await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible();
+  await expectUserPromptReady(page);
 
-  // Add capsule instance
-  await page.getByRole('button', {name: '+ Capsule'}).click();
+  await expandLeftSection(page, 'Capsules');
+  await capsuleRow(page, 'My Capsule').getByRole('button', {name: '↓ Insert'}).click();
   await expect(page.locator('.step-type-badge').filter({hasText: 'Capsule'}).last()).toBeVisible();
 });
 
@@ -212,7 +237,7 @@ test('smoke: spread and collapse inline capsule', async ({page}) => {
   await page.reload();
   const card = stepCard(page, 'Inline Smoke Capsule');
   await expect(card).toBeVisible({timeout: 10000});
-  await card.getByRole('button', {name: 'Spread'}).click();
+  await card.getByRole('button', {name: 'Edit inline'}).click();
   await expect(card.locator('.capsule-inline-body')).toBeVisible();
   await expect(card.locator('.capsule-inline-step-label')).toHaveText('Body Text');
   await card.getByRole('button', {name: 'Collapse'}).click();
@@ -221,7 +246,7 @@ test('smoke: spread and collapse inline capsule', async ({page}) => {
 
 // 9. Configure loop-group max iterations
 test('smoke: configure loop group step', async ({page}) => {
-  await page.getByRole('button', {name: '+ Loop'}).click();
+  await insertBlankStepType(page, 'Loop');
   await expect(page.locator('.chain-editor .step-type-badge').filter({hasText: 'Loop'})).toBeVisible();
   await page.locator('.chain-editor .chain-step').last().click();
   await page.getByRole('button', {name: 'Inspector'}).click();
@@ -234,9 +259,7 @@ test('smoke: configure loop group step', async ({page}) => {
 
 // 10 + 11. Execute pipeline and inspect trace
 test('smoke: execute pipeline and inspect trace', async ({page}) => {
-  // Add endpoint + discover models
   await addEndpoint(page);
-  await page.getByRole('button', {name: 'Discover models'}).click();
   await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 5000});
 
   // Default pipeline includes a Model Call step — assign a discovered model
@@ -248,7 +271,7 @@ test('smoke: execute pipeline and inspect trace', async ({page}) => {
   await modelSelect.dispatchEvent('change');
 
   // Enter prompt and execute
-  await page.getByPlaceholder('Enter your prompt…').fill('Say hello');
+  await fillUserPrompt(page, 'Say hello');
   await page.getByRole('button', {name: 'Execute Pipeline'}).click();
 
   // Wait for run to finish
@@ -261,8 +284,8 @@ test('smoke: execute pipeline and inspect trace', async ({page}) => {
   await expect(page.locator('.ev-completed').first()).toBeVisible();
 
   // Check output
-  await page.getByRole('button', {name: 'Output'}).click();
-  await expect(page.locator('.output-text')).toContainText('smoke test output', {timeout: 5000});
+  await page.getByRole('button', {name: 'Output', exact: true}).click();
+  await expect(page.locator('.output-panel')).toContainText('smoke test output', {timeout: 5000});
 });
 
 // Persistence: pipeline and capsule definitions survive reload.
@@ -274,7 +297,6 @@ test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Persisted Capsule');
-  await page.getByRole('button', {name: 'Lock'}).click();
   await page.getByRole('button', {name: '← Pipeline'}).click();
 
   await page.reload();
@@ -282,7 +304,7 @@ test('smoke: save and reload pipeline and capsule', async ({page}) => {
   await expect(page.locator('.step-title').filter({hasText: 'Model Call'})).toBeVisible();
   await expandLeftSection(page, 'Capsules');
   await expect(page.getByText('Persisted Capsule')).toBeVisible();
-  await expect(page.getByText('locked')).toBeVisible();
+  await expect(capsuleRow(page, 'Persisted Capsule').locator('.capsule-status.cs-draft')).toBeVisible();
 });
 
 // Export and import Capsule.
@@ -290,8 +312,10 @@ test('smoke: export and import capsule', async ({page}) => {
   await page.getByTitle('Create a new empty Capsule').click();
   await expect(page.getByPlaceholder('Capsule name')).toBeVisible({timeout: 5000});
   await page.getByPlaceholder('Capsule name').fill('Portable Cap');
-  await page.getByRole('button', {name: 'Lock'}).click();
-  await expect(page.getByText('locked')).toBeVisible();
+  await page.getByRole('button', {name: '+ Add Model Call'}).click();
+  await page.getByPlaceholder('Capsule name').blur();
+  await expect(capsuleRow(page, 'Portable Cap')).toBeVisible();
+  await expect(capsuleRow(page, 'Portable Cap').locator('.capsule-status.cs-draft')).toBeVisible();
 
   const exportText = await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -330,7 +354,7 @@ test('smoke: export and import capsule', async ({page}) => {
   );
   await page.reload();
   await expandLeftSection(page, 'Capsules');
-  await expect(page.getByText('No Capsules yet.')).toBeVisible({timeout: 10000});
+  await expect(capsuleRow(page, 'Portable Cap')).toHaveCount(0);
 
   const importChooser = page.waitForEvent('filechooser');
   await page.getByTitle('Import a Capsule from a JSON file').click();
@@ -344,11 +368,11 @@ test('smoke: export and import capsule', async ({page}) => {
   await expect(page.getByRole('dialog')).toBeVisible({timeout: 5000});
   await page.getByRole('dialog').getByRole('button', {name: 'Import'}).click();
   await expect(page.locator('.capsule-row-name').filter({hasText: 'Portable Cap'})).toBeVisible({timeout: 5000});
-  await expect(page.locator('.capsule-row-meta').filter({hasText: 'locked'})).toBeVisible();
+  await expect(page.locator('.capsule-row-meta').filter({hasText: 'draft'})).toBeVisible();
 });
 
 test('smoke: insert intent extraction suggestion', async ({page}) => {
-  await expandLeftSection(page, 'Step Suggestions');
+  await expandLeftSection(page, 'Step library');
   await expect(page.getByText('Intent Extraction')).toBeVisible({timeout: 5000});
   const row = page.locator('.suggestion-row').filter({hasText: 'Intent Extraction'});
   await row.getByRole('button', {name: '↓ After'}).click();

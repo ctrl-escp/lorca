@@ -1,4 +1,5 @@
 import {test, expect} from '@playwright/test';
+import {expectUserPromptReady} from './helpers/promptEditor.js';
 
 const OLLAMA_BASE = 'http://localhost:11434';
 
@@ -28,14 +29,14 @@ test.beforeEach(async ({page}) => {
   );
 
   await page.reload();
-  await expect(page.getByPlaceholder('Enter your prompt…')).toBeVisible({timeout: 10000});
+  await expectUserPromptReady(page);
 });
 
 function modelSelect(page: import('@playwright/test').Page) {
   return page.locator('.inspector-tab-panel select').filter({has: page.locator('option', {hasText: 'select model'})}).first();
 }
 
-test('inline capsule inner step model matches instance slot assignment', async ({page}) => {
+test('inline capsule inner step uses instance slot assignment', async ({page}) => {
   const now = '2026-01-01T00:00:00.000Z';
   await page.evaluate(async ({timestamp}) => {
     const capsule = {
@@ -114,7 +115,7 @@ test('inline capsule inner step model matches instance slot assignment', async (
             lastEditedAt: timestamp,
             config: {
               type: 'model-call',
-              modelRef: {kind: 'fixed', endpointId: 'ep-test', modelName: 'deepseek-coder-v2:16b'},
+              modelRef: {kind: 'slot', slotName: 'domain_router'},
               mode: 'generate',
               outputNames: ['text', 'rawResponse'],
             },

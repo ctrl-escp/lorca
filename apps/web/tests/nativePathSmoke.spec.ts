@@ -1,4 +1,5 @@
 import {test, expect} from '@playwright/test';
+import {importPipelineJson} from './helpers/pipelineToolbar.js';
 
 const OLLAMA_BASE = 'http://localhost:11434';
 
@@ -37,39 +38,6 @@ async function addEndpoint(page: import('@playwright/test').Page) {
   await page.getByPlaceholder('http://localhost:11434').fill(OLLAMA_BASE);
   await page.getByRole('button', {name: 'Add endpoint'}).click();
   await expect(page.getByText('llama3:latest')).toBeVisible({timeout: 10000});
-}
-
-async function openPipelineImportModal(page: import('@playwright/test').Page) {
-  const inlineImport = page.getByRole('button', {name: 'Import'});
-  if (await inlineImport.isVisible()) {
-    await inlineImport.click();
-    return;
-  }
-  await page.getByRole('button', {name: '⋯ More'}).click();
-  await page.getByRole('button', {name: 'Import'}).click();
-}
-
-async function importPipelineJson(page: import('@playwright/test').Page, exportPayload: string) {
-  await openPipelineImportModal(page);
-  const pasteDialog = page.getByRole('dialog');
-  await expect(pasteDialog.getByText('Import Pipeline')).toBeVisible({timeout: 5000});
-
-  const importChooser = page.waitForEvent('filechooser');
-  await pasteDialog.getByText('Load from file').click();
-  const chooser = await importChooser;
-  await chooser.setFiles({
-    name: 'remap.pipeline.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(exportPayload),
-  });
-  await pasteDialog.getByRole('button', {name: 'Import'}).click();
-
-  const remapDialog = page.getByRole('dialog');
-  await expect(remapDialog.getByRole('heading', {name: 'Import pipeline'})).toBeVisible({timeout: 5000});
-  for (const select of await remapDialog.locator('select').all()) {
-    await select.selectOption({index: 1});
-  }
-  await remapDialog.getByRole('button', {name: 'Import'}).click();
 }
 
 test('e2e: import remaps missing model references onto local endpoints', async ({page}) => {
