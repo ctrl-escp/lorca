@@ -3,10 +3,10 @@ import {ok, err} from '@lorca/core';
 import {validateStepChainPipeline} from '@lorca/pipeline';
 
 export function validateCapsule(def: CapsuleDefinition): Result<void, PipelineError> {
-  if (def.steps === undefined) {
+  if (def.steps.length === 0) {
     return err({
       code: 'invalid_pipeline_graph',
-      message: 'Capsule must define steps[]; migrate graph-only definitions before validation',
+      message: 'Capsule must define at least one step',
     });
   }
   return validateStepChainCapsule(def);
@@ -31,7 +31,7 @@ function validateStepChainCapsule(def: CapsuleDefinition): Result<void, Pipeline
     id: def.id,
     name: def.name,
     input: def.input ?? {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
-    steps: def.steps ?? [],
+    steps: def.steps,
     createdAt: def.createdAt,
     updatedAt: def.updatedAt,
   }, {extraArtifactRefs: capsuleInputArtifactRefs(def)});

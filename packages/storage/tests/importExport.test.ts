@@ -1,6 +1,7 @@
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition, LegacyPipelineDefinition, PipelineDefinition, StepOutputsExport} from '@lorca/core';
-import {migrateLegacyPipeline} from '@lorca/pipeline';
+import type {CapsuleDefinition, PipelineDefinition, StepOutputsExport} from '@lorca/core';
+import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
+import {migrateLegacyPipeline} from '@lorca/pipeline/legacyGraph';
 import {
   exportPipeline,
   exportCapsule,
@@ -248,25 +249,12 @@ function makeInlineCapsulePipeline(): PipelineDefinition {
 }
 
 function makeCapsule(): CapsuleDefinition {
-  return {
-    schemaVersion: 1,
-    id: 'cap-1',
-    name: 'Verifier',
-    version: 'v1',
-    status: 'locked',
-    interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    nodes: [{id: 'input-1', type: 'input'}],
-    edges: [],
-    outputRef: {nodeId: 'input-1', outputName: 'xml'},
-    tests: [],
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  };
+  return makeStepChainCapsule();
 }
 
 function makeStepChainCapsule(): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-chain',
     name: 'Step Capsule',
     version: 'v1',
@@ -277,9 +265,6 @@ function makeStepChainCapsule(): CapsuleDefinition {
       parameters: [],
       modelSlots: [],
     },
-    nodes: [{id: 'stale', type: 'manual-text', text: 'stale graph'}],
-    edges: [],
-    outputRef: {nodeId: 'stale', outputName: 'text'},
     steps: [{
       id: 'body',
       type: 'presentation',
@@ -294,6 +279,29 @@ function makeStepChainCapsule(): CapsuleDefinition {
     tests: [],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
+
+function legacyGraphCapsuleExport() {
+  return {
+    exportedAt: '2026-01-01T00:00:00Z',
+    app: 'lorca',
+    kind: 'capsule',
+    capsule: {
+      schemaVersion: 2,
+      id: 'cap-legacy',
+      name: 'Legacy Graph Capsule',
+      version: 'v1',
+      status: 'locked',
+      interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
+      steps: [],
+      nodes: [{id: 'input-1', type: 'input'}],
+      edges: [],
+      outputRef: {nodeId: 'input-1', outputName: 'xml'},
+      tests: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
   };
 }
 
@@ -498,7 +506,7 @@ describe('importExport', () => {
     if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
     const preview = previewCapsuleImport(parsed, localCtx);
     if ('errors' in preview) throw new Error(preview.errors.join(', '));
-    expect(preview.capsule.name).toBe('Verifier');
+    expect(preview.capsule.name).toBe('Step Capsule');
     expect(preview.missingModels).toHaveLength(0);
   });
 
@@ -511,12 +519,12 @@ describe('importExport', () => {
     expect(parsed.stepOutputs?.artifacts['answer.text']?.stepId).toBe('step-1');
   });
 
-  it('strips legacy graph fields from step-chain capsule exports', () => {
+  it('exports step-chain capsules without legacy graph fields', () => {
     const file = exportCapsule(makeStepChainCapsule());
     expect(file.capsule.steps).toHaveLength(1);
-    expect(file.capsule.nodes).toBeUndefined();
-    expect(file.capsule.edges).toBeUndefined();
-    expect(file.capsule.outputRef).toBeUndefined();
+    expect('nodes' in file.capsule).toBe(false);
+    expect('edges' in file.capsule).toBe(false);
+    expect('outputRef' in file.capsule).toBe(false);
   });
 
   it('strips legacy graph fields from included step-chain capsules in pipeline exports', () => {
@@ -543,9 +551,9 @@ describe('importExport', () => {
     const file = exportPipeline(pipeline, [makeStepChainCapsule()]);
     const cap = file.includedCapsules?.[0];
     expect(cap?.steps).toHaveLength(1);
-    expect(cap?.nodes).toBeUndefined();
-    expect(cap?.edges).toBeUndefined();
-    expect(cap?.outputRef).toBeUndefined();
+    expect(cap && 'nodes' in cap).toBe(false);
+    expect(cap && 'edges' in cap).toBe(false);
+    expect(cap && 'outputRef' in cap).toBe(false);
   });
 
   it('prepareImportedCapsule assigns a new id', () => {
@@ -554,31 +562,30 @@ describe('importExport', () => {
     expect(next.id).not.toBe('cap-1');
   });
 
-  it('prepareImportedCapsule migrates graph-only capsules and stores step-chain fields only', () => {
+  it('prepareImportedCapsule stores step-chain fields only', () => {
     const next = prepareImportedCapsule(makeCapsule(), 'cap-imported', {});
     expect(next.schemaVersion).toBe(2);
-    expect(next.steps).toBeDefined();
-    expect(next.nodes).toBeUndefined();
-    expect(next.edges).toBeUndefined();
-    expect(next.outputRef).toBeUndefined();
+    expect(next.steps.length).toBeGreaterThan(0);
+    expect('nodes' in next).toBe(false);
+    expect('edges' in next).toBe(false);
+    expect('outputRef' in next).toBe(false);
   });
 
-  it('parseCapsuleExport normalizes step-chain capsules and drops stale graph fields', () => {
+  it('rejects legacy graph-only capsule imports', () => {
+    const parsed = parseCapsuleExport(legacyGraphCapsuleExport());
+    expect('errors' in parsed).toBe(true);
+    if ('errors' in parsed) {
+      expect(parsed.errors.some((e) => e.includes('legacy graph-only'))).toBe(true);
+    }
+  });
+
+  it('parseCapsuleExport normalizes step-chain capsules', () => {
     const parsed = parseCapsuleExport({...exportCapsule(makeStepChainCapsule())});
     if ('errors' in parsed) throw new Error(parsed.errors.join(', '));
     expect(parsed.capsule.steps).toHaveLength(1);
-    expect(parsed.capsule.nodes).toBeUndefined();
-    expect(parsed.capsule.edges).toBeUndefined();
-    expect(parsed.capsule.outputRef).toBeUndefined();
-  });
-
-  it('exports graph-only capsules as migrated step-chain bodies', () => {
-    const file = exportCapsule(makeCapsule());
-    expect(file.capsule.schemaVersion).toBe(2);
-    expect(file.capsule.steps).toBeDefined();
-    expect(file.capsule.nodes).toBeUndefined();
-    expect(file.capsule.edges).toBeUndefined();
-    expect(file.capsule.outputRef).toBeUndefined();
+    expect('nodes' in parsed.capsule).toBe(false);
+    expect('edges' in parsed.capsule).toBe(false);
+    expect('outputRef' in parsed.capsule).toBe(false);
   });
 
   it('round-trips prompt blocks, history reads, enabled flags, and primaryOutputName', () => {

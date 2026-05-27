@@ -70,7 +70,7 @@ function modelCallStep(
 
 function buildCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-1',
     name: 'Test',
     version: 'v1',
@@ -197,53 +197,19 @@ describe('executeCapsuleTestRun', () => {
     expect(capturedPrompt).toContain('my prompt');
   });
 
-  it('migrates graph-only capsules before running', async () => {
-    const def: CapsuleDefinition = {
-      schemaVersion: 1,
-      id: 'cap-graph',
-      name: 'Graph Capsule',
-      version: 'v1',
-      status: 'draft',
-      interface: {
-        inputs: [],
-        outputs: [{name: 'answer', kind: 'text', sourceArtifactKey: 'answer.text'}],
-        parameters: [],
-        modelSlots: [],
-      },
-      nodes: [
-        {id: 'in', type: 'input'},
-        {
-          id: 'mc-1',
-          type: 'model-call',
-          artifactPrefix: 'answer',
-          config: {
-            modelRef: {kind: 'fixed', endpointId: 'ep-1', modelName: 'test'},
-            mode: 'generate',
-            inputArtifactRef: 'user_prompt.xml',
-          },
-        },
-      ],
-      edges: [
-        {id: 'e1', fromNodeId: 'in', fromOutput: 'xml', toNodeId: 'mc-1', toInput: 'input'},
-      ],
-      outputRef: {nodeId: 'mc-1', outputName: 'text'},
-      tests: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const artifacts: string[] = [];
+  it('rejects capsules with empty steps at execution time', async () => {
+    const def = buildCapsule({steps: []});
     const result = await executeCapsuleTestRun(
       def,
       {userPromptRaw: 'hello', inputValues: {}, paramValues: {}, slotAssignments: {}},
       (id) => (id === 'ep-1' ? ENDPOINT : undefined),
       {
-        onArtifact(a) { artifacts.push(a.name); },
+        onArtifact() {},
         onTraceEvent() {},
       },
     );
 
-    expect(result.ok).toBe(true);
-    expect(artifacts).toContain('answer.text');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('at least one step');
   });
 });

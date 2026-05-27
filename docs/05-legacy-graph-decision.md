@@ -6,14 +6,15 @@ Date: 2026-05-25 · **Status updated:** 2026-05-25 (migration complete)
 
 Lorca should migrate runtime execution to native V2 step chains only. The V1 graph format should remain only as a temporary import/migration compatibility path for old saved pipelines and graph-only capsules.
 
-Do not keep the V2-to-V1 bridge indefinitely. Do not drop V1 import yet.
+Do not keep the V2-to-V1 bridge indefinitely. **V1 import cutoff is complete (2026-05-26):** graph-only imports are rejected; `LegacyPipelineDefinition` lives on `@lorca/core/legacy` only.
 
 ## Current state (post-migration)
 
 - Top-level pipelines and capsules are canonical V2 `steps[]` definitions at runtime, in IndexedDB, and in export files.
 - `executeStepChain()` is the only production executor for pipelines, loop groups, inline capsule chains, snapshots, history reads, and artifact refs.
 - **Removed from production:** `executePipeline()`, `compilePipelineToLegacyGraph()`, `syncCapsuleLegacyGraphFromSteps()`, and the V2→V1 bridge. Legacy graph validation helpers (`validateLegacyPipeline`, `topologicalOrder`, `outputKey`, `resolveOutputRef`) live in `packages/pipeline/src/legacyGraph.ts` and are exported only via the `@lorca/pipeline/legacyGraph` subpath for import/migration tests.
-- **Import/load only:** `migrateLegacyPipeline()` and `ensureCapsuleStepChain()` convert graph-only or legacy pipeline records to `steps[]`. Graph import validation uses `validateGraphCapsuleForImport()` on that path; `validateCapsule()` is step-chain-only.
+- **Import:** rejects graph-only capsule exports and capsule `schemaVersion` ≠ 2. Pipeline import requires `schemaVersion` 2.
+- **Load/persistence only:** Dexie upgrade and `normalizePersisted*` still migrate legacy IndexedDB rows via `@lorca/pipeline/legacyGraph`.
 - **Persistence:** Capsule `schemaVersion` **2** is written for normalized step-chain bodies. Dexie v2 upgrade and load-time normalization strip `nodes`, `edges`, and `outputRef` once `steps[]` exists. Content signatures hash canonical `steps[]`, input, and interface — not stale graph fields.
 - Built-in examples are step-chain-first; narrow graph fixtures remain in migration tests only.
 
@@ -27,9 +28,9 @@ At the same time, V1 import/migration is still useful. Old IndexedDB records, ex
 
 - New code must read and write V2 `steps[]` as the canonical pipeline and capsule body.
 - V1 `nodes`, `edges`, and `outputRef` are compatibility fields only at import/load boundaries.
-- V1 graph-only definitions may be accepted at load/import boundaries and immediately migrated to `steps[]`.
+- V1 graph-only definitions are **rejected at import**. Existing IndexedDB rows may still be migrated once on load via Dexie v2 upgrade.
 - Runtime execution must not compile V2 steps back into V1 graphs.
-- V1 import can be removed only after an explicit schema cutoff or migration/export compatibility decision.
+- V1 import is removed at JSON import boundaries; legacy types remain on `@lorca/core/legacy` for load migration and tests.
 
 ## Migration sequence
 
@@ -42,7 +43,7 @@ All steps below are **complete** as of 2026-05-25:
 5. ✅ Rewrite built-in example capsules as step-chain-first fixtures; keep one small graph fixture set for migration tests.
 6. ✅ Keep `migrateLegacyPipeline()` and `ensureCapsuleStepChain()` narrowly scoped to load/import compatibility.
 7. ✅ Remove the V2-to-V1 bridge and legacy runtime (`executePipeline`, graph compiler, graph sync helpers).
-8. ⏳ **Future:** decide whether V1 import itself remains supported or gets a documented import cutoff (schema v2 persistence is done; graph import still accepted).
+8. ✅ **Import cutoff:** reject graph-only imports; drop `LegacyPipelineDefinition` from the public `@lorca/core` surface (`@lorca/core/legacy` subpath).
 
 ## Removal inventory
 
@@ -72,8 +73,7 @@ All criteria **met** (2026-05-25):
 
 **Implemented (2026-05-25):**
 
-- Capsule `schemaVersion` bumped to **2** for persisted/exported step-chain bodies (`1` still accepted at import).
-- Dexie v2 upgrade rewrites existing capsule and pipeline records; load-time normalization catches missed rows.
-- V1 graph import remains available through `migrateLegacyPipeline()` / `ensureCapsuleStepChain()` until an explicit **import** cutoff is decided.
+- Capsule `schemaVersion` **2** only at import/export. Dexie v2 upgrade rewrites existing capsule and pipeline records; load-time normalization catches missed rows.
+- V1 graph import is **rejected** at JSON import boundaries. Legacy graph migration remains for existing IndexedDB rows only (`@lorca/pipeline/legacyGraph`).
 
-**Future (optional):** reject graph-only imports without migration, or drop `LegacyPipelineDefinition` from the type surface entirely.
+**Complete (2026-05-26):** graph-only JSON imports rejected; `LegacyPipelineDefinition` moved off the public `@lorca/core` export surface.

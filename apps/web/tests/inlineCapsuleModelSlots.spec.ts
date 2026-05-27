@@ -39,7 +39,7 @@ test('inline capsule inner step model matches instance slot assignment', async (
   const now = '2026-01-01T00:00:00.000Z';
   await page.evaluate(async ({timestamp}) => {
     const capsule = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: 'cap-slot-sync',
       name: 'Slot Sync Capsule',
       version: 'v1',
@@ -55,9 +55,6 @@ test('inline capsule inner step model matches instance slot assignment', async (
           description: 'Router slot',
         }],
       },
-      nodes: [],
-      edges: [],
-      outputRef: {nodeId: 'domain', outputName: 'text'},
       steps: [{
         id: 'domain',
         type: 'model-call',

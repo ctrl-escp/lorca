@@ -1,4 +1,4 @@
-import type {PipelineDefinition, PipelineError, PipelineStep, Result} from '@lorca/core';
+import type {CapsuleDefinition, PipelineDefinition, PipelineError, PipelineStep, Result} from '@lorca/core';
 import {
   LOOP_PREV_ARTIFACT_REF,
   LOOP_PREV_STEP_ID,
@@ -17,6 +17,7 @@ const ARTIFACT_PLACEHOLDER_RE = /\\?\{\{artifact\.([\w.\-]+)\}\}/g;
 
 export interface ValidateStepChainOptions {
   extraArtifactRefs?: readonly string[];
+  resolveCapsule?: (capsuleId: string, capsuleVersion: string) => CapsuleDefinition | undefined;
 }
 
 function baseArtifactRefs(extraArtifactRefs?: readonly string[]): Set<string> {
@@ -185,7 +186,7 @@ function validateTemplateArtifactRefs(
 function validateCapsuleBindings(
   step: PipelineStep,
   chainSteps: PipelineStep[],
-  extraArtifactRefs?: readonly string[],
+  options: ValidateStepChainOptions = {},
 ): Result<void, PipelineError> {
   if (step.config.type !== 'capsule-instance') return ok(undefined);
   const config = step.config;
@@ -196,7 +197,7 @@ function validateCapsuleBindings(
     return err({code: 'missing_capsule_version', message: 'Capsule instance is missing capsuleVersion', nodeId: step.id});
   }
 
-  const available = artifactRefsBeforeStep(chainSteps, step.id, extraArtifactRefs);
+  const available = artifactRefsBeforeStep(chainSteps, step.id, options.extraArtifactRefs);
   for (const [port, ref] of Object.entries(config.inputBindings)) {
     if (!ref.trim()) {
       return err({
@@ -224,13 +225,36 @@ function validateCapsuleBindings(
     }
   }
 
+  const resolved = options.resolveCapsule?.(config.capsuleId, config.capsuleVersion);
+  if (resolved) {
+    const declaredOutputs = new Set(resolved.interface.outputs.map((output) => output.name));
+    for (const port of Object.keys(config.outputBindings)) {
+      if (!declaredOutputs.has(port)) {
+        return err({
+          code: 'invalid_capsule_interface',
+          message: `Capsule output binding "${port}" is not declared on ${config.capsuleId} ${config.capsuleVersion}`,
+          nodeId: step.id,
+        });
+      }
+    }
+    for (const output of resolved.interface.outputs) {
+      if (!config.outputBindings[output.name]?.trim()) {
+        return err({
+          code: 'invalid_capsule_interface',
+          message: `Capsule instance is missing output binding for port "${output.name}"`,
+          nodeId: step.id,
+        });
+      }
+    }
+  }
+
   return ok(undefined);
 }
 
 function validateLoopGroup(
   step: PipelineStep,
   outerStepsBefore: PipelineStep[],
-  extraArtifactRefs?: readonly string[],
+  options: ValidateStepChainOptions = {},
 ): Result<void, PipelineError> {
   if (step.config.type !== 'loop-group') return ok(undefined);
   const config = step.config;
@@ -282,13 +306,13 @@ function validateLoopGroup(
   if (!innerPrimary.ok) return innerPrimary;
 
   const chainSteps = [...outerStepsBefore, step, ...config.steps];
-  return validateStepList(config.steps, chainSteps, true, extraArtifactRefs);
+  return validateStepList(config.steps, chainSteps, true, options);
 }
 
 function validateInlineCapsuleSteps(
   step: PipelineStep,
   outerStepsBefore: PipelineStep[],
-  extraArtifactRefs?: readonly string[],
+  options: ValidateStepChainOptions = {},
 ): Result<void, PipelineError> {
   if (step.config.type !== 'capsule-instance') return ok(undefined);
   const inlineSteps = step.config.inlineSteps;
@@ -301,7 +325,7 @@ function validateInlineCapsuleSteps(
   if (!nestedPrimary.ok) return nestedPrimary;
 
   const chainSteps = [...outerStepsBefore, step, ...inlineSteps];
-  return validateStepList(inlineSteps, chainSteps, false, extraArtifactRefs);
+  return validateStepList(inlineSteps, chainSteps, false, options);
 }
 
 function validateDuplicateArtifactKeys(steps: PipelineStep[]): Result<void, PipelineError> {
@@ -328,7 +352,7 @@ function validateStepList(
   steps: PipelineStep[],
   chainSteps: PipelineStep[],
   allowLoopPrev = false,
-  extraArtifactRefs?: readonly string[],
+  options: ValidateStepChainOptions = {},
 ): Result<void, PipelineError> {
   for (const step of steps) {
     const stepIndex = chainSteps.findIndex((candidate) => candidate.id === step.id);
@@ -337,16 +361,16 @@ function validateStepList(
     const historyResult = validateStepHistoryReads(step, chainSteps, allowLoopPrev);
     if (!historyResult.ok) return historyResult;
 
-    const templateResult = validateTemplateArtifactRefs(step, chainSteps, extraArtifactRefs);
+    const templateResult = validateTemplateArtifactRefs(step, chainSteps, options.extraArtifactRefs);
     if (!templateResult.ok) return templateResult;
 
-    const capsuleResult = validateCapsuleBindings(step, chainSteps, extraArtifactRefs);
+    const capsuleResult = validateCapsuleBindings(step, chainSteps, options);
     if (!capsuleResult.ok) return capsuleResult;
 
-    const loopResult = validateLoopGroup(step, outerBefore, extraArtifactRefs);
+    const loopResult = validateLoopGroup(step, outerBefore, options);
     if (!loopResult.ok) return loopResult;
 
-    const inlineResult = validateInlineCapsuleSteps(step, outerBefore, extraArtifactRefs);
+    const inlineResult = validateInlineCapsuleSteps(step, outerBefore, options);
     if (!inlineResult.ok) return inlineResult;
   }
 
@@ -366,7 +390,7 @@ export function validateStepChainBody(
   const dupes = validateDuplicateArtifactKeys(steps);
   if (!dupes.ok) return dupes;
 
-  return validateStepList(steps, steps, false, options.extraArtifactRefs);
+  return validateStepList(steps, steps, false, options);
 }
 
 export function validateStepChainPipeline(

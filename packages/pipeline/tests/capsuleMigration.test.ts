@@ -10,20 +10,18 @@ import {
 } from './graphFixtures.js';
 
 describe('ensureCapsuleStepChain', () => {
-  it('migrates graph-only capsules to steps[]', () => {
-    const migrated = ensureCapsuleStepChain(makeGraphCapsule([
+  it('does not migrate graph-only capsules at runtime', () => {
+    const normalized = ensureCapsuleStepChain(makeGraphCapsule([
       GRAPH_CAPSULE_INPUT_NODE,
       GRAPH_CAPSULE_MODEL_NODE,
     ]));
-    expect(migrated.steps).toHaveLength(1);
-    expect(migrated.steps![0]!.type).toBe('model-call');
-    expect(migrated.input?.outputNamespace).toBe('user_prompt');
-    expect(migrated.nodes).toBeUndefined();
-    expect(migrated.edges).toBeUndefined();
-    expect(migrated.outputRef).toBeUndefined();
+    expect(normalized.steps).toHaveLength(0);
+    expect('nodes' in normalized).toBe(false);
+    expect('edges' in normalized).toBe(false);
+    expect('outputRef' in normalized).toBe(false);
   });
 
-  it('keeps existing steps and strips stale legacy graph', () => {
+  it('keeps existing steps and strips stale legacy graph fields', () => {
     const capsule: CapsuleDefinition = {
       ...makeGraphCapsule([GRAPH_CAPSULE_INPUT_NODE, GRAPH_CAPSULE_MANUAL_TEXT_NODE]),
       steps: [{
@@ -40,18 +38,18 @@ describe('ensureCapsuleStepChain', () => {
     };
     const result = ensureCapsuleStepChain(capsule);
     expect(result.steps).toHaveLength(1);
-    expect(result.steps![0]!.label).toBe('Note');
-    expect(result.nodes).toBeUndefined();
-    expect(result.edges).toBeUndefined();
-    expect(result.outputRef).toBeUndefined();
+    expect(result.steps[0]!.label).toBe('Note');
+    expect('nodes' in result).toBe(false);
+    expect('edges' in result).toBe(false);
+    expect('outputRef' in result).toBe(false);
   });
 
   it('does not synthesize legacy graph fields for capsules with loop-group steps', () => {
     const expert = getBuiltinExample('example-expert')!;
     const loaded = ensureCapsuleStepChain(expert);
-    expect(loaded.steps?.some((s) => s.config.type === 'loop-group')).toBe(true);
-    expect(loaded.nodes).toBeUndefined();
-    expect(loaded.edges).toBeUndefined();
-    expect(loaded.outputRef).toBeUndefined();
+    expect(loaded.steps.some((s) => s.config.type === 'loop-group')).toBe(true);
+    expect('nodes' in loaded).toBe(false);
+    expect('edges' in loaded).toBe(false);
+    expect('outputRef' in loaded).toBe(false);
   });
 });

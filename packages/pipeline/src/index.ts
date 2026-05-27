@@ -6,7 +6,6 @@ export {
   buildActiveStepChain,
   compileStepChainToExecutionPlan,
   compileActiveStepsToExecutionPlan,
-  migrateLegacyPipeline,
   migrateManualTextSteps,
   makeEmptyPipeline,
 } from './chainCompiler.js';

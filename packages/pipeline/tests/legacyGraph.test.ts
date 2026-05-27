@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {LegacyPipelineDefinition} from '@lorca/core';
+import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {validateLegacyPipeline, topologicalOrder, resolveOutputRef} from '../src/legacyGraph.js';
 
 function base(): LegacyPipelineDefinition {

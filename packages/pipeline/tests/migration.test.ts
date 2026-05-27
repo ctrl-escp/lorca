@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
-import type {LegacyPipelineDefinition} from '@lorca/core';
-import {migrateLegacyPipeline} from '../src/chainCompiler.js';
+import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
+import {migrateLegacyPipeline} from '../src/legacyGraph.js';
 
 function makeLegacyPipeline(): LegacyPipelineDefinition {
   const inputId = 'input-1';

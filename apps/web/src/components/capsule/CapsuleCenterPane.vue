@@ -147,6 +147,7 @@ import ExportModal from '../export/ExportModal.vue';
 import ImportModal from '../import/ImportModal.vue';
 import CapsuleModelSlotFields from '../shared/CapsuleModelSlotFields.vue';
 import TextEditor from '../shared/TextEditor.vue';
+import {formatCapsuleValidationError} from '../../utils/editorValidation.js';
 
 const props = defineProps<{capsule: CapsuleDefinition}>();
 const emit = defineEmits<{update: [capsule: CapsuleDefinition]}>();
@@ -364,6 +365,11 @@ async function runCapsule(stopAtStepId?: string) {
 function handleLock() {
   const draft = editor.getCapsule();
   if (!draft || draft.status !== 'draft') return;
+  const validationError = formatCapsuleValidationError(draft);
+  if (validationError) {
+    alert(`Cannot lock: ${validationError}`);
+    return;
+  }
   capsulesStore.updateCapsule(draft.id, draft);
   const result = capsulesStore.lockCapsuleById(draft.id);
   if (!result.ok) {
@@ -383,6 +389,11 @@ function handleEditLocked() {
 function handleExport() {
   const c = editor.getCapsule();
   if (!c) return;
+  const validationError = formatCapsuleValidationError(c);
+  if (validationError) {
+    alert(`Cannot export: ${validationError}`);
+    return;
+  }
   refreshExportModal(c, false);
 }
 

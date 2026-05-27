@@ -1,17 +1,19 @@
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition, PipelineStep} from '@lorca/core';
+import type {CapsuleDefinition, CapsuleInterface, PipelineStep} from '@lorca/core';
+import type {LegacyGraphCapsuleRecord} from '@lorca/core/legacy';
 import {validateGraphCapsuleForImport} from '@lorca/pipeline/legacyGraph';
 import {validateCapsule} from '../src/validate.js';
 
-function graphCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
+type GraphCapsuleFixture = LegacyGraphCapsuleRecord & {
+  id: string;
+  interface: CapsuleInterface;
+};
+
+function graphCapsule(overrides: Partial<GraphCapsuleFixture> = {}): GraphCapsuleFixture {
   const nodeId = 'model-1';
   return {
-    schemaVersion: 1,
     id: 'cap-1',
-    name: 'Test Capsule',
-    version: 'v1',
-    status: 'draft',
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
     nodes: [
       {id: nodeId, type: 'model-call', artifactPrefix: 'result',
@@ -19,9 +21,6 @@ function graphCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefini
     ],
     edges: [],
     outputRef: {nodeId, outputName: 'text'},
-    tests: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -41,7 +40,7 @@ function textStep(id: string, text = 'ok', outputNamespace = id): PipelineStep {
 
 function stepChainCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-1',
     name: 'Test Capsule',
     version: 'v1',
@@ -179,10 +178,10 @@ describe('validateGraphCapsuleForImport (graph-only import path)', () => {
 });
 
 describe('validateCapsule (step-chain capsules)', () => {
-  it('rejects graph-only capsules without steps[]', () => {
-    const result = validateCapsule(graphCapsule());
+  it('rejects capsules without steps', () => {
+    const result = validateCapsule(stepChainCapsule({steps: []}));
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.message).toContain('steps[]');
+    if (!result.ok) expect(result.error.message).toContain('at least one step');
   });
 
   it('validates step-chain capsules without legacy graph fields', () => {
@@ -197,14 +196,11 @@ describe('validateCapsule (step-chain capsules)', () => {
     if (!result.ok) expect(result.error.code).toBe('invalid_pipeline_graph');
   });
 
-  it('ignores stale graph fields when steps are canonical', () => {
-    const result = validateCapsule(stepChainCapsule({
-      nodes: [
-        {id: 'missing-output', type: 'manual-text', text: 'stale'},
-      ],
-      outputRef: {nodeId: 'ghost', outputName: 'text'},
-    }));
-    expect(result.ok).toBe(true);
+  it('ignores stale graph fields on in-memory objects when steps are canonical', () => {
+    const stale = stepChainCapsule() as CapsuleDefinition & LegacyGraphCapsuleRecord;
+    stale.nodes = [{id: 'missing-output', type: 'manual-text', text: 'stale'}];
+    stale.outputRef = {nodeId: 'ghost', outputName: 'text'};
+    expect(validateCapsule(stale).ok).toBe(true);
   });
 
   it('rejects step-chain outputs that reference unknown artifacts', () => {

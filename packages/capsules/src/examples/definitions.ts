@@ -17,7 +17,7 @@ const GENERATOR_SUGGESTION_CATALOG = JSON.stringify(
 export const LORCA_PIPELINE_GENERATOR_ID = 'lorca-pipeline-generator';
 
 export const LORCA_PIPELINE_GENERATOR: CapsuleDefinition = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: LORCA_PIPELINE_GENERATOR_ID,
   name: 'Lorca Pipeline Generator',
   description: 'Build a Lorca pipeline step sequence from a natural language description.',

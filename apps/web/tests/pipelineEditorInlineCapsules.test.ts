@@ -46,7 +46,7 @@ function textStep(id: string, text: string, outputNamespace = id): PipelineStep 
 function capsule(): CapsuleDefinition {
   const body = textStep('body', 'saved body', 'body');
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap',
     name: 'Test Capsule',
     version: 'v1',
@@ -57,9 +57,6 @@ function capsule(): CapsuleDefinition {
       parameters: [],
       modelSlots: [],
     },
-    nodes: [],
-    edges: [],
-    outputRef: {nodeId: 'body', outputName: 'text'},
     steps: [body],
     input: {raw: '', tagName: 'user_prompt', outputNamespace: 'user_prompt'},
     tests: [],

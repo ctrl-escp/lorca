@@ -2,10 +2,10 @@ import type {
   PipelineDefinition,
   PipelineStep,
   StepType,
-  LegacyPipelineDefinition,
   PipelineNode,
   PipelineEdge,
 } from '@lorca/core';
+import type {LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {getStepHistoryReads, getStepBlockReasons} from './historyReads.js';
 import {newStepId} from './stepId.js';
 

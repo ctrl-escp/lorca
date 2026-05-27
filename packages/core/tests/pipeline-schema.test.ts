@@ -1,13 +1,13 @@
 import {describe, it, expect} from 'vitest';
 import type {
   PipelineDefinition,
-  LegacyPipelineDefinition,
   CapsuleDefinition,
   CapsuleInterface,
   AiEndpointConfig,
   PipelineError,
   CapsuleTestRunSummary,
 } from '../src/index.js';
+import type {LegacyPipelineDefinition} from '../src/types/legacy.js';
 import {ok, err, CAPSULE_LOOP_MAX_COUNT} from '../src/index.js';
 
 // ── V2 Pipeline fixtures ──────────────────────────────────────────────────────
@@ -72,38 +72,38 @@ function makeMinimalLegacyPipeline(): LegacyPipelineDefinition {
 }
 
 function makeMinimalCapsule(): CapsuleDefinition {
+  const now = '2026-01-01T00:00:00Z';
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-1',
     name: 'Test Capsule',
     version: 'v1',
     status: 'draft',
     interface: {
       inputs: [{name: 'source_text', kind: 'text', required: true}],
-      outputs: [{name: 'result', kind: 'text'}],
+      outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'result.text'}],
       parameters: [],
-      modelSlots: [],
+      modelSlots: [{name: 'main_model', suggestedBuckets: ['general'], required: true}],
     },
-    nodes: [
-      {id: 'input-1', type: 'input'},
-      {
-        id: 'model-1',
+    steps: [{
+      id: 'model-1',
+      type: 'model-call',
+      label: 'Model',
+      enabled: true,
+      outputNamespace: 'result',
+      primaryOutputName: 'text',
+      lastEditedAt: now,
+      config: {
         type: 'model-call',
-        artifactPrefix: 'result',
-        config: {
-          modelRef: {kind: 'slot', slotName: 'main_model'},
-          mode: 'generate',
-          inputArtifactRef: 'source_text',
-        },
+        modelRef: {kind: 'slot', slotName: 'main_model'},
+        mode: 'generate',
+        outputNames: ['text', 'rawResponse'],
       },
-    ],
-    edges: [
-      {id: 'e-1', fromNodeId: 'input-1', fromOutput: 'xml', toNodeId: 'model-1', toInput: 'input'},
-    ],
-    outputRef: {nodeId: 'model-1', outputName: 'text'},
+    }],
+    input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
     tests: [],
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -182,37 +182,25 @@ describe('LegacyPipelineDefinition V1 (graph)', () => {
 describe('CapsuleDefinition schema', () => {
   it('accepts a minimal valid Capsule', () => {
     const cap = makeMinimalCapsule();
-    expect(cap.schemaVersion).toBe(1);
+    expect(cap.schemaVersion).toBe(2);
     expect(cap.version).toBe('v1');
     expect(cap.status).toBe('draft');
+    expect(cap.steps).toHaveLength(1);
   });
 
   it('accepts canonical schemaVersion 2 capsules', () => {
-    const {nodes: _n, edges: _e, outputRef: _o, ...base} = makeMinimalCapsule();
     const cap: CapsuleDefinition = {
-      ...base,
+      ...makeMinimalCapsule(),
       schemaVersion: 2,
       steps: [],
     };
     expect(cap.schemaVersion).toBe(2);
   });
 
-  it('validates a preprocess-model-postprocess shape', () => {
-    const cap: CapsuleDefinition = {
-      ...makeMinimalCapsule(),
-      nodes: [
-        {id: 'input-1', type: 'input'},
-        {id: 'wrap-1', type: 'prompt-wrapper', config: {tagName: 'task', instructionText: 'Summarize:', includeInputArtifact: true, inputPlacement: 'after-instructions'}},
-        {id: 'model-1', type: 'model-call', artifactPrefix: 'summary', config: {modelRef: {kind: 'slot', slotName: 'model'}, mode: 'generate', inputArtifactRef: 'wrap-1.text'}},
-        {id: 'extract-1', type: 'json-extract', artifactPrefix: 'extracted', inputArtifactRef: 'summary.text'},
-      ],
-      edges: [
-        {id: 'e1', fromNodeId: 'input-1', fromOutput: 'xml', toNodeId: 'wrap-1', toInput: 'input'},
-        {id: 'e2', fromNodeId: 'wrap-1', fromOutput: 'text', toNodeId: 'model-1', toInput: 'input'},
-        {id: 'e3', fromNodeId: 'model-1', fromOutput: 'text', toNodeId: 'extract-1', toInput: 'input'},
-      ],
-    };
-    expect(cap.nodes).toHaveLength(4);
+  it('validates a preprocess-model-postprocess step-chain shape', () => {
+    const cap = makeMinimalCapsule();
+    expect(cap.steps).toHaveLength(1);
+    expect(cap.steps[0]?.type).toBe('model-call');
   });
 });
 

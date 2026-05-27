@@ -19,7 +19,7 @@ function makePipeline(steps: PipelineStep[], inputRaw = 'hello'): PipelineDefini
 
 function makeCapsule(overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-1',
     name: 'Test Capsule',
     version: 'v1',

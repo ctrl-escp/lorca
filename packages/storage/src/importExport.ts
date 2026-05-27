@@ -10,7 +10,6 @@ import type {
 } from '@lorca/core';
 import {resolveModelCallSuggestedBuckets} from '@lorca/capsules';
 import {validatePipeline} from '@lorca/pipeline';
-import {validateGraphCapsuleForImport} from '@lorca/pipeline/legacyGraph';
 import {validateCapsule} from '@lorca/capsules';
 import {
   isCapsuleImportSchemaVersion,
@@ -19,15 +18,33 @@ import {
 
 const PIPELINE_SCHEMA_VERSION = 2;
 
-function isGraphOnlyCapsule(capsule: CapsuleDefinition): boolean {
-  return (capsule.steps?.length ?? 0) === 0 && (capsule.nodes?.length ?? 0) > 0;
+function hasLegacyGraphCapsuleFields(capsule: unknown): boolean {
+  if (typeof capsule !== 'object' || capsule === null) return false;
+  const record = capsule as Record<string, unknown>;
+  return (
+    Array.isArray(record.nodes) && record.nodes.length > 0
+    && !(Array.isArray(record.steps) && record.steps.length > 0)
+  );
+}
+
+function legacyCapsuleImportError(capsule: CapsuleDefinition): ImportParseError | null {
+  const schemaErr = capsuleImportSchemaVersionError(capsule.schemaVersion);
+  if (schemaErr) return {ok: false, errors: [schemaErr]};
+  if ((capsule.steps?.length ?? 0) === 0) {
+    return {ok: false, errors: ['Capsule must define steps[]; legacy graph-only imports are no longer supported']};
+  }
+  if (hasLegacyGraphCapsuleFields(capsule)) {
+    return {
+      ok: false,
+      errors: ['Legacy graph-only capsule imports are no longer supported; re-export with steps[]'],
+    };
+  }
+  return null;
 }
 
 function validateCapsuleImportBody(capsule: CapsuleDefinition): ImportParseError | null {
-  if (isGraphOnlyCapsule(capsule)) {
-    const graphVal = validateGraphCapsuleForImport(capsule);
-    if (!graphVal.ok) return {ok: false, errors: [graphVal.error.message]};
-  }
+  const legacyErr = legacyCapsuleImportError(capsule);
+  if (legacyErr) return legacyErr;
   const normalized = normalizeCapsuleBody(capsule);
   const validation = validateCapsule(normalized);
   if (!validation.ok) return {ok: false, errors: [validation.error.message]};
@@ -38,13 +55,20 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Migrate graph-only capsules and drop legacy graph fields for persistence/export/import. */
+/** Drop legacy graph fields for persistence/export/import. */
 function normalizeCapsuleBody(capsule: CapsuleDefinition): CapsuleDefinition {
   return normalizePersistedCapsule(capsule);
 }
 
 function cloneCapsuleForExport(capsule: CapsuleDefinition): CapsuleDefinition {
   return deepClone(normalizeCapsuleBody(capsule));
+}
+
+function buildCapsuleResolver(
+  includedCapsules: readonly CapsuleDefinition[] = [],
+): (capsuleId: string, capsuleVersion: string) => CapsuleDefinition | undefined {
+  const byKey = new Map(includedCapsules.map((cap) => [capsuleLookupKey(cap.id, cap.version), cap]));
+  return (capsuleId, capsuleVersion) => byKey.get(capsuleLookupKey(capsuleId, capsuleVersion));
 }
 
 export interface ImportContext {
@@ -140,18 +164,15 @@ export function parsePipelineExport(data: unknown): PipelineExportFile | ImportP
 
   if (file.includedCapsules) {
     for (const cap of file.includedCapsules) {
-      const capErr = capsuleImportSchemaVersionError(cap.schemaVersion);
-      if (capErr) return {ok: false, errors: [capErr]};
+      const capErr = validateCapsuleImportBody(cap);
+      if (capErr) return capErr;
     }
   }
 
-  const result = validatePipeline(file.pipeline);
+  const result = validatePipeline(file.pipeline, {
+    resolveCapsule: buildCapsuleResolver(file.includedCapsules ?? []),
+  });
   if (!result.ok) return {ok: false, errors: [result.error.message]};
-
-  for (const cap of file.includedCapsules ?? []) {
-    const capErr = validateCapsuleImportBody(cap);
-    if (capErr) return capErr;
-  }
 
   return file;
 }
@@ -161,9 +182,6 @@ export function parseCapsuleExport(data: unknown): CapsuleExportFile | ImportPar
   if (errors.length > 0) return {ok: false, errors};
 
   const file = data as CapsuleExportFile;
-  const schemaErr = capsuleImportSchemaVersionError(file.capsule.schemaVersion);
-  if (schemaErr) return {ok: false, errors: [schemaErr]};
-
   const importErr = validateCapsuleImportBody(file.capsule);
   if (importErr) return importErr;
 
@@ -411,7 +429,7 @@ function envelopeErrors(data: unknown, expectedKind: 'pipeline' | 'capsule'): st
 
 function capsuleImportSchemaVersionError(version: unknown): string | null {
   if (!isCapsuleImportSchemaVersion(version)) {
-    return `Unsupported capsule schemaVersion: ${String(version)} (expected 1 or 2)`;
+    return `Unsupported capsule schemaVersion: ${String(version)} (expected 2)`;
   }
   return null;
 }

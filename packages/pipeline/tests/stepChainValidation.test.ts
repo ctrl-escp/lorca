@@ -398,12 +398,96 @@ describe('validatePipeline step-chain rules', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('missing_artifact');
   });
+
+  it('rejects unknown capsule output ports when resolver is available', () => {
+    const capsuleDef: CapsuleDefinition = {
+      schemaVersion: 2,
+      id: 'cap-def',
+      name: 'Capsule',
+      version: 'v1',
+      status: 'locked',
+      interface: {
+        inputs: [],
+        outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+        parameters: [],
+        modelSlots: [],
+      },
+      steps: [textStep('body')],
+      input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+      tests: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const capsuleStep: PipelineStep = {
+      id: 'cap',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: 'cap-def',
+        capsuleVersion: 'v1',
+        inputBindings: {},
+        outputBindings: {ghost: 'cap.text'},
+      },
+    };
+    const result = validatePipeline(makePipeline([capsuleStep]), {
+      resolveCapsule: () => capsuleDef,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('invalid_capsule_interface');
+  });
+
+  it('rejects missing required capsule output bindings when resolver is available', () => {
+    const capsuleDef: CapsuleDefinition = {
+      schemaVersion: 2,
+      id: 'cap-def',
+      name: 'Capsule',
+      version: 'v1',
+      status: 'locked',
+      interface: {
+        inputs: [],
+        outputs: [{name: 'result', kind: 'text', sourceArtifactKey: 'body.text'}],
+        parameters: [],
+        modelSlots: [],
+      },
+      steps: [textStep('body')],
+      input: {raw: '', tagName: 'user', outputNamespace: 'user_prompt'},
+      tests: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const capsuleStep: PipelineStep = {
+      id: 'cap',
+      type: 'capsule-instance',
+      label: 'Capsule',
+      enabled: true,
+      outputNamespace: 'cap',
+      primaryOutputName: 'text',
+      lastEditedAt: '2026-01-01T00:00:00Z',
+      config: {
+        type: 'capsule-instance',
+        capsuleId: 'cap-def',
+        capsuleVersion: 'v1',
+        inputBindings: {},
+        outputBindings: {},
+      },
+    };
+    const result = validatePipeline(makePipeline([capsuleStep]), {
+      resolveCapsule: () => capsuleDef,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('missing output binding');
+  });
 });
 
 describe('validateCapsule uses step-chain pipeline validation', () => {
   it('rejects invalid loop groups inside capsules', () => {
     const capsule: CapsuleDefinition = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: 'cap',
       name: 'Capsule',
       version: 'v1',

@@ -174,6 +174,7 @@ import {usePipelineGeneratorFlow} from '../../composables/usePipelineGeneratorFl
 import {usePipelineCapsuleActions} from '../../composables/usePipelineCapsuleActions.js';
 import {useModalDialogs} from '../../composables/useModalDialogs.js';
 import {resetWorkspace} from '../../utils/workspaceReset.js';
+import {formatPipelineValidationError} from '../../utils/editorValidation.js';
 import {useCapsuleRunStore} from '../../stores/capsuleRun.js';
 import {useUiStore} from '../../stores/ui.js';
 import ChainEditor from './ChainEditor.vue';
@@ -508,6 +509,14 @@ async function handleRunOnlyStep(stepId: string) {
 
 function handleExport() {
   editorStore.updateUserPrompt(userPrompt.value);
+  const validationError = formatPipelineValidationError(editorStore.pipeline, {
+    resolveCapsule: (id, version) => capsulesStore.getCapsule(id, version),
+  });
+  if (validationError) {
+    inlineError.value = `Cannot export: ${validationError}`;
+    return;
+  }
+  inlineError.value = null;
   refreshExportModal(false);
 }
 

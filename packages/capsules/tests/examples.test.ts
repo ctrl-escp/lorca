@@ -87,10 +87,8 @@ describe('builtin examples', () => {
 
   it('exports built-in examples as step-chain capsules only', () => {
     for (const def of BUILTIN_EXAMPLES) {
-      expect(def.steps?.length, `${def.id} should define steps`).toBeGreaterThan(0);
-      expect(def.nodes, `${def.id} should not export legacy nodes`).toBeUndefined();
-      expect(def.edges, `${def.id} should not export legacy edges`).toBeUndefined();
-      expect(def.outputRef, `${def.id} should not export legacy outputRef`).toBeUndefined();
+      expect(def.steps.length, `${def.id} should define steps`).toBeGreaterThan(0);
+      expect(def.schemaVersion, `${def.id} should use schemaVersion 2`).toBe(2);
     }
   });
 

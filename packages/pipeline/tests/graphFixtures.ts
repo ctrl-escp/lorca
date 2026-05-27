@@ -1,19 +1,21 @@
 import type {CapsuleDefinition, PipelineNode} from '@lorca/core';
+import type {LegacyGraphCapsuleRecord} from '@lorca/core/legacy';
 
-/** Minimal graph-only capsule fixtures for migration tests. */
-export function makeGraphCapsule(nodes: PipelineNode[]): CapsuleDefinition {
+/** Minimal graph-only capsule fixtures for legacy migration tests. */
+export function makeGraphCapsule(nodes: PipelineNode[]): CapsuleDefinition & LegacyGraphCapsuleRecord {
   const last = nodes.at(-1)!;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-graph',
     name: 'Graph Capsule',
     version: 'v1',
     status: 'draft',
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
+    steps: [],
     nodes,
-    edges: [
-      {id: 'e1', fromNodeId: nodes[0]!.id, fromOutput: 'xml', toNodeId: nodes[1]!.id, toInput: 'input'},
-    ],
+    edges: nodes.length > 1
+      ? [{id: 'e1', fromNodeId: nodes[0]!.id, fromOutput: 'xml', toNodeId: nodes[1]!.id, toInput: 'input'}]
+      : [],
     outputRef: {nodeId: last.id, outputName: 'text'},
     tests: [],
     createdAt: '2025-01-01T00:00:00.000Z',

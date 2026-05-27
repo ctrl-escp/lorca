@@ -52,9 +52,9 @@ describe('extractStepsToCapsule', () => {
     expect(result.value.pipeline.steps[0]!.type).toBe('capsule-instance');
     expect(result.value.capsule.steps).toHaveLength(1);
     expect(result.value.capsule.steps![0]!.id).toBe('a');
-    expect(result.value.capsule.nodes).toBeUndefined();
-    expect(result.value.capsule.edges).toBeUndefined();
-    expect(result.value.capsule.outputRef).toBeUndefined();
+    expect('nodes' in result.value.capsule).toBe(false);
+    expect('edges' in result.value.capsule).toBe(false);
+    expect('outputRef' in result.value.capsule).toBe(false);
   });
 
   it('creates input ports for history reads outside the selection', () => {

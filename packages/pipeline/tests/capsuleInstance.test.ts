@@ -67,7 +67,7 @@ function makeSlotModelStep(id: string, slotName: string, outputNamespace = id): 
 
 function makeStepChainCapsule(text: string): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap-chain',
     name: 'Step Chain Capsule',
     version: 'v1',

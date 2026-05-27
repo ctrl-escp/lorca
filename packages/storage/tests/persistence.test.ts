@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import type {CapsuleDefinition, LegacyPipelineDefinition} from '@lorca/core';
+import type {CapsuleDefinition} from '@lorca/core';
+import type {LegacyGraphCapsuleRecord, LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {
   CAPSULE_SCHEMA_VERSION,
   normalizePersistedCapsule,
@@ -9,7 +10,9 @@ import {
   isCapsuleImportSchemaVersion,
 } from '../src/persistence.js';
 
-function graphCapsule(): CapsuleDefinition {
+type StoredCapsuleRecord = CapsuleDefinition & LegacyGraphCapsuleRecord;
+
+function graphCapsule(): StoredCapsuleRecord {
   return {
     schemaVersion: 1,
     id: 'cap-graph',
@@ -17,6 +20,7 @@ function graphCapsule(): CapsuleDefinition {
     version: 'v1',
     status: 'locked',
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
+    steps: [],
     nodes: [
       {id: 'in', type: 'input'},
       {id: 'mt', type: 'manual-text', artifactPrefix: 'note', text: 'legacy note'},
@@ -28,7 +32,7 @@ function graphCapsule(): CapsuleDefinition {
     tests: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
-  };
+  } as unknown as StoredCapsuleRecord;
 }
 
 function legacyPipeline(): LegacyPipelineDefinition {
@@ -62,25 +66,25 @@ function legacyPipeline(): LegacyPipelineDefinition {
 }
 
 describe('persistence normalization', () => {
-  it('accepts capsule import schema versions 1 and 2 only', () => {
-    expect(isCapsuleImportSchemaVersion(1)).toBe(true);
+  it('accepts capsule import schema version 2 only', () => {
     expect(isCapsuleImportSchemaVersion(2)).toBe(true);
+    expect(isCapsuleImportSchemaVersion(1)).toBe(false);
     expect(isCapsuleImportSchemaVersion(3)).toBe(false);
   });
 
   it('migrates graph-only capsules to schemaVersion 2 without legacy graph fields', () => {
     const normalized = normalizePersistedCapsule(graphCapsule());
     expect(normalized.schemaVersion).toBe(CAPSULE_SCHEMA_VERSION);
-    expect(normalized.steps?.length).toBeGreaterThan(0);
-    expect(normalized.nodes).toBeUndefined();
-    expect(normalized.edges).toBeUndefined();
-    expect(normalized.outputRef).toBeUndefined();
+    expect(normalized.steps.length).toBeGreaterThan(0);
+    expect('nodes' in normalized).toBe(false);
+    expect('edges' in normalized).toBe(false);
+    expect('outputRef' in normalized).toBe(false);
   });
 
   it('bumps step-chain capsules from schemaVersion 1 to 2', () => {
-    const {nodes: _n, edges: _e, outputRef: _o, ...base} = graphCapsule();
-    const capsule: CapsuleDefinition = {
-      ...base,
+    const capsule = {
+      ...graphCapsule(),
+      schemaVersion: 1,
       steps: [{
         id: 'body',
         type: 'presentation',
@@ -91,7 +95,10 @@ describe('persistence normalization', () => {
         lastEditedAt: '2026-01-01T00:00:00.000Z',
         config: {type: 'presentation', text: 'hello', outputNames: ['text']},
       }],
-    };
+      nodes: undefined,
+      edges: undefined,
+      outputRef: undefined,
+    } as unknown as StoredCapsuleRecord;
     const normalized = normalizePersistedCapsule(capsule);
     expect(normalized.schemaVersion).toBe(2);
   });

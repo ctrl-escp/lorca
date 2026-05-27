@@ -3,13 +3,13 @@
  */
 import type {
   CapsuleDefinition,
-  LegacyPipelineDefinition,
   PipelineEdge,
   PipelineNode,
   PipelineOutputRef,
   PipelineError,
   Result,
 } from '@lorca/core';
+import type {LegacyGraphCapsuleRecord, LegacyPipelineDefinition} from '@lorca/core/legacy';
 import {ok, err} from '@lorca/core';
 
 export function nodePrefix(node: PipelineNode): string {
@@ -121,9 +121,9 @@ export function validateLegacyPipeline(
   return ok(undefined);
 }
 
-/** Graph-only capsule validation for import boundaries (before migration to steps[]). */
+/** Graph-only capsule validation for legacy migration tests. */
 export function validateGraphCapsuleForImport(
-  def: CapsuleDefinition,
+  def: LegacyGraphCapsuleRecord & Pick<CapsuleDefinition, 'id' | 'interface'>,
 ): Result<void, PipelineError> {
   const nodes = def.nodes ?? [];
   const edges = def.edges ?? [];
@@ -273,3 +273,5 @@ function nodeOutputKeys(node: PipelineNode): string[] {
     }
   }
 }
+
+export {migrateLegacyPipeline} from './chainCompiler.js';

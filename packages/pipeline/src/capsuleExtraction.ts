@@ -5,14 +5,13 @@ import type {
   CapsuleOutputPort,
   CapsuleModelSlot,
   CapsuleValueKind,
-  LegacyPipelineDefinition,
   PipelineDefinition,
   PipelineInputConfig,
   PipelineStep,
   StepHistoryReadConfig,
 } from '@lorca/core';
+import type {LegacyGraphCapsuleRecord} from '@lorca/core/legacy';
 import {PIPELINE_INPUT_STEP_ID} from '@lorca/core';
-import {migrateLegacyPipeline} from './chainCompiler.js';
 import {buildActiveStepChain, compileActiveStepsToExecutionPlan} from './chainCompiler.js';
 import {getStepHistoryReads} from './historyReads.js';
 import {stepArtifactKey} from './artifacts.js';
@@ -275,8 +274,9 @@ const DEFAULT_CAPSULE_INPUT: PipelineInputConfig = {
   outputNamespace: 'user_prompt',
 };
 
-export function stripCapsuleLegacyGraphFields(capsule: CapsuleDefinition): CapsuleDefinition {
-  if (capsule.steps === undefined) return capsule;
+export function stripCapsuleLegacyGraphFields(
+  capsule: CapsuleDefinition & LegacyGraphCapsuleRecord,
+): CapsuleDefinition {
   const {nodes: _nodes, edges: _edges, outputRef: _outputRef, ...rest} = capsule;
   return rest;
 }
@@ -421,36 +421,13 @@ export function extractFullPipelineToCapsule(
   });
 }
 
-/** Ensure capsules use steps[] as canonical body; migrate graph-only capsules on load. */
+/** Normalize capsule bodies to canonical step-chain shape and strip stale graph fields. */
 export function ensureCapsuleStepChain(capsule: CapsuleDefinition): CapsuleDefinition {
   const input = capsule.input ?? DEFAULT_CAPSULE_INPUT;
-
-  if (capsule.steps !== undefined) {
-    return stripCapsuleLegacyGraphFields({...capsule, input});
-  }
-
-  if (!(capsule.nodes?.length ?? 0)) {
-    return {...capsule, input, steps: []};
-  }
-
-  const legacy: LegacyPipelineDefinition = {
-    schemaVersion: 1,
-    id: capsule.id,
-    name: capsule.name,
-    inputArtifactName: 'user_prompt',
-    nodes: capsule.nodes ?? [],
-    edges: capsule.edges ?? [],
-    outputRef: capsule.outputRef ?? {nodeId: '', outputName: 'text'},
-    createdAt: capsule.createdAt,
-    updatedAt: capsule.updatedAt,
-  };
-  if (capsule.description !== undefined) legacy.description = capsule.description;
-
-  const migrated = migrateLegacyPipeline(legacy);
   return stripCapsuleLegacyGraphFields({
     ...capsule,
-    input: migrated.input,
-    steps: migrated.steps,
+    input,
+    steps: capsule.steps ?? [],
   });
 }
 

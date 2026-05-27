@@ -143,7 +143,7 @@ test('smoke: spread and collapse inline capsule', async ({page}) => {
   await page.evaluate(async () => {
     const now = '2026-01-01T00:00:00.000Z';
     const capsule = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: 'cap-inline-smoke',
       name: 'Inline Smoke Capsule',
       version: 'v1',
@@ -154,9 +154,6 @@ test('smoke: spread and collapse inline capsule', async ({page}) => {
         parameters: [],
         modelSlots: [],
       },
-      nodes: [],
-      edges: [],
-      outputRef: {nodeId: 'body', outputName: 'text'},
       steps: [{
         id: 'body',
         type: 'presentation',

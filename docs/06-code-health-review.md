@@ -8,7 +8,7 @@ This review focused on code smells, dead or stale paths, irrelevant tests, flows
 
 ## Summary
 
-Findings **1–3, 4–9** from the original review are **resolved**. Finding **10** is **partially resolved** — the largest chain-editing hotspots were split; `LeftPane.vue` is now small. Optional follow-ups (V1 import cutoff, validation UX) are tracked in `docs/tmp-notes.md`.
+Findings **1–3, 4–9** from the original review are **resolved**. Finding **10** is **partially resolved** — the largest chain-editing hotspots were split; `LeftPane.vue` is now small. Optional follow-ups (V1 import cutoff, validation UX, output binding checks) are **complete** — see `docs/tmp-notes.md`.
 
 ## Findings
 
@@ -36,7 +36,7 @@ Findings **1–3, 4–9** from the original review are **resolved**. Finding **1
 
 **Resolution:** `stepChainValidation.ts` validates loop groups, history reads, template artifact refs, capsule input bindings, inline inner steps, duplicate artifact keys, and `outputStepId`. Covered by `stepChainValidation.test.ts`.
 
-**Optional:** surface validation errors in the editor before lock/export; validate opaque capsule output bindings against resolved capsule ports.
+**Resolved:** `validateCapsule()` validates step chains; graph validation is migration-only (`validateGraphCapsuleForImport` on `@lorca/pipeline/legacyGraph`). Editor surfaces validation errors before lock/export; opaque capsule output bindings are checked against resolved interface ports when a resolver is available.
 
 ### 5. Native and legacy JSON parsing disagree — **Resolved**
 

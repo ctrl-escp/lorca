@@ -3,6 +3,7 @@ import {usePipelineEditorStore} from '../stores/pipelineEditor.js';
 import {useCapsulesStore} from '../stores/capsules.js';
 import {usePipelinesStore} from '../stores/pipelines.js';
 import {useUiStore} from '../stores/ui.js';
+import {formatPipelineValidationError} from '../utils/editorValidation.js';
 
 export interface ModalPromises {
   showConfirm: (options: {
@@ -51,6 +52,13 @@ export function usePipelineCapsuleActions(options: {
     options.closeMoreMenu?.();
     if (editorStore.steps.length === 0) {
       options.inlineError.value = 'Add steps before locking a Capsule.';
+      return;
+    }
+    const validationError = formatPipelineValidationError(editorStore.pipeline, {
+      resolveCapsule: (id, version) => capsulesStore.getCapsule(id, version),
+    });
+    if (validationError) {
+      options.inlineError.value = `Cannot lock: ${validationError}`;
       return;
     }
     const range = editorStore.getSelectionRange();

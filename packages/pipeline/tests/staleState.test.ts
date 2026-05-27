@@ -49,7 +49,7 @@ function snapshotFor(step: PipelineStep, pipeline: PipelineDefinition, userSig: 
 
 function makeCapsule(text: string): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'cap',
     name: 'Capsule',
     version: 'v1',
@@ -60,9 +60,6 @@ function makeCapsule(text: string): CapsuleDefinition {
       parameters: [],
       modelSlots: [],
     },
-    nodes: [],
-    edges: [],
-    outputRef: {nodeId: 'body', outputName: 'text'},
     steps: [makeStep('body', text, {outputNamespace: 'body'})],
     tests: [],
     createdAt: new Date().toISOString(),

@@ -5,13 +5,22 @@ import {useCapsulesStore} from '../src/stores/capsules.js';
 
 function makeDraft(id: string, overrides: Partial<CapsuleDefinition> = {}): CapsuleDefinition {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     name: 'Test Capsule',
     version: 'v1',
     status: 'draft',
     interface: {inputs: [], outputs: [], parameters: [], modelSlots: []},
-    steps: [],
+    steps: [{
+      id: 'body',
+      type: 'presentation',
+      label: 'Body',
+      enabled: true,
+      outputNamespace: 'body',
+      primaryOutputName: 'text',
+      lastEditedAt: '2025-01-01T00:00:00.000Z',
+      config: {type: 'presentation', text: 'hello', outputNames: ['text']},
+    }],
     tests: [],
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',

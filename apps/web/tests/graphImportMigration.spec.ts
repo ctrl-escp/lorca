@@ -2,7 +2,7 @@ import {test, expect} from '@playwright/test';
 
 const OLLAMA_BASE = 'http://localhost:11434';
 
-/** Graph-only capsule export (no steps[]) — mirrors packages/storage/tests/importExport.test.ts makeCapsule pattern. */
+/** Graph-only capsule export (no steps[]) — legacy imports are rejected. */
 function graphOnlyCapsuleExport() {
   const now = '2026-01-01T00:00:00.000Z';
   return {
@@ -10,7 +10,7 @@ function graphOnlyCapsuleExport() {
     app: 'lorca',
     kind: 'capsule',
     capsule: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: 'cap-graph-e2e',
       name: 'Graph Legacy Capsule',
       version: 'v1',
@@ -21,6 +21,7 @@ function graphOnlyCapsuleExport() {
         parameters: [],
         modelSlots: [],
       },
+      steps: [],
       nodes: [
         {id: 'in', type: 'input'},
         {id: 'mt', type: 'manual-text', artifactPrefix: 'note', text: 'legacy note body'},
@@ -118,45 +119,7 @@ async function expandLeftSection(
   }
 }
 
-type StoredCapsuleShape = {
-  name: string;
-  schemaVersion: number;
-  stepCount: number;
-  stepTypes: string[];
-  hasNodes: boolean;
-  hasEdges: boolean;
-  hasOutputRef: boolean;
-};
-
-async function readStoredCapsule(page: import('@playwright/test').Page, name: string): Promise<StoredCapsuleShape> {
-  return page.evaluate(async (capsuleName) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const req = indexedDB.open('lorca');
-      req.onerror = () => reject(req.error);
-      req.onsuccess = () => resolve(req.result);
-    });
-    const capsules = await new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
-      const tx = db.transaction('capsules', 'readonly');
-      const req = tx.objectStore('capsules').getAll();
-      req.onerror = () => reject(req.error);
-      req.onsuccess = () => resolve(req.result as Array<Record<string, unknown>>);
-    });
-    const cap = capsules.find((c) => c.name === capsuleName);
-    if (!cap) throw new Error(`capsule not found: ${capsuleName}`);
-    const steps = cap.steps as Array<{type: string}> | undefined;
-    return {
-      name: String(cap.name),
-      schemaVersion: Number(cap.schemaVersion),
-      stepCount: steps?.length ?? 0,
-      stepTypes: steps?.map((s) => s.type) ?? [],
-      hasNodes: Object.prototype.hasOwnProperty.call(cap, 'nodes'),
-      hasEdges: Object.prototype.hasOwnProperty.call(cap, 'edges'),
-      hasOutputRef: Object.prototype.hasOwnProperty.call(cap, 'outputRef'),
-    };
-  }, name);
-}
-
-test('e2e: import graph-only capsule export migrates to step-chain body', async ({page}) => {
+test('e2e: reject graph-only capsule import', async ({page}) => {
   const exportPayload = JSON.stringify(graphOnlyCapsuleExport());
 
   await expandLeftSection(page, 'Capsules');
@@ -169,21 +132,8 @@ test('e2e: import graph-only capsule export migrates to step-chain body', async 
     buffer: Buffer.from(exportPayload),
   });
 
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible({timeout: 5000});
-  await dialog.getByRole('button', {name: 'Import'}).click();
-
-  await expect(page.locator('.capsule-row-name').filter({hasText: 'Graph Legacy Capsule'})).toBeVisible({
-    timeout: 5000,
-  });
-
-  const stored = await readStoredCapsule(page, 'Graph Legacy Capsule');
-  expect(stored.schemaVersion).toBe(2);
-  expect(stored.stepCount).toBeGreaterThan(0);
-  expect(stored.stepTypes).toContain('presentation');
-  expect(stored.hasNodes).toBe(false);
-  expect(stored.hasEdges).toBe(false);
-  expect(stored.hasOutputRef).toBe(false);
+  await expect(page.getByText(/legacy graph-only/i)).toBeVisible({timeout: 5000});
+  await expect(page.locator('.capsule-row-name').filter({hasText: 'Graph Legacy Capsule'})).toHaveCount(0);
 });
 
 test('e2e: load graph-only pipeline from IndexedDB as V2 step chain', async ({page}) => {

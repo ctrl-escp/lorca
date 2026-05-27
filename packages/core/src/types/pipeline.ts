@@ -289,21 +289,7 @@ export type PipelineNode =
   | ManualTextNode
   | CapsuleInstanceNode;
 
-/** Legacy V1 graph-backed pipeline — only used for Capsule internals and migration */
-export interface LegacyPipelineDefinition {
-  schemaVersion: 1;
-  id: string;
-  name: string;
-  description?: string;
-  inputArtifactName: string;
-  nodes: PipelineNode[];
-  edges: PipelineEdge[];
-  outputRef: PipelineOutputRef;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ── Capsule definition (still uses graph model) ──────────────────────────────
+// ── Capsule definition ───────────────────────────────────────────────────────
 
 export interface CapsuleTestRunSummary {
   runId: string;
@@ -323,31 +309,16 @@ export interface CapsuleTestCase {
 }
 
 export interface CapsuleDefinition {
-  /** 1 = legacy graph import only; 2 = canonical step-chain body persisted in IndexedDB/export. */
-  schemaVersion: 1 | 2;
+  schemaVersion: 2;
   id: string;
   name: string;
   description?: string;
   version: `v${number}`;
   status: 'draft' | 'locked';
   interface: CapsuleInterface;
-  /**
-   * V2 step-chain body. Present for all Capsules created/edited after Phase 11.
-   * Preferred execution path; takes precedence over nodes/edges when present.
-   */
-  steps?: PipelineStep[];
+  steps: PipelineStep[];
   /** Default input config for step-chain capsules (mirrors pipeline input). */
   input?: PipelineInputConfig;
-  /**
-   * @deprecated Legacy graph representation. Kept for import compatibility only.
-   * Will be removed once all persisted Capsules have been migrated.
-   * New code must not write these fields; readers must guard with `?? []`.
-   */
-  nodes?: PipelineNode[];
-  /** @deprecated See nodes. */
-  edges?: PipelineEdge[];
-  /** @deprecated See nodes. */
-  outputRef?: PipelineOutputRef;
   tests: CapsuleTestCase[];
   createdAt: string;
   updatedAt: string;
@@ -442,15 +413,6 @@ export interface PipelineExportFile {
   app: 'lorca';
   kind: 'pipeline';
   pipeline: PipelineDefinition;
-  includedCapsules?: CapsuleDefinition[];
-  stepOutputs?: StepOutputsExport;
-}
-
-export interface LegacyPipelineExportFile {
-  exportedAt: string;
-  app: 'lorca';
-  kind: 'pipeline';
-  pipeline: LegacyPipelineDefinition;
   includedCapsules?: CapsuleDefinition[];
   stepOutputs?: StepOutputsExport;
 }
