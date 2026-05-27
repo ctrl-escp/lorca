@@ -25,3 +25,16 @@ export {
 export type {ModelAutoSelectResult} from './modelResolution.js';
 export {ollamaAdapter} from './ollama.js';
 export {testBrowserAccess, listModels, executeModelCall} from './registry.js';
+export {
+  buildGeneratorModelCatalog,
+  resolveGeneratorModelAssignments,
+  formatGeneratorModelId,
+  parseGeneratorModelId,
+} from './generatorModels.js';
+export type {
+  GeneratorModelCatalogEntry,
+  BuildGeneratorModelCatalogInput,
+  ResolveGeneratorModelAssignmentsInput,
+  GeneratorModelAssignmentRequest,
+  UnresolvedModelRef,
+} from './generatorModels.js';

@@ -1,15 +1,10 @@
 import type {PipelineStep} from '@lorca/core';
-import {ALL_SUGGESTIONS, getBuiltinExamples} from '@lorca/capsules';
-
-export type StepRolePromptSource = 'suggestion' | 'example';
-
-export interface StepRolePromptTemplate {
-  id: string;
-  role: string;
-  category: string;
-  source: StepRolePromptSource;
-  text: string;
-}
+import {
+  dedupeStepRolePromptTemplates,
+  type StepRolePromptTemplate,
+} from '@lorca/prompt';
+import {ALL_SUGGESTIONS} from './suggestions/index.js';
+import {getBuiltinExamples} from './examples/index.js';
 
 const CATEGORY_LABELS: Record<string, string> = {
   extraction: 'Extraction',
@@ -26,12 +21,6 @@ function normalizeText(text: string): string {
 
 function isSubstantive(text: string): boolean {
   return text.trim().length >= 3;
-}
-
-function hashText(text: string): string {
-  let h = 5381;
-  for (let i = 0; i < text.length; i++) h = ((h << 5) + h) ^ text.charCodeAt(i);
-  return (h >>> 0).toString(36);
 }
 
 function categoryLabel(category: string): string {
@@ -65,26 +54,12 @@ function collectFromSteps(
   for (const step of steps) visit(step);
 }
 
-export function dedupeStepRolePromptTemplates(
-  entries: readonly StepRolePromptTemplate[],
-): StepRolePromptTemplate[] {
-  const seen = new Map<string, StepRolePromptTemplate>();
-  for (const entry of entries) {
-    const key = normalizeText(entry.text);
-    if (!key || seen.has(key)) continue;
-    seen.set(key, {...entry, id: `role-${hashText(key)}`});
-  }
-  return [...seen.values()].sort(
-    (a, b) => a.category.localeCompare(b.category) || a.role.localeCompare(b.role),
-  );
-}
-
-export interface StepRolePromptCatalogOptions {
+export interface BuildRolePromptCatalogOptions {
   excludeText?: string;
 }
 
 /** Built-in specialized step instruction prompts (suggestions + example capsules). */
-export function getStepRolePromptCatalog(options?: StepRolePromptCatalogOptions): StepRolePromptTemplate[] {
+export function buildRolePromptCatalog(options?: BuildRolePromptCatalogOptions): StepRolePromptTemplate[] {
   const raw: StepRolePromptTemplate[] = [];
 
   for (const suggestion of ALL_SUGGESTIONS) {
@@ -111,10 +86,4 @@ export function getStepRolePromptCatalog(options?: StepRolePromptCatalogOptions)
   const exclude = options?.excludeText ? normalizeText(options.excludeText) : null;
   if (!exclude) return deduped;
   return deduped.filter((entry) => normalizeText(entry.text) !== exclude);
-}
-
-export function truncatePromptPreview(text: string, maxLen = 120): string {
-  const oneLine = text.replace(/\s+/g, ' ').trim();
-  if (oneLine.length <= maxLen) return oneLine;
-  return `${oneLine.slice(0, maxLen - 1)}…`;
 }

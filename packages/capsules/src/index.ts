@@ -35,3 +35,12 @@ export {
   resolveModelCallSuggestedBuckets,
 } from './suggestions/index.js';
 export type {PipelineSuggestion, SuggestionCategory} from './suggestions/index.js';
+export {buildRolePromptCatalog} from './rolePromptCatalog.js';
+export type {BuildRolePromptCatalogOptions} from './rolePromptCatalog.js';
+export {
+  buildPipelineGeneratorRequest,
+} from './pipelineGeneratorRequest.js';
+export type {
+  BuildPipelineGeneratorRequestInput,
+  PipelineGeneratorRequestPayload,
+} from './pipelineGeneratorRequest.js';

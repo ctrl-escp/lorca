@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 import {computed, nextTick, ref, watch} from 'vue';
-import type {StepRolePromptSource, StepRolePromptTemplate} from '../../utils/stepRolePromptCatalog.js';
+import type {StepRolePromptSource, StepRolePromptTemplate} from '@lorca/prompt';
 
 const props = defineProps<{
   open: boolean;

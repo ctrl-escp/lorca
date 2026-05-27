@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "dev": "npm run dev --workspace=apps/web",
-    "validate": "npm run lint && npm run build && npm test"
+    "check:deps": "node scripts/check-package-deps.mjs",
+    "validate": "npm run lint && npm run check:deps && npm run build && npm test"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",

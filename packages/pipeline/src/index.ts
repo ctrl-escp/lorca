@@ -75,3 +75,26 @@ export {
   dataSourceBadgeTitle,
 } from './stepRefs.js';
 export type {StepDataSourceRefKind} from './stepRefs.js';
+export {
+  PIPELINE_GENERATOR_SCHEMA_VERSION,
+  PIPELINE_GENERATOR_HARD_ENTRY_CAP,
+  parsePipelineGeneratorPlan,
+  buildStepsFromGeneratorPlan,
+  validateBuiltGeneratorSteps,
+  countPlanEntries,
+  isDefaultPipelineStub,
+  parseGeneratorArtifactRef,
+  formatGeneratorArtifactRef,
+} from './generator/index.js';
+export type {
+  PipelineGeneratorPlan,
+  GeneratorPlanEntry,
+  GeneratorApplyMode,
+  GeneratorBuildContext,
+  GeneratorBuildResult,
+  GeneratorModelAssignmentRequest,
+  UnresolvedModelRef,
+  PipelineGeneratorParseResult,
+  ParsePipelineGeneratorPlanOptions,
+  GeneratorArtifactRef,
+} from './generator/index.js';
