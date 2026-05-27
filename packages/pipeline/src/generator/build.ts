@@ -4,11 +4,12 @@ import type {
   GeneratorBuildResult,
   PipelineGeneratorPlan,
 } from './types.js';
+import {MaterializeState} from './materializeState.js';
+import {materializePlan} from './materialize.js';
 import {validatePlanCatalogIds} from './validateCatalog.js';
 
 /**
  * Materialize pipeline steps from a parsed generator plan.
- * Phase 2 will implement full entry materialization.
  */
 export function buildStepsFromGeneratorPlan(
   plan: PipelineGeneratorPlan,
@@ -41,13 +42,33 @@ export function buildStepsFromGeneratorPlan(
     };
   }
 
-  errors.push('Step builder for plan entries is not implemented yet (Phase 2)');
+  const state = new MaterializeState(context, context.existingPipeline);
+  errors.push(...materializePlan(plan.steps, state));
+
+  if (errors.length > 0) {
+    return {
+      ok: false,
+      steps: [],
+      errors,
+      unresolvedModels: [],
+      assumptions,
+      warnings,
+    };
+  }
+
+  const {steps: resolvedSteps, unresolved} = context.resolveModelAssignments({
+    steps: state.steps,
+    requests: state.modelRequests,
+  });
+
+  const validationErrors = validateBuiltGeneratorSteps(resolvedSteps, context);
+  errors.push(...validationErrors);
 
   return {
-    ok: false,
-    steps: [],
+    ok: errors.length === 0,
+    steps: resolvedSteps,
     errors,
-    unresolvedModels: [],
+    unresolvedModels: unresolved,
     assumptions,
     warnings,
   };

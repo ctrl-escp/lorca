@@ -35,3 +35,9 @@ export {validatePlanRefs, type ValidatePlanRefsOptions} from './validateRefs.js'
 export {validatePlanCatalogIds} from './validateCatalog.js';
 export {coercePlanEntry} from './coerce.js';
 export {buildStepsFromGeneratorPlan, validateBuiltGeneratorSteps} from './build.js';
+export {materializePlan, materializeEntries} from './materialize.js';
+export {
+  resolveGeneratorRefToArtifactKey,
+  convertGeneratorTemplateText,
+  uniqueNamespace,
+} from './refResolve.js';

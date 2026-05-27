@@ -40,18 +40,22 @@ describe('buildStepsFromGeneratorPlan', () => {
     expect(result.errors.some((e) => e.includes('Unknown suggestionId'))).toBe(true);
   });
 
-  it('reports not-implemented for valid catalog ids before Phase 2 materialization', () => {
+  it('materializes a minimal custom step', () => {
     const result = buildStepsFromGeneratorPlan(
       {
         schemaVersion: PIPELINE_GENERATOR_SCHEMA_VERSION,
-        steps: [{kind: 'suggestion', stepKey: 'a', suggestionId: 'known'}],
+        steps: [{
+          kind: 'custom',
+          stepKey: 'summarize',
+          label: 'Summarize',
+          prompt: {mode: 'custom', text: 'Summarize the input.'},
+        }],
       },
-      mockContext({
-        instantiateSuggestion: (id) => (id === 'known' ? [{id: 's'} as never] : null),
-      }),
+      mockContext(),
     );
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes('Phase 2'))).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]?.outputNamespace).toBe('summarize');
   });
 
   it('invokes resolveModelAssignments when builder is implemented', () => {
