@@ -148,7 +148,8 @@
   color: #6a9fc8;
 }
 .chain-step.selected:hover .step-drag-handle { background: #152535; color: #8ec8e8; }
-.step-card-content :is(button, input, select, .text-editor) { cursor: pointer; }
+.step-card-content :is(button, select) { cursor: pointer; }
+.step-card-content :is(input, .text-editor) { cursor: text; }
 .chain-step.dragging .step-card { opacity: 0.45; }
 /* Full step-card outline when reordering onto an existing step */
 .chain-step.drop-target-step .step-card {

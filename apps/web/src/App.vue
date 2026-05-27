@@ -299,6 +299,11 @@ body {
   color: #e8e8e8;
 }
 
+input,
+textarea {
+  caret-color: #e8e8e8;
+}
+
 .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 
 .app-header {

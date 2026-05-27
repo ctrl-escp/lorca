@@ -121,7 +121,10 @@ onMounted(() => {
           color: '#555',
           borderRight: '1px solid #242424',
         },
-      }),
+        '.cm-cursor, .cm-dropCursor': {
+          borderLeftColor: '#e8e8e8',
+        },
+      }, {dark: true}),
     ],
   });
   viewRef.value = new EditorView({state, parent: hostRef.value});
